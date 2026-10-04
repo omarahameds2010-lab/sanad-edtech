@@ -28,6 +28,7 @@ model Tenant {
   courses             Course[]
   sections            Section[]
   lessons             Lesson[]
+  videos              Video[]
   enrollments         Enrollment[]
   exams               Exam[]
   attempts            Attempt[]
@@ -241,10 +242,62 @@ model Lesson {
   tenant   Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   section  Section        @relation(fields: [sectionId], references: [id], onDelete: Cascade)
   progress LessonProgress[]
+  videos   Video[]
 
   @@map("lessons")
   @@index([tenantId])
   @@index([sectionId])
+}
+
+// ============================================
+// VIDEO
+// ============================================
+
+model Video {
+  id                  String       @id @default(uuid())
+  tenantId            String
+  lessonId            String
+  title               String
+  description         String?
+  status              VideoStatus  @default(UPLOADING)
+  provider            String
+  providerVideoId     String?
+  providerUploadUrl   String?
+  uploadUrlExpiresAt  DateTime?
+  duration            Int?
+  width               Int?
+  height              Int?
+  fileSize            BigInt?
+  mimeType            String?
+  thumbnailUrl        String?
+  hlsManifestUrl      String?
+  dashManifestUrl     String?
+  errorMessage        String?
+  uploadedBy          String
+  uploadedAt          DateTime?
+  processedAt         DateTime?
+  publishedAt         DateTime?
+  createdAt           DateTime     @default(now())
+  updatedAt           DateTime     @updatedAt
+
+  tenant Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  lesson Lesson  @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+
+  @@map("videos")
+  @@index([tenantId])
+  @@index([lessonId])
+  @@index([status])
+  @@index([providerVideoId])
+  @@unique([tenantId, providerVideoId])
+}
+
+enum VideoStatus {
+  UPLOADING
+  PROCESSING
+  READY
+  PUBLISHED
+  FAILED
+  ARCHIVED
 }
 
 enum CourseStatus {

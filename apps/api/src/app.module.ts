@@ -15,6 +15,7 @@ import { EntitlementsModule } from './modules/entitlements/entitlements.module';
 import { PlansModule } from './modules/plans/plans.module';
 import { VideoProtectionModule } from './modules/video-protection/video-protection.module';
 import { PaymentsModule } from './modules/payments/payments.module';
+import { VideoModule } from './modules/video/video.module';
 
 @Module({
   imports: [
@@ -41,6 +42,7 @@ import { PaymentsModule } from './modules/payments/payments.module';
     PlansModule,
     VideoProtectionModule,
     PaymentsModule,
+    VideoModule,
   ],
   controllers: [HealthController],
   providers: [

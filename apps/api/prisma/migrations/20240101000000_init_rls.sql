@@ -569,3 +569,18 @@ CREATE POLICY payment_audit_logs_select_policy ON payment_audit_logs
 CREATE POLICY payment_audit_logs_insert_policy ON payment_audit_logs
   FOR INSERT
   WITH CHECK (current_setting('app.tenant_id', true) = tenant_id::text);
+
+-- RLS Policy: Videos
+ALTER TABLE videos ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY videos_select_policy ON videos
+  FOR SELECT
+  USING (current_setting('app.tenant_id', true) = tenant_id::text);
+
+CREATE POLICY videos_insert_policy ON videos
+  FOR INSERT
+  WITH CHECK (current_setting('app.tenant_id', true) = tenant_id::text);
+
+CREATE POLICY videos_update_policy ON videos
+  FOR UPDATE
+  USING (current_setting('app.tenant_id', true) = tenant_id::text);
