@@ -584,3 +584,78 @@ CREATE POLICY videos_insert_policy ON videos
 CREATE POLICY videos_update_policy ON videos
   FOR UPDATE
   USING (current_setting('app.tenant_id', true) = tenant_id::text);
+
+-- RLS Policy: Assignments
+ALTER TABLE assignments ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY assignments_select_policy ON assignments
+  FOR SELECT
+  USING (current_setting('app.tenant_id', true) = tenant_id::text);
+
+CREATE POLICY assignments_insert_policy ON assignments
+  FOR INSERT
+  WITH CHECK (current_setting('app.tenant_id', true) = tenant_id::text);
+
+CREATE POLICY assignments_update_policy ON assignments
+  FOR UPDATE
+  USING (current_setting('app.tenant_id', true) = tenant_id::text);
+
+-- RLS Policy: Assignment Submissions
+ALTER TABLE assignment_submissions ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY assignment_submissions_select_policy ON assignment_submissions
+  FOR SELECT
+  USING (current_setting('app.tenant_id', true) = tenant_id::text);
+
+CREATE POLICY assignment_submissions_insert_policy ON assignment_submissions
+  FOR INSERT
+  WITH CHECK (current_setting('app.tenant_id', true) = tenant_id::text);
+
+CREATE POLICY assignment_submissions_update_policy ON assignment_submissions
+  FOR UPDATE
+  USING (current_setting('app.tenant_id', true) = tenant_id::text);
+
+-- RLS Policy: Exams
+ALTER TABLE exams ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY exams_select_policy ON exams
+  FOR SELECT
+  USING (current_setting('app.tenant_id', true) = tenant_id::text);
+
+CREATE POLICY exams_insert_policy ON exams
+  FOR INSERT
+  WITH CHECK (current_setting('app.tenant_id', true) = tenant_id::text);
+
+CREATE POLICY exams_update_policy ON exams
+  FOR UPDATE
+  USING (current_setting('app.tenant_id', true) = tenant_id::text);
+
+-- RLS Policy: Exam Questions
+ALTER TABLE exam_questions ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY exam_questions_select_policy ON exam_questions
+  FOR SELECT
+  USING (current_setting('app.tenant_id', true) = tenant_id::text);
+
+CREATE POLICY exam_questions_insert_policy ON exam_questions
+  FOR INSERT
+  WITH CHECK (current_setting('app.tenant_id', true) = tenant_id::text);
+
+CREATE POLICY exam_questions_update_policy ON exam_questions
+  FOR UPDATE
+  USING (current_setting('app.tenant_id', true) = tenant_id::text);
+
+-- RLS Policy: Exam Attempts
+ALTER TABLE exam_attempts ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY exam_attempts_select_policy ON exam_attempts
+  FOR SELECT
+  USING (current_setting('app.tenant_id', true) = tenant_id::text);
+
+CREATE POLICY exam_attempts_insert_policy ON exam_attempts
+  FOR INSERT
+  WITH CHECK (current_setting('app.tenant_id', true) = tenant_id::text);
+
+CREATE POLICY exam_attempts_update_policy ON exam_attempts
+  FOR UPDATE
+  USING (current_setting('app.tenant_id', true) = tenant_id::text);
