@@ -129,6 +129,7 @@ model User {
   auditLogs             AuditLog[]
   outboxEvents          OutboxEvent[]
   entitlements          Entitlement[]
+  courses             Course[]        @relation("CourseTeacher")
 
   @@map("users")
   @@index([tenantId])
@@ -194,6 +195,12 @@ model Course {
   tenantId    String
   title       String
   slug        String
+  shortDescription String?
+  description String?
+  thumbnailUrl String?
+  visibility  String        @default("PUBLIC")
+  level       String?
+  language    String        @default("ar")
   grade       String?
   price       Decimal       @db.Decimal(10, 2)
   currency    String        @default("EGP")
@@ -201,13 +208,15 @@ model Course {
   publishedAt DateTime?
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
+  teacherId   String?
 
   tenant     Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  teacher    User?         @relation("CourseTeacher", fields: [teacherId], references: [id], onDelete: SetNull)
   sections   Section[]
   enrollments Enrollment[]
-  exams      Exam[]
 
   @@map("courses")
+  @@unique([tenantId, slug])
   @@index([tenantId])
   @@index([slug])
   @@index([status])
@@ -526,6 +535,7 @@ enum CourseStatus {
   PROCESSING
   READY
   PUBLISHED
+  UNPUBLISHED
   ARCHIVED
 }
 

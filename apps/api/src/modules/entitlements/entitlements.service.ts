@@ -187,7 +187,7 @@ export class EntitlementsService {
 
     // Get exams for the course
     const exams = await this.prisma.exam.findMany({
-      where: { tenantId, courseId, status: 'PUBLISHED' },
+      where: { tenantId, status: 'PUBLISHED', lesson: { section: { courseId } } },
       select: { id: true },
     });
 
