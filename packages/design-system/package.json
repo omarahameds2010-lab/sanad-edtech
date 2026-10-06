@@ -1,0 +1,9 @@
+{
+  "name": "@lp/design-system",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Design system foundation: semantic tokens, motion tokens, RTL-ready base styles for the multi-tenant LMS.",
+  "exports": {
+    "./tokens.css": "./tokens.css"
+  }
+}

@@ -1,0 +1,95 @@
+/* ============================================================
+   @lp/design-system — Master Identity Tokens
+   ONE LEARNING UNIVERSE. MANY LEARNING IDENTITIES.
+   ============================================================ */
+
+:root {
+  /* ---------- Master surfaces ---------- */
+  --bg-base: #121316;          /* deep graphite / near black */
+  --bg-surface: #1a1c23;       /* warm dark surface */
+  --bg-elevated: #22242d;      /* elevated panel */
+  --text-primary: #f4f4f6;     /* warm off-white */
+  --text-muted: #8c909e;       /* subtle neutral */
+  --border-subtle: rgba(244, 244, 246, 0.08);
+
+  /* ---------- Tenant / Subject adaptive ---------- */
+  --tenant-accent: #d4a373;          /* default amber; tenants override */
+  --tenant-motif-opacity: 0.15;
+
+  /* ---------- Semantic (components never reference --tenant-accent) ---------- */
+  --color-action: var(--tenant-accent);
+  --color-focus: var(--tenant-accent);
+  --color-brand: var(--tenant-accent);
+
+  /* ---------- Typography scale ---------- */
+  --font-display: "IBM Plex Sans Arabic", "Inter", system-ui, sans-serif;
+  --font-body: "IBM Plex Sans Arabic", "Inter", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+
+  /* ---------- Spacing / grid ---------- */
+  --space-unit: 4px;
+  --space-xs: 4px;
+  --space-sm: 8px;
+  --space-md: 16px;
+  --space-lg: 24px;
+  --space-xl: 40px;
+  --space-2xl: 64px;
+  --radius-card: 12px;
+  --radius-control: 8px;
+
+  /* ---------- Motion tokens ---------- */
+  --motion-instant: 80ms;
+  --motion-fast: 140ms;
+  --motion-standard: 220ms;
+  --motion-medium: 320ms;
+  --motion-slow: 450ms;
+  --motion-emphasis: 650ms;
+  --motion-hero: 900ms;
+
+  /* ---------- Easing ---------- */
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --ease-enter: cubic-bezier(0, 0, 0.2, 1);
+  --ease-exit: cubic-bezier(0.4, 0, 1, 1);
+
+  /* ---------- Motion distance scale ---------- */
+  --motion-distance-xs: 2px;
+  --motion-distance-sm: 4px;
+  --motion-distance-md: 12px;
+  --motion-distance-lg: 24px;
+}
+
+/* ---------- Reduced motion ---------- */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --motion-instant: 0ms;
+    --motion-fast: 0ms;
+    --motion-standard: 0ms;
+    --motion-medium: 0ms;
+    --motion-slow: 0ms;
+    --motion-emphasis: 0ms;
+    --motion-hero: 0ms;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ---------- RTL: logical properties baseline ---------- */
+[dir="rtl"] {
+  direction: rtl;
+  text-align: right;
+}
+
+/* ---------- Base body ---------- */
+body {
+  background-color: var(--bg-base);
+  color: var(--text-primary);
+  font-family: var(--font-body);
+  margin: 0;
+}
