@@ -64,7 +64,7 @@ export class IdempotencyService {
   }
 
   async markCompleted(tenantId: string, key: string, responseData: any): Promise<void> {
-    const responseHash = this.hashRequest(responseData);
+    const responseHash = JSON.stringify(responseData);
     await this.prisma.idempotencyKey.update({
       where: { tenantId_key: { tenantId, key } },
       data: { status: 'COMPLETED', responseHash },

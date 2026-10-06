@@ -126,7 +126,7 @@ describe('ExamsService', () => {
       expect(result.timeRemainingSeconds).toBe(70 * 60);
       expect(result.questions[0]).not.toHaveProperty('correctAnswer');
 
-      expect(progressionService.handleEnterExam).toHaveBeenCalledWith(tenantId, userId, 'e1', 'l1', 'key1');
+      expect(progressionService.handleEnterExam).toHaveBeenCalledWith(tenantId, userId, 'e1', 'l1', 'key1:progression');
       expect(idempotencyService.markCompleted).toHaveBeenCalled();
     });
   });

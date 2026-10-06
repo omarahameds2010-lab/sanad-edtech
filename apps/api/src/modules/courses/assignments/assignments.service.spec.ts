@@ -131,7 +131,7 @@ describe('AssignmentsService', () => {
       expect(Math.abs(result.expiresAt.getTime() - expected)).toBeLessThan(1000);
       expect(result.timeRemainingSeconds).toBe(300 * 60);
 
-      expect(progressionService.handleEnterAssignment).toHaveBeenCalledWith(tenantId, userId, 'a1', 'l1', 'key1');
+      expect(progressionService.handleEnterAssignment).toHaveBeenCalledWith(tenantId, userId, 'a1', 'l1', 'key1:progression');
       expect(idempotencyService.markCompleted).toHaveBeenCalled();
       expect(result.startedAt.getTime()).toBeGreaterThanOrEqual(before);
       expect(result.startedAt.getTime()).toBeLessThanOrEqual(after);

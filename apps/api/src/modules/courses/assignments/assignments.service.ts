@@ -411,7 +411,7 @@ export class AssignmentsService {
       userId,
       assignmentId,
       lesson.id,
-      idempotencyKey,
+      `${idempotencyKey}:progression`,
     );
 
     return response;

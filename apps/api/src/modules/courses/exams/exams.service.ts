@@ -451,7 +451,7 @@ export class ExamsService {
       userId,
       examId,
       lesson.id,
-      idempotencyKey,
+      `${idempotencyKey}:progression`,
     );
 
     return response;

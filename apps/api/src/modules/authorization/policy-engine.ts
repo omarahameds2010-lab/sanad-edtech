@@ -21,7 +21,8 @@ export type ResourceType =
   | 'community'
   | 'notification'
   | 'analytics'
-  | 'settings';
+  | 'settings'
+  | 'section';
 
 export type Action =
   | 'create'
@@ -43,7 +44,9 @@ export type Action =
   | 'view'
   | 'export'
   | 'configure'
-  | 'redeem';
+  | 'redeem'
+  | 'archive'
+  | 'reorder';
 
 export interface AuthorizationContext {
   userId: string;
@@ -180,6 +183,7 @@ export class PolicyEngine {
     const rolePermissions: Record<string, Record<ResourceType, Action[]>> = {
       ADMIN: {
         course: ['create', 'read', 'update', 'delete', 'publish', 'unpublish', 'manage'],
+        section: ['create', 'read', 'update', 'delete', 'publish', 'unpublish', 'manage', 'reorder'],
         lesson: ['create', 'read', 'update', 'delete', 'publish', 'unpublish', 'manage'],
         exam: ['create', 'read', 'update', 'delete', 'publish', 'unpublish', 'grade', 'manage'],
         attempt: ['read', 'grade', 'manage'],
@@ -202,6 +206,7 @@ export class PolicyEngine {
       },
       TEACHER: {
         course: ['create', 'read', 'update', 'publish', 'unpublish'],
+        section: ['create', 'read', 'update', 'delete', 'publish', 'unpublish', 'reorder'],
         lesson: ['create', 'read', 'update', 'publish', 'unpublish'],
         exam: ['create', 'read', 'update', 'publish', 'unpublish', 'grade'],
         attempt: ['read', 'grade'],
@@ -224,6 +229,7 @@ export class PolicyEngine {
       },
       STUDENT: {
         course: ['read'],
+        section: ['read'],
         lesson: ['read', 'watch'],
         exam: ['read', 'attempt'],
         attempt: ['create', 'read', 'submit'],
@@ -246,6 +252,7 @@ export class PolicyEngine {
       },
       PARENT: {
         course: ['read'],
+        section: ['read'],
         lesson: ['read'],
         exam: ['read'],
         attempt: ['read'],
