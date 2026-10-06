@@ -14,6 +14,9 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { CoursesService } from './courses.service';
+import { SectionsService } from './sections/sections.service';
+import { LessonsService } from './lessons/lessons.service';
+import { EnrollmentsService } from './enrollments/enrollments.service';
 import { CreateCourseRequest, UpdateCourseRequest } from './dto/create-course.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RequirePermission } from '../authorization/authorization.decorators';
@@ -123,103 +126,158 @@ export class PublicCoursesController {
   }
 }
 
-@Controller('api/v1/teacher/sections')
+@Controller('api/v1/teacher')
 @UseGuards(JwtAuthGuard)
 export class SectionsController {
-  constructor(private coursesService: CoursesService) {}
+  constructor(private sectionsService: SectionsService) {}
 
   @Post('courses/:courseId/sections')
   @RequirePermission({ action: 'create', resourceType: 'section' })
   @HttpCode(HttpStatus.CREATED)
   async createSection(@Request() req, @Param('courseId') courseId: string, @Body() body: any) {
-    // Implementation will be in sections service
-    return { message: 'Section creation - to be implemented' };
+    const section = await this.sectionsService.createSection(req.tenantId, courseId, body);
+    return { data: section };
   }
 
   @Get('courses/:courseId/sections')
   @RequirePermission({ action: 'read', resourceType: 'section' })
-  async listSections(@Request() req, @Param('courseId') courseId: string, @Query() query: any) {
-    return { message: 'List sections - to be implemented' };
+  async listSections(@Request() req, @Param('courseId') courseId: string) {
+    const sections = await this.sectionsService.listSections(req.tenantId, courseId);
+    return { data: sections };
   }
 
-  @Patch(':id')
+  @Get('sections/:id')
+  @RequirePermission({ action: 'read', resourceType: 'section', resourceIdParam: 'id' })
+  async getSection(@Request() req, @Param('id') id: string) {
+    const section = await this.sectionsService.getSection(req.tenantId, id);
+    return { data: section };
+  }
+
+  @Patch('sections/:id')
   @RequirePermission({ action: 'update', resourceType: 'section', resourceIdParam: 'id' })
   async updateSection(@Request() req, @Param('id') id: string, @Body() body: any) {
-    return { message: 'Update section - to be implemented' };
+    const section = await this.sectionsService.updateSection(req.tenantId, id, body);
+    return { data: section };
   }
 
-  @Delete(':id')
+  @Delete('sections/:id')
   @RequirePermission({ action: 'delete', resourceType: 'section', resourceIdParam: 'id' })
   @HttpCode(HttpStatus.NO_CONTENT)
   async deleteSection(@Request() req, @Param('id') id: string) {
-    return { message: 'Delete section - to be implemented' };
+    await this.sectionsService.deleteSection(req.tenantId, id);
   }
 
   @Patch('courses/:courseId/sections/reorder')
   @RequirePermission({ action: 'reorder', resourceType: 'section' })
   async reorderSections(@Request() req, @Param('courseId') courseId: string, @Body() body: { items: { id: string; position: number }[] }) {
-    return { message: 'Reorder sections - to be implemented' };
+    const sections = await this.sectionsService.reorderSections(req.tenantId, courseId, body.items);
+    return { data: sections };
   }
 }
 
-@Controller('api/v1/teacher/lessons')
+@Controller('api/v1/teacher')
 @UseGuards(JwtAuthGuard)
 export class TeacherLessonsController {
-  constructor(private coursesService: CoursesService) {}
+  constructor(private lessonsService: LessonsService) {}
 
   @Post('sections/:sectionId/lessons')
   @RequirePermission({ action: 'create', resourceType: 'lesson' })
   @HttpCode(HttpStatus.CREATED)
   async createLesson(@Request() req, @Param('sectionId') sectionId: string, @Body() body: any) {
-    return { message: 'Lesson creation - to be implemented' };
+    const lesson = await this.lessonsService.createLesson(req.tenantId, sectionId, body);
+    return { data: lesson };
   }
 
   @Get('sections/:sectionId/lessons')
   @RequirePermission({ action: 'read', resourceType: 'lesson' })
-  async listLessons(@Request() req, @Param('sectionId') sectionId: string, @Query() query: any) {
-    return { message: 'List lessons - to be implemented' };
+  async listLessons(@Request() req, @Param('sectionId') sectionId: string) {
+    const lessons = await this.lessonsService.listLessons(req.tenantId, sectionId);
+    return { data: lessons };
   }
 
-  @Get(':id')
+  @Get('lessons/:id')
   @RequirePermission({ action: 'read', resourceType: 'lesson', resourceIdParam: 'id' })
   async getLesson(@Request() req, @Param('id') id: string) {
-    return { message: 'Get lesson - to be implemented' };
+    const lesson = await this.lessonsService.getLesson(req.tenantId, id);
+    return { data: lesson };
   }
 
-  @Patch(':id')
+  @Patch('lessons/:id')
   @RequirePermission({ action: 'update', resourceType: 'lesson', resourceIdParam: 'id' })
   async updateLesson(@Request() req, @Param('id') id: string, @Body() body: any) {
-    return { message: 'Update lesson - to be implemented' };
+    const lesson = await this.lessonsService.updateLesson(req.tenantId, id, body);
+    return { data: lesson };
   }
 
-  @Delete(':id')
+  @Delete('lessons/:id')
   @RequirePermission({ action: 'delete', resourceType: 'lesson', resourceIdParam: 'id' })
   @HttpCode(HttpStatus.NO_CONTENT)
   async deleteLesson(@Request() req, @Param('id') id: string) {
-    return { message: 'Delete lesson - to be implemented' };
+    await this.lessonsService.deleteLesson(req.tenantId, id);
   }
 
-  @Post(':id/publish')
+  @Post('lessons/:id/publish')
   @RequirePermission({ action: 'publish', resourceType: 'lesson', resourceIdParam: 'id' })
   async publishLesson(@Request() req, @Param('id') id: string) {
-    return { message: 'Publish lesson - to be implemented' };
+    const lesson = await this.lessonsService.publishLesson(req.tenantId, id);
+    return { data: lesson };
   }
 
-  @Post(':id/unpublish')
+  @Post('lessons/:id/unpublish')
   @RequirePermission({ action: 'publish', resourceType: 'lesson', resourceIdParam: 'id' })
   async unpublishLesson(@Request() req, @Param('id') id: string) {
-    return { message: 'Unpublish lesson - to be implemented' };
+    const lesson = await this.lessonsService.unpublishLesson(req.tenantId, id);
+    return { data: lesson };
+  }
+
+  @Patch('sections/:sectionId/lessons/reorder')
+  @RequirePermission({ action: 'reorder', resourceType: 'lesson' })
+  async reorderLessons(@Request() req, @Param('sectionId') sectionId: string, @Body() body: { items: { id: string; position: number }[] }) {
+    const lessons = await this.lessonsService.reorderLessons(req.tenantId, sectionId, body.items);
+    return { data: lessons };
   }
 }
 
 @Controller('api/v1/student/lessons')
 @UseGuards(JwtAuthGuard)
 export class StudentLessonsController {
-  constructor(private coursesService: CoursesService) {}
+  constructor(private lessonsService: LessonsService) {}
 
   @Get(':lessonId')
   @RequirePermission({ action: 'read', resourceType: 'lesson', resourceIdParam: 'lessonId' })
   async getLesson(@Request() req, @Param('lessonId') lessonId: string) {
-    return { message: 'Student lesson access - to be implemented' };
+    const result = await this.lessonsService.getStudentLesson(req.tenantId, req.user.sub, lessonId);
+    return { data: result };
+  }
+}
+
+@Controller('api/v1/student/enrollments')
+@UseGuards(JwtAuthGuard)
+export class StudentEnrollmentsController {
+  constructor(private enrollmentsService: EnrollmentsService) {}
+
+  @Post(':courseId')
+  @HttpCode(HttpStatus.CREATED)
+  async enroll(@Request() req, @Param('courseId') courseId: string) {
+    const enrollment = await this.enrollmentsService.enroll(req.tenantId, req.user.sub, courseId);
+    return { data: enrollment };
+  }
+
+  @Get()
+  async list(@Request() req, @Query('status') status?: string) {
+    const enrollments = await this.enrollmentsService.listEnrollments(req.tenantId, req.user.sub, status);
+    return { data: enrollments };
+  }
+
+  @Get(':id')
+  async get(@Request() req, @Param('id') id: string) {
+    const enrollment = await this.enrollmentsService.getEnrollment(req.tenantId, req.user.sub, id);
+    return { data: enrollment };
+  }
+
+  @Post(':id/cancel')
+  async cancel(@Request() req, @Param('id') id: string) {
+    const enrollment = await this.enrollmentsService.cancelEnrollment(req.tenantId, req.user.sub, id);
+    return { data: enrollment };
   }
 }
