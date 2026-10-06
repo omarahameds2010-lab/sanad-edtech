@@ -17,6 +17,8 @@ import { ExamsModule } from './exams/exams.module';
 import { SectionsModule } from './sections/sections.module';
 import { LessonsModule } from './lessons/lessons.module';
 import { EnrollmentsModule } from './enrollments/enrollments.module';
+import { ProgressModule } from './progress/progress.module';
+import { ProgressController } from './progress/progress.controller';
 
 @Module({
   imports: [
@@ -30,6 +32,7 @@ import { EnrollmentsModule } from './enrollments/enrollments.module';
     SectionsModule,
     LessonsModule,
     EnrollmentsModule,
+    ProgressModule,
   ],
   controllers: [
     TeacherCoursesController,
@@ -38,6 +41,7 @@ import { EnrollmentsModule } from './enrollments/enrollments.module';
     TeacherLessonsController,
     StudentLessonsController,
     StudentEnrollmentsController,
+    ProgressController,
   ],
   providers: [CoursesService, PrismaService],
   exports: [CoursesService],
