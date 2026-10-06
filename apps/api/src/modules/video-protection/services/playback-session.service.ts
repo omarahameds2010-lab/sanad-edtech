@@ -274,6 +274,17 @@ export class PlaybackSessionService {
       data: { lastHeartbeatAt: new Date() },
     });
 
+    // Persist video progress into the LMS progress model
+    const existing = await this.prisma.lessonProgress.findUnique({
+      where: { tenantId_userId_lessonId: { tenantId, userId: studentId, lessonId: session.lessonId } },
+    });
+    const position = Math.max(0, Math.floor(input.position));
+    await this.prisma.lessonProgress.upsert({
+      where: { tenantId_userId_lessonId: { tenantId, userId: studentId, lessonId: session.lessonId } },
+      create: { tenantId, userId: studentId, lessonId: session.lessonId, watchedSeconds: position, lastPosition: position },
+      update: { watchedSeconds: Math.max(existing?.watchedSeconds ?? 0, position), lastPosition: position },
+    });
+
     // Evaluate risk based on heartbeat data
     const riskScore = this.calculateRiskScore(input, session);
     const riskLevel = this.getRiskLevel(riskScore);
