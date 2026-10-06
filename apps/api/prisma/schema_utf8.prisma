@@ -1,0 +1,1458 @@
+﻿// This is your Prisma schema file
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================
+// TENANT FOUNDATION
+// ============================================
+
+model Tenant {
+  id        String   @id @default(uuid())
+  name      String
+  slug      String   @unique
+  planId    String?
+  status    TenantStatus @default(ACTIVE)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  domains             TenantDomain[]
+  config              TenantConfig?
+  users               User[]
+  courses             Course[]
+  sections            Section[]
+  lessons             Lesson[]
+  videos              Video[]
+  enrollments         Enrollment[]
+  exams               Exam[]
+  examQuestions       ExamQuestion[]
+  examAttempts        ExamAttempt[]
+  assignments         Assignment[]
+  assignmentSubmissions AssignmentSubmission[]
+  orders              Order[]
+  orderItems          OrderItem[]
+  paymentIntents      PaymentIntent[]
+  payments            Payment[]
+  paymentAttempts     PaymentAttempt[]
+  refunds             Refund[]
+  vouchers            Voucher[]
+  voucherRedemptions  VoucherRedemption[]
+  ledgerEntries       LedgerEntry[]
+  webhookEvents       WebhookEvent[]
+  idempotencyKeys     IdempotencyKey[]
+  reconciliationRuns  ReconciliationRun[]
+  reconciliationItems ReconciliationItem[]
+  paymentRiskEvents   PaymentRiskEvent[]
+  settlements         Settlement[]
+  settlementItems     SettlementItem[]
+  paymentAuditLogs    PaymentAuditLog[]
+  auditLogs           AuditLog[]
+  outboxEvents        OutboxEvent[]
+  entitlements        Entitlement[]
+  subscription        Subscription?
+
+  @@map("tenants")
+}
+
+model TenantDomain {
+  id          String   @id @default(uuid())
+  tenantId    String
+  domain      String   @unique
+  isPrimary   Boolean  @default(false)
+  verifiedAt  DateTime?
+  createdAt   DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("tenant_domains")
+  @@index([tenantId])
+  @@index([domain])
+}
+
+model TenantConfig {
+  id          String   @id @default(uuid())
+  tenantId    String   @unique
+  config      Json
+  version     Int      @default(1)
+  updatedAt   DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("tenant_config")
+}
+
+enum TenantStatus {
+  PROVISIONING
+  ACTIVE
+  SUSPENDED
+  GRACE_PERIOD
+  ARCHIVED
+}
+
+// ============================================
+// USERS & AUTH
+// ============================================
+
+model User {
+  id           String   @id @default(uuid())
+  tenantId     String
+  role         UserRole
+  name         String
+  phone        String?
+  email        String?  @unique
+  passwordHash String
+  grade        String?
+  status       UserStatus @default(ACTIVE)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  tenant                Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  devices               Device[]
+  sessions              Session[]
+  enrollments           Enrollment[]
+  progress              LessonProgress[]
+  examAttempts          ExamAttempt[]      @relation("ExamAttemptStudent")
+  gradedExamAttempts    ExamAttempt[]      @relation("ExamAttemptGrader")
+  assignmentSubmissions AssignmentSubmission[] @relation("AssignmentStudent")
+  gradedAssignments     AssignmentSubmission[] @relation("AssignmentGrader")
+  orders                Order[]
+  paymentIntents        PaymentIntent[]
+  payments              Payment[]
+  refunds               Refund[]
+  teacherSettlements    Settlement[]
+  auditLogs             AuditLog[]
+  outboxEvents          OutboxEvent[]
+  entitlements          Entitlement[]
+
+  @@map("users")
+  @@index([tenantId])
+  @@unique([tenantId, phone])
+  @@unique([tenantId, email])
+}
+
+model Device {
+  id          String   @id @default(uuid())
+  tenantId    String
+  userId      String
+  fingerprint String
+  lastSeen    DateTime @default(now())
+  revokedAt   DateTime?
+  createdAt   DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("devices")
+  @@index([tenantId])
+  @@index([userId])
+  @@unique([tenantId, fingerprint])
+}
+
+model Session {
+  id                String   @id @default(uuid())
+  tenantId          String
+  userId            String
+  deviceId          String?
+  refreshTokenHash  String   @unique
+  createdAt         DateTime @default(now())
+  expiresAt         DateTime
+  revokedAt         DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+  @@index([tenantId])
+  @@index([userId])
+}
+
+enum UserRole {
+  STUDENT
+  TEACHER
+  ADMIN
+  PARENT
+  SUPER_ADMIN
+}
+
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+  PENDING
+  DELETED
+}
+
+// ============================================
+// COURSES & CONTENT
+// ============================================
+
+model Course {
+  id          String        @id @default(uuid())
+  tenantId    String
+  title       String
+  slug        String
+  grade       String?
+  price       Decimal       @db.Decimal(10, 2)
+  currency    String        @default("EGP")
+  status      CourseStatus  @default(DRAFT)
+  publishedAt DateTime?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  tenant     Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  sections   Section[]
+  enrollments Enrollment[]
+  exams      Exam[]
+
+  @@map("courses")
+  @@index([tenantId])
+  @@index([slug])
+  @@index([status])
+}
+
+model Section {
+  id         String   @id @default(uuid())
+  tenantId   String
+  courseId  String
+  title      String
+  orderIndex Int
+  createdAt  DateTime @default(now())
+
+  tenant  Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  course  Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  lessons Lesson[]
+
+  @@map("sections")
+  @@index([tenantId])
+  @@index([courseId])
+}
+
+model Lesson {
+  id                String            @id @default(uuid())
+  tenantId          String
+  sectionId         String
+  type              LessonType
+  title             String
+  slug              String
+  description       String?
+  videoId           String?
+  duration          Int?
+  orderIndex        Int
+  isFree            Boolean           @default(false)
+  releaseAt         DateTime?
+  status            LessonStatus      @default(DRAFT)
+
+  // Content Progression Fields
+  unlockType        ContentUnlockType @default(NONE)
+  unlockTargetId    String?           // ID of assignment/exam/lesson that unlocks next
+  lockStatus        ContentLockStatus @default(LOCKED)
+  assignmentId      String?           // Reference to Assignment if this lesson has one
+  examId            String?           // Reference to Exam if this lesson has one
+  assignmentTimerMinutes      Int?    // 300 minutes default
+  examTimerMinutes            Int?    // 70 minutes default
+  assignmentPassingScore      Int?    // Optional passing score for assignment
+  examPassingScore            Int?    // Optional passing score for exam
+  isPrerequisite              Boolean @default(false) // If true, must complete before next
+
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+  publishedAt       DateTime?
+
+  tenant   Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  section  Section         @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  progress LessonProgress[]
+  videos   Video[]
+  assignment Assignment?
+  exam     Exam?
+
+  @@map("lessons")
+  @@index([tenantId])
+  @@index([sectionId])
+  @@index([slug])
+  @@index([status])
+  @@index([assignmentId])
+  @@index([examId])
+}
+
+// ============================================
+// ASSIGNMENT
+// ============================================
+
+model Assignment {
+  id                  String        @id @default(uuid())
+  tenantId            String
+  lessonId            String        @unique
+  title               String
+  description         String?
+  instructions        String?
+  timerMinutes        Int           @default(300) // 5 hours default
+  passingScore        Int?          // percentage 0-100
+  maxAttempts         Int           @default(1)
+  allowLateSubmission Boolean       @default(true)
+  latePenaltyPercent  Int?          @default(0)
+  status              AssignmentStatus @default(DRAFT)
+  createdAt           DateTime      @default(now())
+  updatedAt           DateTime      @updatedAt
+
+  tenant   Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  lesson   Lesson       @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  submissions AssignmentSubmission[]
+
+  @@map("assignments")
+  @@index([tenantId])
+  @@index([lessonId])
+  @@index([status])
+}
+
+enum AssignmentStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+// ============================================
+// ASSIGNMENT SUBMISSION
+// ============================================
+
+model AssignmentSubmission {
+  id              String              @id @default(uuid())
+  tenantId        String
+  assignmentId    String
+  studentId       String
+  content         String?             // text submission
+  attachments     Json?               // file URLs, metadata
+  status          SubmissionStatus    @default(SUBMITTED)
+  score           Int?                // percentage 0-100
+  gradedBy        String?             // teacher ID
+  gradedAt        DateTime?
+  feedback        String?
+  submittedAt     DateTime            @default(now())
+
+  tenant      Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  assignment  Assignment     @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  student     User           @relation("AssignmentStudent", fields: [studentId], references: [id], onDelete: Cascade)
+  grader      User?          @relation("AssignmentGrader", fields: [gradedBy], references: [id], onDelete: SetNull)
+
+  @@map("assignment_submissions")
+  @@index([tenantId])
+  @@index([assignmentId])
+  @@index([studentId])
+  @@index([status])
+  @@unique([assignmentId, studentId])
+}
+
+enum SubmissionStatus {
+  SUBMITTED
+  GRADED
+  LATE
+  REJECTED
+  RETURNED
+}
+
+// ============================================
+// EXAM
+// ============================================
+
+model Exam {
+  id                  String       @id @default(uuid())
+  tenantId            String
+  lessonId            String       @unique
+  title               String
+  description         String?
+  instructions        String?
+  timerMinutes        Int          @default(70)
+  passingScore        Int          @default(60) // percentage 0-100
+  maxAttempts         Int          @default(1)
+  shuffleQuestions    Boolean      @default(false)
+  shuffleOptions      Boolean      @default(false)
+  showResults         Boolean      @default(true)
+  showCorrectAnswers  Boolean      @default(false)
+  status              ExamStatus   @default(DRAFT)
+  createdAt           DateTime     @default(now())
+  updatedAt           DateTime     @updatedAt
+
+  tenant     Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  lesson     Lesson         @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  questions  ExamQuestion[]
+  attempts   ExamAttempt[]
+
+  @@map("exams")
+  @@index([tenantId])
+  @@index([lessonId])
+  @@index([status])
+}
+
+enum ExamStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+// ============================================
+// EXAM QUESTION
+// ============================================
+
+model ExamQuestion {
+  id              String            @id @default(uuid())
+  tenantId        String
+  examId          String
+  type            ExamQuestionType
+  text            String
+  explanation     String?
+  points          Int               @default(1)
+  position        Int
+  options         Json?             // for MCQ, True/False
+  correctAnswer   Json?             // answer key
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  tenant   Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  exam     Exam          @relation(fields: [examId], references: [id], onDelete: Cascade)
+
+  @@map("exam_questions")
+  @@index([tenantId])
+  @@index([examId])
+  @@index([position])
+}
+
+enum ExamQuestionType {
+  MCQ
+  TRUE_FALSE
+  SHORT_ANSWER
+  ESSAY
+  MATCHING
+}
+
+// ============================================
+// EXAM ATTEMPT
+// ============================================
+
+model ExamAttempt {
+  id                  String           @id @default(uuid())
+  tenantId            String
+  examId              String
+  studentId           String
+  attemptNumber       Int
+  status              AttemptStatus    @default(IN_PROGRESS)
+  startedAt           DateTime         @default(now())
+  submittedAt         DateTime?
+  timeRemainingSeconds Int?
+  score               Int?             // percentage 0-100
+  passed              Boolean?
+  answers             Json?            // student answers
+  gradingData         Json?            // grading details
+  gradedAt            DateTime?
+  gradedBy            String?          // teacher ID
+  createdAt           DateTime         @default(now())
+  updatedAt           DateTime         @updatedAt
+
+  tenant  Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  exam    Exam          @relation(fields: [examId], references: [id], onDelete: Cascade)
+  student User          @relation("ExamAttemptStudent", fields: [studentId], references: [id], onDelete: Cascade)
+  grader  User?         @relation("ExamAttemptGrader", fields: [gradedBy], references: [id], onDelete: SetNull)
+
+  @@map("exam_attempts")
+  @@index([tenantId])
+  @@index([examId])
+  @@index([studentId])
+  @@index([status])
+  @@unique([examId, studentId, attemptNumber])
+}
+
+enum AttemptStatus {
+  IN_PROGRESS
+  SUBMITTED
+  GRADED
+  TIMED_OUT
+  CANCELLED
+}
+
+// ============================================
+// VIDEO
+// ============================================
+
+model Video {
+  id                  String       @id @default(uuid())
+  tenantId            String
+  lessonId            String
+  title               String
+  description         String?
+  status              VideoStatus  @default(UPLOADING)
+  provider            String
+  providerVideoId     String?
+  providerUploadUrl   String?
+  uploadUrlExpiresAt  DateTime?
+  duration            Int?
+  width               Int?
+  height              Int?
+  fileSize            BigInt?
+  mimeType            String?
+  thumbnailUrl        String?
+  hlsManifestUrl      String?
+  dashManifestUrl     String?
+  errorMessage        String?
+  uploadedBy          String
+  uploadedAt          DateTime?
+  processedAt         DateTime?
+  publishedAt         DateTime?
+  createdAt           DateTime     @default(now())
+  updatedAt           DateTime     @updatedAt
+
+  tenant Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  lesson Lesson  @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+
+  @@map("videos")
+  @@index([tenantId])
+  @@index([lessonId])
+  @@index([status])
+  @@index([providerVideoId])
+  @@unique([tenantId, providerVideoId])
+}
+
+enum VideoStatus {
+  UPLOADING
+  PROCESSING
+  READY
+  PUBLISHED
+  FAILED
+  ARCHIVED
+}
+
+enum CourseStatus {
+  DRAFT
+  PROCESSING
+  READY
+  PUBLISHED
+  ARCHIVED
+}
+
+enum LessonType {
+  VIDEO
+  PDF
+  QUIZ
+  LIVE
+  ASSIGNMENT
+  EXAM
+  RESOURCE
+}
+
+enum LessonStatus {
+  DRAFT
+  PROCESSING
+  READY
+  PUBLISHED
+  ARCHIVED
+}
+
+enum ContentUnlockType {
+  NONE
+  ENTER_ASSIGNMENT
+  ENTER_EXAM
+  COMPLETE_ASSIGNMENT
+  COMPLETE_EXAM
+  PASS_EXAM
+  SCORE_THRESHOLD
+  TIME_ELAPSED
+  MANUAL
+}
+
+enum ContentLockStatus {
+  LOCKED
+  UNLOCKED
+  AVAILABLE
+  EXPIRED
+}
+
+// ============================================
+// ENROLLMENTS & PROGRESS
+// ============================================
+
+model Enrollment {
+  id         String          @id @default(uuid())
+  tenantId   String
+  userId     String
+  courseId   String
+  startsAt   DateTime
+  expiresAt  DateTime?
+  status     EnrollmentStatus @default(ACTIVE)
+  source     String
+  createdAt  DateTime        @default(now())
+
+  tenant Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  course Course  @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@map("enrollments")
+  @@index([tenantId])
+  @@index([userId])
+  @@index([courseId])
+  @@unique([userId, courseId])
+}
+
+model LessonProgress {
+  id             String   @id @default(uuid())
+  tenantId       String
+  userId         String
+  lessonId       String
+  watchedSeconds Int      @default(0)
+  lastPosition   Int?
+  completedAt    DateTime?
+  updatedAt      DateTime @updatedAt
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lesson Lesson @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+
+  @@map("lesson_progress")
+  @@unique([tenantId, userId, lessonId])
+  @@index([tenantId])
+  @@index([userId])
+}
+
+enum EnrollmentStatus {
+  ACTIVE
+  EXPIRED
+  CANCELLED
+}
+
+// ============================================
+// AUDIT LOGS
+// ============================================
+
+model AuditLog {
+  id            String   @id @default(uuid())
+  tenantId      String
+  actorUserId  String?
+  action        String
+  resourceType  String
+  resourceId    String?
+  metadata      Json?
+  ip            String?
+  userAgent     String?
+  createdAt     DateTime @default(now())
+
+  tenant     Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  actorUser  User?   @relation(fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  @@map("audit_logs")
+  @@index([tenantId])
+  @@index([actorUserId])
+  @@index([resourceType, resourceId])
+  @@index([createdAt])
+}
+
+// ============================================
+// OUTBOX (Transactional Event Publishing)
+// ============================================
+
+model OutboxEvent {
+  id            String   @id @default(uuid())
+  tenantId      String
+  userId        String?
+  eventType    String
+  eventVersion Int      @default(1)
+  aggregateType String
+  aggregateId   String
+  payload       Json
+  createdAt     DateTime @default(now())
+  publishedAt   DateTime?
+  retryCount    Int      @default(0)
+  lastError     String?
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@map("outbox_events")
+  @@index([tenantId])
+  @@index([userId])
+  @@index([publishedAt])
+  @@index([createdAt])
+}
+
+// ============================================
+// ENTITLEMENTS
+// ============================================
+
+model Entitlement {
+  id            String   @id @default(uuid())
+  tenantId      String
+  userId        String
+  resourceType  String
+  resourceId    String
+  source        String
+  startsAt      DateTime?
+  expiresAt     DateTime?
+  status        EntitlementStatus @default(ACTIVE)
+  metadata      Json?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("entitlements")
+  @@index([tenantId])
+  @@index([userId])
+  @@index([resourceType, resourceId])
+  @@index([status])
+  @@index([expiresAt])
+}
+
+enum EntitlementStatus {
+  ACTIVE
+  EXPIRED
+  REVOKED
+  PENDING
+}
+
+// ============================================
+// VIDEO PROTECTION
+// ============================================
+
+model PlaybackSession {
+  id                String   @id @default(uuid())
+  tenantId          String
+  studentId         String
+  deviceId          String
+  lessonId          String
+  videoId           String
+  watermarkSeed     BigInt
+  watermarkPayload  Json
+  ipHash            String
+  userAgentHash     String
+  startedAt         DateTime @default(now())
+  lastHeartbeatAt   DateTime @default(now())
+  endedAt           DateTime?
+  status            PlaybackSessionStatus @default(ACTIVE)
+  riskScore         Int      @default(0)
+  riskLevel         RiskLevel @default(LOW)
+
+  @@map("playback_sessions")
+  @@index([tenantId])
+  @@index([studentId])
+  @@index([deviceId])
+  @@index([lessonId])
+  @@index([videoId])
+  @@index([status])
+  @@index([startedAt])
+}
+
+model CaptureEvent {
+  id                    String   @id @default(uuid())
+  tenantId              String
+  studentId             String
+  deviceId              String
+  playbackSessionId     String
+  videoId               String
+  eventType             CaptureEventType
+  detectedAt            DateTime @default(now())
+  metadata              Json?
+
+  @@map("capture_events")
+  @@index([tenantId])
+  @@index([studentId])
+  @@index([deviceId])
+  @@index([playbackSessionId])
+  @@index([videoId])
+  @@index([eventType])
+  @@index([detectedAt])
+}
+
+model SecurityEvent {
+  id            String   @id @default(uuid())
+  tenantId      String
+  userId        String?
+  eventType     String
+  severity      SecurityEventSeverity
+  requestId     String?
+  ipHash        String?
+  deviceId      String?
+  metadata      Json?
+  createdAt     DateTime @default(now())
+
+  @@map("security_events")
+  @@index([tenantId])
+  @@index([userId])
+  @@index([eventType])
+  @@index([severity])
+  @@index([createdAt])
+}
+
+enum PlaybackSessionStatus {
+  ACTIVE
+  ENDED
+  REVOKED
+  BLOCKED
+}
+
+enum RiskLevel {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+enum CaptureEventType {
+  SCREENSHOT
+  SCREEN_RECORDING_DETECTED
+  WATERMARK_TAMPERED
+  FOCUS_LOST
+  DEVTOOLS_SUSPECTED
+  PLAYER_HIDDEN
+}
+
+enum SecurityEventSeverity {
+  INFO
+  WARNING
+  CRITICAL
+}
+
+// ============================================
+// PLANS & SUBSCRIPTIONS
+// ============================================
+
+model Subscription {
+  id                    String   @id @default(uuid())
+  tenantId              String   @unique
+  planId                String
+  status                SubscriptionStatus @default(TRIALING)
+  currentPeriodStart    DateTime
+  currentPeriodEnd      DateTime
+  cancelAtPeriodEnd     Boolean  @default(false)
+  cancelledAt           DateTime?
+  trialEnd              DateTime?
+  metadata              Json?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("subscriptions")
+  @@index([tenantId])
+  @@index([planId])
+  @@index([status])
+}
+
+enum SubscriptionStatus {
+  TRIALING
+  ACTIVE
+  PAST_DUE
+  CANCELED
+  UNPAID
+  PAUSED
+}
+
+// ============================================
+// PAYMENTS
+// ============================================
+
+model Order {
+  id              String      @id @default(uuid())
+  tenantId        String
+  userId          String
+  number          String
+  currency        String      @default("EGP")
+  subtotalMinor   BigInt
+  discountMinor   BigInt      @default(0)
+  totalMinor      BigInt
+  status          OrderStatus @default(PENDING)
+  expiresAt       DateTime?
+  metadata        Json?
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  tenant          Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user            User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items           OrderItem[]
+  payments        Payment[]
+  paymentIntents  PaymentIntent[]
+  refunds         Refund[]
+
+  @@map("orders")
+  @@index([tenantId])
+  @@index([userId])
+  @@index([status])
+  @@unique([tenantId, number])
+}
+
+model OrderItem {
+  id              String   @id @default(uuid())
+  tenantId        String
+  orderId         String
+  resourceType    String
+  resourceId      String
+  name            String
+  quantity        Int      @default(1)
+  unitPriceMinor  BigInt
+  totalMinor      BigInt
+  metadata        Json?
+  createdAt       DateTime @default(now())
+
+  tenant          Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  order           Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@map("order_items")
+  @@index([tenantId])
+  @@index([orderId])
+  @@index([resourceType, resourceId])
+}
+
+enum OrderStatus {
+  PENDING
+  CONFIRMED
+  EXPIRED
+  CANCELLED
+  REFUNDED
+}
+
+model PaymentIntent {
+  id                  String             @id @default(uuid())
+  tenantId            String
+  orderId             String
+  userId              String
+  amountMinor         BigInt
+  currency            String             @default("EGP")
+  requestedMethod     PaymentMethod?
+  status              PaymentIntentStatus @default(CREATED)
+  provider            String?
+  externalIntentId    String?
+  idempotencyKey      String?
+  expiresAt           DateTime?
+  metadata            Json?
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+
+  tenant              Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  order               Order              @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  user                User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  attempts            PaymentAttempt[]
+  payments            Payment[]
+
+  @@map("payment_intents")
+  @@index([tenantId])
+  @@index([orderId])
+  @@index([userId])
+  @@index([status])
+  @@unique([tenantId, idempotencyKey])
+}
+
+model Payment {
+  id                      String            @id @default(uuid())
+  tenantId                String
+  orderId                 String
+  userId                  String
+  paymentIntentId         String?
+  provider                String
+  paymentMethod           PaymentMethod
+  status                  PaymentStatus     @default(CREATED)
+  amountMinor             BigInt
+  currency                String            @default("EGP")
+  providerTransactionId   String?
+  idempotencyKey          String?
+  confirmedAt             DateTime?
+  failedAt                DateTime?
+  refundedAt              DateTime?
+  failureCode             String?
+  failureReason           String?
+  metadata                Json?
+  createdAt               DateTime          @default(now())
+  updatedAt               DateTime          @updatedAt
+
+  tenant                  Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  order                   Order              @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  user                    User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  paymentIntent           PaymentIntent?     @relation(fields: [paymentIntentId], references: [id], onDelete: SetNull)
+  attempts                PaymentAttempt[]
+  refunds                 Refund[]
+  ledgerEntries           LedgerEntry[]
+
+  @@map("payments")
+  @@index([tenantId])
+  @@index([orderId])
+  @@index([userId])
+  @@index([provider])
+  @@index([providerTransactionId])
+  @@index([status])
+  @@index([idempotencyKey])
+  @@unique([provider, providerTransactionId])
+}
+
+model PaymentAttempt {
+  id                      String                    @id @default(uuid())
+  tenantId                String
+  paymentId               String
+  paymentIntentId         String?
+  attemptNumber           Int
+  provider                String
+  paymentMethod           PaymentMethod
+  status                  PaymentAttemptStatus      @default(INITIATED)
+  amountMinor             BigInt
+  currency                String                  @default("EGP")
+  externalReference       String?
+  initiatedAt             DateTime                @default(now())
+  completedAt             DateTime?
+  failureCode             String?
+  failureReason           String?
+  metadata                Json?
+  createdAt               DateTime                @default(now())
+  updatedAt               DateTime                @updatedAt
+
+  tenant                  Tenant                  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  payment                 Payment                 @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  paymentIntent           PaymentIntent?          @relation(fields: [paymentIntentId], references: [id], onDelete: SetNull)
+
+  @@map("payment_attempts")
+  @@index([tenantId])
+  @@index([paymentId])
+  @@index([paymentIntentId])
+  @@index([provider])
+  @@index([status])
+  @@unique([paymentId, attemptNumber])
+}
+
+model Refund {
+  id                      String         @id @default(uuid())
+  tenantId                String
+  paymentId               String
+  orderId                 String
+  userId                  String
+  requestedBy             String
+  amountMinor             BigInt
+  currency                String         @default("EGP")
+  reason                  String?
+  providerRefundId        String?
+  status                  RefundStatus   @default(PENDING)
+  processedAt             DateTime?
+  metadata                Json?
+  createdAt               DateTime       @default(now())
+  updatedAt               DateTime       @updatedAt
+
+  tenant                  Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  payment                 Payment        @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  order                   Order          @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  user                    User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("refunds")
+  @@index([tenantId])
+  @@index([paymentId])
+  @@index([orderId])
+  @@index([userId])
+  @@index([status])
+}
+
+enum PaymentMethod {
+  CARD
+  MOBILE_WALLET
+  INSTANT_PAYMENT
+  CASH_REFERENCE
+  VOUCHER
+  MANUAL_TRANSFER
+}
+
+enum PaymentIntentStatus {
+  CREATED
+  PROCESSING
+  REQUIRES_ACTION
+  SUCCEEDED
+  FAILED
+  EXPIRED
+  CANCELLED
+}
+
+enum PaymentStatus {
+  CREATED
+  PENDING
+  PROCESSING
+  PAID
+  FAILED
+  EXPIRED
+  CANCELLED
+  REFUND_PENDING
+  REFUNDED
+}
+
+enum PaymentAttemptStatus {
+  INITIATED
+  PROCESSING
+  REQUIRES_ACTION
+  SUCCEEDED
+  FAILED
+  EXPIRED
+  CANCELLED
+}
+
+enum RefundStatus {
+  PENDING
+  PROCESSING
+  SUCCEEDED
+  FAILED
+  EXPIRED
+  CANCELLED
+}
+
+// ============================================
+// LEDGER
+// ============================================
+
+model LedgerEntry {
+  id              String            @id @default(uuid())
+  tenantId        String
+  paymentId       String?
+  orderId         String?
+  refundId        String?
+  accountCode     String
+  entryType       LedgerEntryType
+  amountMinor     BigInt
+  currency        String            @default("EGP")
+  reference       String?
+  metadata        Json?
+  createdAt       DateTime          @default(now())
+
+  tenant          Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  payment         Payment?          @relation(fields: [paymentId], references: [id], onDelete: SetNull)
+
+  @@map("ledger_entries")
+  @@index([tenantId])
+  @@index([paymentId])
+  @@index([orderId])
+  @@index([refundId])
+  @@index([accountCode])
+  @@index([entryType])
+  @@index([createdAt])
+}
+
+enum LedgerEntryType {
+  DEBIT
+  CREDIT
+}
+
+// ============================================
+// WEBHOOKS & IDEMPOTENCY
+// ============================================
+
+model WebhookEvent {
+  id                    String             @id @default(uuid())
+  tenantId              String?
+  provider              String
+  externalEventId       String
+  eventType             String
+  signatureVerified     Boolean            @default(false)
+  payloadHash           String
+  receivedAt            DateTime           @default(now())
+  processedAt           DateTime?
+  processingStatus      WebhookProcessingStatus @default(PENDING)
+  errorCode             String?
+  metadata              Json?
+  createdAt             DateTime           @default(now())
+
+  tenant                Tenant?            @relation(fields: [tenantId], references: [id], onDelete: SetNull)
+
+  @@map("webhook_events")
+  @@index([tenantId])
+  @@index([provider])
+  @@index([externalEventId])
+  @@index([receivedAt])
+  @@index([processingStatus])
+  @@unique([provider, externalEventId])
+}
+
+enum WebhookProcessingStatus {
+  PENDING
+  PROCESSING
+  PROCESSED
+  FAILED
+  IGNORED
+}
+
+model IdempotencyKey {
+  id              String   @id @default(uuid())
+  tenantId        String
+  userId          String?
+  key             String
+  operation       String
+  requestHash     String
+  responseHash    String?
+  status          IdempotencyStatus @default(PENDING)
+  createdAt       DateTime @default(now())
+  expiresAt       DateTime
+
+  tenant          Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("idempotency_keys")
+  @@index([tenantId])
+  @@index([userId])
+  @@index([key])
+  @@index([operation])
+  @@unique([tenantId, key])
+}
+
+enum IdempotencyStatus {
+  PENDING
+  COMPLETED
+  FAILED
+}
+
+// ============================================
+// VOUCHERS
+// ============================================
+
+model Voucher {
+  id              String         @id @default(uuid())
+  tenantId        String
+  codeHash        String
+  discountType    VoucherDiscountType
+  discountValue   Int
+  maxUses         Int            @default(1)
+  usedCount       Int            @default(0)
+  courseId        String?
+  expiresAt       DateTime?
+  disabledAt      DateTime?
+  metadata        Json?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  tenant          Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  redemptions     VoucherRedemption[]
+
+  @@map("vouchers")
+  @@index([tenantId])
+  @@index([courseId])
+  @@unique([tenantId, codeHash])
+}
+
+model VoucherRedemption {
+  id              String   @id @default(uuid())
+  tenantId        String
+  voucherId       String
+  userId          String
+  orderId         String?
+  redeemedAt      DateTime @default(now())
+  metadata        Json?
+
+  tenant          Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  voucher         Voucher  @relation(fields: [voucherId], references: [id], onDelete: Cascade)
+
+  @@map("voucher_redemptions")
+  @@index([tenantId])
+  @@index([voucherId])
+  @@index([userId])
+  @@index([orderId])
+  @@unique([voucherId, userId])
+}
+
+enum VoucherDiscountType {
+  PERCENTAGE
+  FIXED_AMOUNT
+}
+
+// ============================================
+// RECONCILIATION
+// ============================================
+
+model ReconciliationRun {
+  id              String                  @id @default(uuid())
+  tenantId        String
+  provider        String
+  status          ReconciliationStatus    @default(PENDING)
+  startedAt       DateTime
+  completedAt     DateTime?
+  totalRecords    Int                     @default(0)
+  matchedCount    Int                     @default(0)
+  mismatchedCount Int                     @default(0)
+  errorCount      Int                     @default(0)
+  metadata        Json?
+  createdAt       DateTime                @default(now())
+  updatedAt       DateTime                @updatedAt
+
+  tenant          Tenant                  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  items           ReconciliationItem[]
+
+  @@map("reconciliation_runs")
+  @@index([tenantId])
+  @@index([provider])
+  @@index([status])
+  @@index([startedAt])
+}
+
+model ReconciliationItem {
+  id                      String                     @id @default(uuid())
+  tenantId                String
+  runId                   String
+  provider                String
+  internalPaymentId       String?
+  providerTransactionId   String?
+  status                  ReconciliationItemStatus   @default(UNKNOWN)
+  internalAmountMinor     BigInt?
+  providerAmountMinor     BigInt?
+  internalStatus          String?
+  providerStatus          String?
+  mismatchDetails         Json?
+  resolvedAt              DateTime?
+  resolvedBy              String?
+  resolution              String?
+  metadata                Json?
+  createdAt               DateTime                   @default(now())
+  updatedAt               DateTime                   @updatedAt
+
+  tenant                  Tenant                     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  run                     ReconciliationRun          @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  @@map("reconciliation_items")
+  @@index([tenantId])
+  @@index([runId])
+  @@index([provider])
+  @@index([internalPaymentId])
+  @@index([providerTransactionId])
+  @@index([status])
+}
+
+enum ReconciliationStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+}
+
+enum ReconciliationItemStatus {
+  MATCHED
+  INTERNAL_PENDING_PROVIDER_PAID
+  INTERNAL_PAID_PROVIDER_PENDING
+  INTERNAL_PAID_PROVIDER_FAILED
+  AMOUNT_MISMATCH
+  REFERENCE_MISMATCH
+  MISSING_INTERNAL_RECORD
+  MISSING_PROVIDER_RECORD
+  REFUND_MISMATCH
+  UNKNOWN
+}
+
+// ============================================
+// RISK / FRAUD
+// ============================================
+
+model PaymentRiskEvent {
+  id              String   @id @default(uuid())
+  tenantId        String
+  paymentId       String?
+  userId          String?
+  eventType       String
+  severity        RiskSeverity
+  score           Int
+  details         Json?
+  createdAt       DateTime @default(now())
+
+  tenant          Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("payment_risk_events")
+  @@index([tenantId])
+  @@index([paymentId])
+  @@index([userId])
+  @@index([eventType])
+  @@index([severity])
+  @@index([createdAt])
+}
+
+enum RiskSeverity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+// ============================================
+// SETTLEMENTS
+// ============================================
+
+model Settlement {
+  id                      String            @id @default(uuid())
+  tenantId                String
+  teacherId               String
+  periodStart             DateTime
+  periodEnd               DateTime
+  grossAmountMinor        BigInt
+  platformFeeMinor        BigInt
+  refundAdjustmentMinor   BigInt            @default(0)
+  netAmountMinor          BigInt
+  currency                String            @default("EGP")
+  status                  SettlementStatus  @default(CALCULATED)
+  payoutReference         String?
+  paidAt                  DateTime?
+  metadata                Json?
+  createdAt               DateTime          @default(now())
+  updatedAt               DateTime          @updatedAt
+
+  tenant                  Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  teacher                 User              @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  items                   SettlementItem[]
+
+  @@map("settlements")
+  @@index([tenantId])
+  @@index([teacherId])
+  @@index([status])
+  @@index([periodStart, periodEnd])
+}
+
+model SettlementItem {
+  id              String   @id @default(uuid())
+  tenantId        String
+  settlementId    String
+  orderId         String
+  paymentId       String
+  courseId        String
+  grossAmountMinor BigInt
+  feeMinor        BigInt
+  netAmountMinor  BigInt
+  createdAt       DateTime @default(now())
+
+  tenant          Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  settlement      Settlement @relation(fields: [settlementId], references: [id], onDelete: Cascade)
+
+  @@map("settlement_items")
+  @@index([tenantId])
+  @@index([settlementId])
+  @@index([orderId])
+  @@index([paymentId])
+  @@index([courseId])
+}
+
+enum SettlementStatus {
+  CALCULATED
+  READY
+  APPROVED
+  PROCESSING
+  PAID
+  FAILED
+  ON_HOLD
+}
+
+// ============================================
+// PAYMENT AUDIT
+// ============================================
+
+model PaymentAuditLog {
+  id              String   @id @default(uuid())
+  tenantId        String
+  actorId         String?
+  paymentId       String?
+  action          String
+  resourceType    String?
+  resourceId      String?
+  previousState   String?
+  nextState       String?
+  reason          String?
+  requestId       String?
+  ipHash          String?
+  metadata        Json?
+  createdAt       DateTime @default(now())
+
+  tenant          Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("payment_audit_logs")
+  @@index([tenantId])
+  @@index([actorId])
+  @@index([paymentId])
+  @@index([action])
+  @@index([resourceType, resourceId])
+  @@index([createdAt])
+}

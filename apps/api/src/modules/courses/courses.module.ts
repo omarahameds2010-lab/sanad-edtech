@@ -6,6 +6,9 @@ import { SectionsController } from './courses.controller';
 import { TeacherLessonsController } from './courses.controller';
 import { StudentLessonsController } from './courses.controller';
 import { StudentEnrollmentsController } from './courses.controller';
+import { ProgressController } from './progress/progress.controller';
+import { TeacherResourcesController } from './courses.controller';
+import { StudentResourcesController } from './courses.controller';
 import { PrismaService } from '../tenants/prisma.service';
 import { AuthorizationModule } from '../authorization/authorization.module';
 import { FeatureFlagsModule } from '../feature-flags/feature-flags.module';
@@ -18,7 +21,7 @@ import { SectionsModule } from './sections/sections.module';
 import { LessonsModule } from './lessons/lessons.module';
 import { EnrollmentsModule } from './enrollments/enrollments.module';
 import { ProgressModule } from './progress/progress.module';
-import { ProgressController } from './progress/progress.controller';
+import { ResourcesModule } from './resources/resources.module';
 
 @Module({
   imports: [
@@ -33,6 +36,7 @@ import { ProgressController } from './progress/progress.controller';
     LessonsModule,
     EnrollmentsModule,
     ProgressModule,
+    ResourcesModule,
   ],
   controllers: [
     TeacherCoursesController,
@@ -42,6 +46,8 @@ import { ProgressController } from './progress/progress.controller';
     StudentLessonsController,
     StudentEnrollmentsController,
     ProgressController,
+    TeacherResourcesController,
+    StudentResourcesController,
   ],
   providers: [CoursesService, PrismaService],
   exports: [CoursesService],

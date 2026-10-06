@@ -29,6 +29,7 @@ model Tenant {
   sections            Section[]
   lessons             Lesson[]
   videos              Video[]
+  resources           Resource[]
   enrollments         Enrollment[]
   exams               Exam[]
   examQuestions       ExamQuestion[]
@@ -274,6 +275,7 @@ model Lesson {
   section  Section         @relation(fields: [sectionId], references: [id], onDelete: Cascade)
   progress LessonProgress[]
   videos   Video[]
+  resources Resource[]
   assignment Assignment?
   exam     Exam?
 
@@ -284,6 +286,35 @@ model Lesson {
   @@index([status])
   @@index([assignmentId])
   @@index([examId])
+}
+
+// ============================================
+// RESOURCE
+// ============================================
+
+model Resource {
+  id           String   @id @default(uuid())
+  tenantId     String
+  lessonId     String
+  title        String
+  type         String   // PDF | FILE | LINK
+  assetId      String?
+  url          String?
+  mimeType     String?
+  size         BigInt?
+  position     Int
+  downloadable Boolean  @default(false)
+
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  lesson Lesson @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+
+  @@map("resources")
+  @@index([tenantId])
+  @@index([lessonId])
+  @@unique([tenantId, id])
 }
 
 // ============================================

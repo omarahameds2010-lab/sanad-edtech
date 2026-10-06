@@ -17,6 +17,7 @@ import { CoursesService } from './courses.service';
 import { SectionsService } from './sections/sections.service';
 import { LessonsService } from './lessons/lessons.service';
 import { EnrollmentsService } from './enrollments/enrollments.service';
+import { ResourcesService } from './resources/resources.service';
 import { CreateCourseRequest, UpdateCourseRequest } from './dto/create-course.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RequirePermission } from '../authorization/authorization.decorators';
@@ -247,6 +248,53 @@ export class StudentLessonsController {
   @RequirePermission({ action: 'read', resourceType: 'lesson', resourceIdParam: 'lessonId' })
   async getLesson(@Request() req, @Param('lessonId') lessonId: string) {
     const result = await this.lessonsService.getStudentLesson(req.tenantId, req.user.sub, lessonId);
+    return { data: result };
+  }
+}
+
+@Controller('api/v1/teacher')
+@UseGuards(JwtAuthGuard)
+export class TeacherResourcesController {
+  constructor(private resourcesService: ResourcesService) {}
+
+  @Post('lessons/:lessonId/resources')
+  @RequirePermission({ action: 'create', resourceType: 'lesson' })
+  @HttpCode(HttpStatus.CREATED)
+  async create(@Request() req, @Param('lessonId') lessonId: string, @Body() body: any) {
+    const resource = await this.resourcesService.createResource(req.tenantId, lessonId, body);
+    return { data: resource };
+  }
+
+  @Get('lessons/:lessonId/resources')
+  @RequirePermission({ action: 'read', resourceType: 'lesson' })
+  async list(@Request() req, @Param('lessonId') lessonId: string) {
+    const resources = await this.resourcesService.listResources(req.tenantId, lessonId);
+    return { data: resources };
+  }
+
+  @Patch('resources/:id')
+  @RequirePermission({ action: 'update', resourceType: 'lesson', resourceIdParam: 'id' })
+  async update(@Request() req, @Param('id') id: string, @Body() body: any) {
+    const resource = await this.resourcesService.updateResource(req.tenantId, id, body);
+    return { data: resource };
+  }
+
+  @Delete('resources/:id')
+  @RequirePermission({ action: 'delete', resourceType: 'lesson', resourceIdParam: 'id' })
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async remove(@Request() req, @Param('id') id: string) {
+    await this.resourcesService.deleteResource(req.tenantId, id);
+  }
+}
+
+@Controller('api/v1/student/resources')
+@UseGuards(JwtAuthGuard)
+export class StudentResourcesController {
+  constructor(private resourcesService: ResourcesService) {}
+
+  @Post(':id/access-url')
+  async accessUrl(@Request() req, @Param('id') id: string) {
+    const result = await this.resourcesService.getAccessUrl(req.tenantId, req.user.sub, id);
     return { data: result };
   }
 }
