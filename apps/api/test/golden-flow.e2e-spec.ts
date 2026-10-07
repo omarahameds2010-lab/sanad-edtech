@@ -363,5 +363,17 @@ describe('Golden LMS Flow (E2E, in-memory Prisma)', () => {
     // 14. Verify progression rule: ENTER_ASSIGNMENT still holds (assignment entered even if not graded)
     const examAccessAfterGrade = await lessonsService.getStudentLesson(TENANT, STUDENT, examLesson.id);
     expect(examAccessAfterGrade.access.isLocked).toBe(false);
+
+    // 15. Student submits exam attempt
+    const examSubmission = await examsService.submitExamAttempt(TENANT, STUDENT, exam.id, {
+      answers: [{ questionId: 'q1', selectedOptionIds: ['opt1'] }],
+      idempotencyKey: 'key-exam-submit-1',
+    });
+    expect(examSubmission.status).toBe('SUBMITTED');
+
+    // 16. Exam result: check student's attempt status after submission
+    const attempts = await examsService.getStudentExamAttempts(TENANT, STUDENT, exam.id);
+    expect(attempts.length).toBe(1);
+    expect(attempts[0].status).toBe('SUBMITTED');
   });
 });
