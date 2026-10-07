@@ -355,6 +355,281 @@ VDOCIPHER_BASE_URL="https://dev.vdocipher.com/api"
 
 ---
 
+## LMS Core: Assignment/Exam Timers & Content Progression System
+
+### Assignment Timer
+- **Default**: 300 minutes (5 hours / 18000 seconds)
+- **Server-authoritative**: `expiresAt = startedAt + configured duration`
+- **Frontend displays**: remaining time only (derived from expiresAt)
+- **Refresh/browser restart must NOT reset timer**
+- **Timer belongs to the attempt**, not the generic assignment
+- Once an attempt starts: `expiresAt` is authoritative
+- Starting the same attempt again MUST NOT reset the timer
+
+### Exam Timer
+- **Default**: 70 minutes (4200 seconds)
+- **Server-authoritative**: `expiresAt = startedAt + configured duration`
+- **On refresh**: expiresAt unchanged
+- **On browser clock manipulation**: server time authoritative
+- Each attempt has its own timer (no shared timer)
+
+### Timer Storage Decision
+- Store: `startedAt`, `expiresAt`
+- Do NOT store only: `remainingSeconds` (derived value)
+- Canonical: `expiresAt = source of truth`
+- `remainingSeconds = derived display value`
+
+### Content Progression System (Progression by Entry)
+
+**Current active progression rules:**
+```
+ENTER_ASSIGNMENT
+    ↓
+EXAM becomes available
+
+ENTER_EXAM
+    ↓
+NEXT LESSON becomes available
+```
+
+**Active unlock types (current phase):**
+- `ENTER_ASSIGNMENT` → unlock linked Exam
+- `ENTER_EXAM` → unlock NEXT LESSON
+
+**Future extension points (not implemented yet):**
+- `COMPLETE_ASSIGNMENT` → unlock next
+- `COMPLETE_EXAM` → unlock next
+- `PASS_EXAM` → unlock next
+- `SCORE_THRESHOLD` → unlock next
+- `TIME_ELAPSED` → unlock after time
+- `MANUAL` → teacher manual unlock
+
+### Progression Trigger
+**Current implementation:**
+- Student enters Assignment (POST /assignments/:id/attempts)
+  → record ENTER_ASSIGNMENT
+  → linked Exam becomes available
+
+- Student enters Exam (POST /exams/:id/attempts)
+  → record ENTER_EXAM
+  → next lesson becomes available
+
+**Progression does NOT require:**
+- SUBMITTED
+- GRADED
+- PASS
+- Score threshold
+
+### Progression Security
+- Frontend MUST NOT control unlock state
+- Unlock decisions happen on server:
+  - Student Request → Auth → Tenant → Authorization → Enrollment → Entitlement → Business Rule → Transaction → Progression Update → Audit/Event
+- Frontend receives only: `isLocked: boolean`, `unlockType: ContentUnlockType`
+
+### Idempotency for Progression
+- Progression updates must be idempotent
+- Use idempotency keys for unlock operations
+- Database constraints prevent duplicate unlocks
+- Transaction + database constraints protect against concurrent requests
+
+### Content Unlock Types (Active vs Future)
+| Unlock Type | Status | Description |
+|-------------|--------|-------------|
+| `ENTER_ASSIGNMENT` | **ACTIVE** | Student enters assignment |
+| `ENTER_EXAM` | **ACTIVE** | Student enters exam |
+| `COMPLETE_ASSIGNMENT` | FUTURE | Assignment completed |
+| `COMPLETE_EXAM` | FUTURE | Exam completed |
+| `PASS_EXAM` | FUTURE | Exam passed |
+| `SCORE_THRESHOLD` | FUTURE | Score threshold reached |
+| `TIME_ELAPSED` | FUTURE | Time elapsed |
+| `MANUAL` | FUTURE | Teacher manual unlock |
+
+### Progression Security
+- **Idempotency**: Progression updates must be idempotent
+- **Transaction**: Progression updates in same transaction as business logic
+- **Audit**: Every unlock event logged with reason
+- **Idempotency keys**: Prevent duplicate unlocks on retry
+- **Database constraints**: Prevent duplicate unlocks at DB level
+
+### Timer Security
+- **Timer state belongs to the individual attempt record**
+- Store: `startedAt`, `expiresAt` (authoritative)
+- Do NOT store only `remainingSeconds` (derived value)
+- **Canonical**: `expiresAt = source of truth`
+- `remainingSeconds = derived display value`
+
+### Assignment Timer
+- **Default**: 300 minutes (5 hours / 18000 seconds)
+- **Server-authoritative**: `expiresAt = startedAt + configured duration`
+- **Frontend displays**: remaining time only (derived from expiresAt)
+- **Refresh/browser restart must NOT reset timer**
+- **Timer belongs to the attempt**, not the generic assignment
+- Once an attempt starts: `expiresAt` is authoritative
+- Starting the same attempt again MUST NOT reset the timer
+
+### Exam Timer
+- **Default**: 70 minutes (4200 seconds)
+- **Server-authoritative**: `expiresAt = startedAt + configured duration`
+- **On refresh**: expiresAt unchanged
+- **On browser clock manipulation**: server time authoritative
+- Each attempt has its own timer (no shared timer)
+
+### Timer Storage Decision
+- Store: `startedAt`, `expiresAt`
+- Do NOT store only: `remainingSeconds` (derived value)
+- Canonical: `expiresAt = source of truth`
+- `remainingSeconds = derived display value`
+
+### Assignment Timer
+- **Default**: 300 minutes (5 hours / 18000 seconds)
+- **Server-authoritative**: `expiresAt = startedAt + configured duration`
+- **Frontend displays**: remaining time only (derived from expiresAt)
+- **Refresh/browser restart must NOT reset timer**
+- **Timer belongs to the attempt**, not the generic assignment
+- Once an attempt starts: `expiresAt` is authoritative
+- Starting the same attempt again MUST NOT reset the timer
+
+### Exam Timer
+- **Default**: 70 minutes (4200 seconds)
+- **Server-authoritative**: `expiresAt = startedAt + configured duration`
+- **On refresh**: expiresAt unchanged
+- **On browser clock manipulation**: server time authoritative
+- Each attempt has its own timer (no shared timer)
+
+### Timer Storage Decision
+- Store: `startedAt`, `expiresAt`
+- Do NOT store only: `remainingSeconds` (derived value)
+- Canonical: `expiresAt = source of truth`
+- `remainingSeconds = derived display value`
+
+### Content Progression System (Progression by Entry)
+
+**Current active progression rules:**
+```
+ENTER_ASSIGNMENT
+    ↓
+EXAM becomes available
+
+ENTER_EXAM
+    ↓
+NEXT LESSON becomes available
+```
+
+**Active unlock types (current phase):**
+- `ENTER_ASSIGNMENT` → unlock linked Exam
+- `ENTER_EXAM` → unlock NEXT LESSON
+
+**Future extension points (not implemented yet):**
+- `COMPLETE_ASSIGNMENT` → unlock next
+- `COMPLETE_EXAM` → unlock next
+- `PASS_EXAM` → unlock next
+- `SCORE_THRESHOLD` → unlock next
+- `TIME_ELAPSED` → unlock after time
+- `MANUAL` → teacher manual unlock
+
+### Progression Trigger
+**Current implementation:**
+- Student enters Assignment (POST /assignments/:id/attempts)
+  → record ENTER_ASSIGNMENT
+  → linked Exam becomes available
+
+- Student enters Exam (POST /exams/:id/attempts)
+  → record ENTER_EXAM
+  → next lesson becomes available
+
+**Progression does NOT require:**
+- SUBMITTED
+- GRADED
+- PASS
+- Score threshold
+
+### Progression Security
+- **Frontend MUST NOT control unlock state**
+- Unlock decisions happen on server:
+  - Student Request → Auth → Tenant → Authorization → Enrollment → Entitlement → Business Rule → Transaction → Progression Update → Audit/Event
+- Frontend receives only: `isLocked: boolean`, `unlockType: ContentUnlockType`
+
+### Idempotency for Progression
+- Progression updates must be idempotent
+- Use idempotency keys for unlock operations
+- Database constraints prevent duplicate unlocks
+- Transaction + database constraints protect against concurrent requests
+
+---
+
+## Testing Requirements
+
+### Unit Tests
+- [ ] `WatermarkEngine.positionAt()` deterministic with same seed
+- [ ] `WatermarkEngine.signPayload()` / `verifySignature()` roundtrip
+- [ ] `SignedTokenService` token creation + verification + expiration
+- [ ] `PlaybackSessionService` risk scoring logic
+- [ ] `WatermarkOverlay` tamper detection (MutationObserver mock)
+
+### Integration Tests
+- [ ] Tenant A cannot get playback token for Tenant B's video
+- [ ] Expired token rejected by `verifyPlaybackToken`
+- [ ] Webhook signature forgery rejected
+- [ ] Concurrent session limit enforced
+- [ ] Device limit enforced
+- [ ] Quota enforcement before upload URL
+- [ ] Webhook replay attack ignored (idempotency)
+- [ ] Webhook signature forgery rejected
+
+### E2E Tests
+- [ ] Teacher uploads video → student watches → watermark visible
+- [ ] Student screen records → capture event logged → risk score increases
+- [ ] Student shares token → second session rejected (single session)
+- [ ] Expired token rejected at CDN edge
+
+### New Tests for LMS Core
+- [ ] **Assignment timer**: starts on ENTER, expires correctly, no reset on refresh
+- [ ] **Exam timer**: starts on ENTER, expires correctly, no reset on refresh
+- [ ] **Progression by Entry**: ENTER_ASSIGNMENT → Exam unlocks, ENTER_EXAM → Next Lesson unlocks
+- [ ] **No score-based progression**: Student can progress without passing
+- [ ] **Timer persistence**: Refresh/browser close doesn't reset timer
+- [ ] **Concurrency**: Two tabs starting same assignment don't create two attempts
+- [ ] **Idempotent progression**: Repeated unlock requests don't create duplicates
+- [ ] **Server-authoritative timer**: Browser clock manipulation doesn't affect expiry
+
+---
+
+## Monitoring & Alerting
+
+### Metrics
+| Metric | Threshold | Alert |
+|--------|-----------|-------|
+| `video.playback.revoked.rate` | > 5% / 5min | WARNING |
+| `video.capture_events.rate` | > 10/min | WARNING |
+| `video.watermark_tampered.rate` | > 0 / 5min | CRITICAL |
+| `video.webhook.signature_failure.rate` | > 1% / 5min | CRITICAL |
+| `video.upload.failure.rate` | > 10% / 15min | WARNING |
+| `video.quota_exceeded.count` | > 0 / hour | INFO |
+
+### New Metrics for LMS Core
+| Metric | Threshold | Alert |
+|--------|-----------|-------|
+| `assignment.timer.expired.rate` | > 10% / 5min | INFO |
+| `exam.timer.expired.rate` | > 10% / 5min | INFO |
+| `progression.unlock.rate` | > 100/min | INFO |
+| `progression.idempotent_conflict.rate` | > 0 / 5min | WARNING |
+
+---
+
+## Future Enhancements
+
+| Feature | Priority | Effort |
+|---------|----------|--------|
+| DRM (Widevine/FairPlay) via Bunny/VdoCipher | High | Medium |
+| Per-segment encryption (AES-128) | Medium | Low |
+| Machine learning risk scoring | Low | High |
+| Forensic watermark extraction tool | Medium | Medium |
+| Automated DMCA takedown integration | Low | Medium |
+| **Assignment/Exam timer API** | **High** | **Medium** |
+| **Content Progression API** | **High** | **Medium** |
+
+---
+
 ## Security Reality Check
 
 > **No video protection is 100% foolproof.** Screen recording via external camera, HDMI capture cards, virtual machines, and rooted/jailbroken devices cannot be prevented.
@@ -376,3 +651,6 @@ VDOCIPHER_BASE_URL="https://dev.vdocipher.com/api"
 ## Implementation
 - `apps/api/src/modules/video/`
 - `apps/api/src/modules/video-protection/`
+- `apps/api/src/modules/assignments/`
+- `apps/api/src/modules/exams/`
+- `apps/api/src/modules/content-progression/`

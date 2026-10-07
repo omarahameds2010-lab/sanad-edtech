@@ -221,6 +221,8 @@ model Course {
   @@index([tenantId])
   @@index([slug])
   @@index([status])
+  @@index([tenantId, status])
+  @@index([tenantId, createdAt])
 }
 
 model Section {
@@ -238,6 +240,7 @@ model Section {
   @@map("sections")
   @@index([tenantId])
   @@index([courseId])
+  @@index([tenantId, courseId])
 }
 
 model Lesson {
@@ -286,6 +289,9 @@ model Lesson {
   @@index([status])
   @@index([assignmentId])
   @@index([examId])
+  @@index([tenantId, sectionId])
+  @@index([tenantId, status])
+  @@index([tenantId, createdAt])
 }
 
 // ============================================
@@ -315,6 +321,8 @@ model Resource {
   @@index([tenantId])
   @@index([lessonId])
   @@unique([tenantId, id])
+  @@index([tenantId, lessonId])
+  @@index([tenantId, type])
 }
 
 // ============================================
@@ -345,6 +353,8 @@ model Assignment {
   @@index([tenantId])
   @@index([lessonId])
   @@index([status])
+  @@index([tenantId, status])
+  @@index([tenantId, lessonId])
 }
 
 enum AssignmentStatus {
@@ -423,6 +433,8 @@ model Exam {
   @@index([tenantId])
   @@index([lessonId])
   @@index([status])
+  @@index([tenantId, status])
+  @@index([tenantId, lessonId])
 }
 
 enum ExamStatus {
@@ -500,6 +512,9 @@ model ExamAttempt {
   @@index([studentId])
   @@index([status])
   @@unique([examId, studentId, attemptNumber])
+  @@index([tenantId, examId])
+  @@index([tenantId, studentId])
+  @@index([tenantId, status])
 }
 
 enum AttemptStatus {
@@ -631,6 +646,9 @@ model Enrollment {
   @@index([userId])
   @@index([courseId])
   @@unique([userId, courseId])
+  @@index([tenantId, userId])
+  @@index([tenantId, courseId])
+  @@index([tenantId, status])
 }
 
 model LessonProgress {
@@ -650,6 +668,8 @@ model LessonProgress {
   @@unique([tenantId, userId, lessonId])
   @@index([tenantId])
   @@index([userId])
+  @@index([tenantId, lessonId])
+  @@index([tenantId, completedAt])
 }
 
 enum EnrollmentStatus {

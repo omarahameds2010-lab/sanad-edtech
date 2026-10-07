@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import { useState } from 'react';
 import UploadManager from '@/app/components/upload/UploadManager';
 
@@ -44,7 +45,7 @@ export default function ThumbnailUploader({ lessonId, courseId, onComplete, onEr
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-md)', maxWidth: 400 }}>
       {preview && (
         <div style={{ position: 'relative', aspectRatio: '16/9', borderRadius: 'var(--radius-card)', overflow: 'hidden', border: '1px solid var(--border-subtle)' }}>
-          <img src={preview} alt="Thumbnail preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+          <Image src={preview} alt="Thumbnail preview" fill style={{ objectFit: 'cover' }} />
         </div>
       )}
 

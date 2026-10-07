@@ -312,8 +312,321 @@ When operationally justified, these modules can become independent services:
 4. **Analytics** (OLAP, heavy queries)
 5. **Notifications** (email/WhatsApp/push volume)
 6. **Search** (Meilisearch/Elasticsearch)
+6. **LMS Core** (content progression, assignment/exam timers)
+
+---
+## LMS Core: Content Progression & Timer Architecture
+
+### Content Progression System (Progression by Entry)
+
+**Current active progression rules:**
+```
+ENTER_ASSIGNMENT
+    ↓
+EXAM becomes available
+
+ENTER_EXAM
+    ↓
+NEXT LESSON becomes available
+```
+
+**Active unlock types (current phase):**
+- `ENTER_ASSIGNMENT` → unlock linked Exam
+- `ENTER_EXAM` → unlock NEXT LESSON
+
+**Future extension points (not implemented yet):**
+- `COMPLETE_ASSIGNMENT` → unlock next
+- `COMPLETE_EXAM` → unlock next
+- `PASS_EXAM` → unlock next
+- `SCORE_THRESHOLD` → unlock next
+- `TIME_ELAPSED` → unlock after time
+- `MANUAL` → teacher manual unlock
+
+### Progression Trigger
+**Current implementation:**
+- Student enters Assignment (POST /assignments/:id/attempts)
+  → record ENTER_ASSIGNMENT
+  → linked Exam becomes available
+
+- Student enters Exam (POST /exams/:id/attempts)
+  → record ENTER_EXAM
+  → next lesson becomes available
+
+**Progression does NOT require:**
+- SUBMITTED
+- GRADED
+- PASS
+- Score threshold
+
+### Progression Security
+- **Frontend MUST NOT control unlock state**
+- Unlock decisions happen on server:
+  - Student Request → Auth → Tenant → Authorization → Enrollment → Entitlement → Business Rule → Transaction → Progression Update → Audit/Event
+- Frontend receives only: `isLocked: boolean`, `unlockType: ContentUnlockType`
+
+### Idempotency for Progression
+- Progression updates must be idempotent
+- Use idempotency keys for unlock operations
+- Database constraints prevent duplicate unlocks
+- Transaction + database constraints protect against concurrent requests
+
+### Timer Security
+- **Timer state belongs to the individual attempt record**
+- Store: `startedAt`, `expiresAt` (authoritative)
+- Do NOT store only `remainingSeconds` (derived value)
+- Canonical: `expiresAt = source of truth`
+- `remainingSeconds = derived display value`
+
+#### Assignment Timer
+- **Default**: 300 minutes (5 hours / 18000 seconds)
+- **Server-authoritative**: `expiresAt = startedAt + configured duration`
+- **Frontend displays**: remaining time only (derived from expiresAt)
+- **Refresh/browser restart must NOT reset timer**
+- **Timer belongs to the attempt**, not the generic assignment
+- Once an attempt starts: `expiresAt` is authoritative
+- Starting the same attempt again MUST NOT reset the timer
+
+#### Exam Timer
+- **Default**: 70 minutes (4200 seconds)
+- **Server-authoritative**: `expiresAt = startedAt + configured duration`
+- **On refresh**: expiresAt unchanged
+- **On browser clock manipulation**: server time authoritative
+- Each attempt has its own timer (no shared timer)
+
+#### Timer Storage Decision
+- Store: `startedAt`, `expiresAt` (authoritative)
+- Do NOT store only `remainingSeconds` (derived value)
+- Canonical: `expiresAt = source of truth`
+- `remainingSeconds = derived display value`
+
+### Timer Security
+- **Timer state belongs to the individual attempt record**
+- Store: `startedAt`, `expiresAt` (authoritative)
+- Do NOT store only `remainingSeconds` (derived value)
+- Canonical: `expiresAt = source of truth`
+- `remainingSeconds = derived display value`
+
+#### Assignment Timer
+- **Default**: 300 minutes (5 hours / 18000 seconds)
+- **Server-authoritative**: `expiresAt = startedAt + configured duration`
+- **Frontend displays**: remaining time only (derived from expiresAt)
+- **Refresh/browser restart must NOT reset timer**
+- **Timer belongs to the attempt**, not the generic assignment
+- Once an attempt starts: `expiresAt` is authoritative
+- Starting the same attempt again MUST NOT reset the timer
+
+#### Exam Timer
+- **Default**: 70 minutes (4200 seconds)
+- **Server-authoritative**: `expiresAt = startedAt + configured duration`
+- **On refresh**: expiresAt unchanged
+- **On browser clock manipulation**: server time authoritative
+- Each attempt has its own timer (no shared timer)
+
+#### Timer Storage Decision
+- Store: `startedAt`, `expiresAt` (authoritative)
+- Do NOT store only `remainingSeconds` (derived value)
+- Canonical: `expiresAt = source of truth`
+- `remainingSeconds = derived display value`
+
+### Content Progression System (Progression by Entry)
+
+**Current active progression rules:**
+```
+ENTER_ASSIGNMENT
+    ↓
+EXAM becomes available
+
+ENTER_EXAM
+    ↓
+NEXT LESSON becomes available
+```
+
+**Active unlock types (current phase):**
+- `ENTER_ASSIGNMENT` → unlock linked Exam
+- `ENTER_EXAM` → unlock NEXT LESSON
+
+**Future extension points (not implemented yet):**
+- `COMPLETE_ASSIGNMENT` → unlock next
+- `COMPLETE_EXAM` → unlock next
+- `PASS_EXAM` → unlock next
+- `SCORE_THRESHOLD` → unlock next
+- `TIME_ELAPSED` → unlock after time
+- `MANUAL` → teacher manual unlock
+
+### Progression Trigger
+**Current implementation:**
+- Student enters Assignment (POST /assignments/:id/attempts)
+  → record ENTER_ASSIGNMENT
+  → linked Exam becomes available
+
+- Student enters Exam (POST /exams/:id/attempts)
+  → record ENTER_EXAM
+  → next lesson becomes available
+
+**Progression does NOT require:**
+- SUBMITTED
+- GRADED
+- PASS
+- Score threshold
+
+### Progression Security
+- **Frontend MUST NOT control unlock state**
+- Unlock decisions happen on server:
+  - Student Request → Auth → Tenant → Authorization → Enrollment → Entitlement → Business Rule → Transaction → Progression Update → Audit/Event
+- Frontend receives only: `isLocked: boolean`, `unlockType: ContentUnlockType`
+
+### Idempotency for Progression
+- Progression updates must be idempotent
+- Use idempotency keys for unlock operations
+- Database constraints prevent duplicate unlocks
+- Transaction + database constraints protect against concurrent requests
 
 ---
 
-*Last updated: 2026-10-04*
-*Source of truth: `AGENTS.md` + `docs/STATUS.md`*
+## LMS Core: Assignment/Exam Architecture
+
+### Assignment/Exam Domain Models
+
+#### Assignment
+- **Fields**: title, description, instructions, timerMinutes (default 300), passingScore, maxAttempts, deadline, status
+- **AssignmentAttempt** lifecycle: IN_PROGRESS → SUBMITTED / EXPIRED / CANCELLED → GRADED
+- **Timer**: 300 minutes default, server-authoritative (expiresAt authoritative)
+- **Submission**: text + file attachments
+- **Grading**: teacher grades submission → score + feedback
+
+#### Exam
+- **Fields**: title, description, timerMinutes (default 70), passingScore, maxAttempts, shuffle
+- **ExamAttempt** lifecycle: IN_PROGRESS → SUBMITTED / EXPIRED / CANCELLED → GRADED
+- **Timer**: 70 minutes default, server-authoritative (expiresAt authoritative)
+- **Question types**: MCQ, TRUE_FALSE, SHORT_ANSWER, ESSAY, MATCHING
+- **Never expose correct answers** to students
+
+#### Assignment/Exam Progression
+- **ENTER_ASSIGNMENT** → unlock linked Exam
+- **ENTER_EXAM** → unlock NEXT LESSON
+- No score/pass requirements for progression
+- Timer starts on ENTER, not on page load
+
+### Assignment/Exam Timer Architecture
+
+#### Timer Security
+- **Timer state belongs to the individual attempt record**
+- Store: `startedAt`, `expiresAt` (authoritative)
+- Do NOT store only `remainingSeconds` (derived value)
+- Canonical: `expiresAt = source of truth`
+- `remainingSeconds = derived display value`
+
+#### Assignment Timer
+- **Default**: 300 minutes (5 hours / 18000 seconds)
+- **Server-authoritative**: `expiresAt = startedAt + configured duration`
+- **Frontend displays**: remaining time only (derived from expiresAt)
+- **Refresh/browser restart must NOT reset timer**
+- **Timer belongs to the attempt**, not the generic assignment
+- Once an attempt starts: `expiresAt` is authoritative
+- Starting the same attempt again MUST NOT reset the timer
+
+#### Exam Timer
+- **Default**: 70 minutes (4200 seconds)
+- **Server-authoritative**: `expiresAt = startedAt + configured duration`
+- **On refresh**: expiresAt unchanged
+- **On browser clock manipulation**: server time authoritative
+- Each attempt has its own timer (no shared timer)
+
+#### Timer Storage Decision
+- Store: `startedAt`, `expiresAt` (authoritative)
+- Do NOT store only `remainingSeconds` (derived value)
+- Canonical: `expiresAt = source of truth`
+- `remainingSeconds = derived display value`
+
+### Content Progression System (Progression by Entry)
+
+**Current active progression rules:**
+```
+ENTER_ASSIGNMENT
+    ↓
+EXAM becomes available
+
+ENTER_EXAM
+    ↓
+NEXT LESSON becomes available
+```
+
+**Active unlock types (current phase):**
+- `ENTER_ASSIGNMENT` → unlock linked Exam
+- `ENTER_EXAM` → unlock NEXT LESSON
+
+**Future extension points (not implemented yet):**
+- `COMPLETE_ASSIGNMENT` → unlock next
+- `COMPLETE_EXAM` → unlock next
+- `PASS_EXAM` → unlock next
+- `SCORE_THRESHOLD` → unlock next
+- `TIME_ELAPSED` → unlock after time
+- `MANUAL` → teacher manual unlock
+
+### Progression Trigger
+**Current implementation:**
+- Student enters Assignment (POST /assignments/:id/attempts)
+  → record ENTER_ASSIGNMENT
+  → linked Exam becomes available
+
+- Student enters Exam (POST /exams/:id/attempts)
+  → record ENTER_EXAM
+  → next lesson becomes available
+
+**Progression does NOT require:**
+- SUBMITTED
+- GRADED
+- PASS
+- Score threshold
+
+### Progression Security
+- **Frontend MUST NOT control unlock state**
+- Unlock decisions happen on server:
+  - Student Request → Auth → Tenant → Authorization → Enrollment → Entitlement → Business Rule → Transaction → Progression Update → Audit/Event
+- Frontend receives only: `isLocked: boolean`, `unlockType: ContentUnlockType`
+
+### Idempotency for Progression
+- Progression updates must be idempotent
+- Use idempotency keys for unlock operations
+- Database constraints prevent duplicate unlocks
+- Transaction + database constraints protect against concurrent requests
+
+---
+
+## Security Implementation
+
+### LMS Core Security Requirements
+
+#### Timer Security
+- **Timer state belongs to the individual attempt record**
+- Store: `startedAt`, `expiresAt` (authoritative)
+- Do NOT store only `remainingSeconds` (derived value)
+- Canonical: `expiresAt = source of truth`
+- `remainingSeconds = derived display value`
+
+#### Assignment Timer
+- **Default**: 300 minutes (5 hours / 18000 seconds)
+- **Server-authoritative**: `expiresAt = startedAt + configured duration`
+- **Frontend displays**: remaining time only (derived from expiresAt)
+- **Refresh/browser restart must NOT reset timer**
+- **Timer belongs to the attempt**, not the generic assignment
+- Once an attempt starts: `expiresAt` is authoritative
+- Starting the same attempt again MUST NOT reset the timer
+
+#### Exam Timer
+- **Default**: 70 minutes (4200 seconds)
+- **Server-authoritative**: `expiresAt = startedAt + configured duration`
+- **On refresh**: expiresAt unchanged
+- **On browser clock manipulation**: server time authoritative
+- Each attempt has its own timer (no shared timer)
+
+#### Timer Storage Decision
+- Store: `startedAt`, `expiresAt` (authoritative)
+- Do NOT store only `remainingSeconds` (derived value)
+- Canonical: `expiresAt = source of truth`
+- `remainingSeconds = derived display value`
+
+---
+
+*Last updated: 2026-10-05*
+*Source of truth: `AGENTS.md` + `docs/STATUS.md` + `docs/VIDEO_PROTECTION.md` + `docs/SECURITY.md`*

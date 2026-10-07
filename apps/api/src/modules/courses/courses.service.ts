@@ -5,6 +5,93 @@ import { UpdateCourseRequest } from './dto/create-course.dto';
 import { CourseStatus } from '@prisma/client';
 import { Prisma } from '@prisma/client';
 
+const courseSelect = {
+  id: true,
+  title: true,
+  slug: true,
+  shortDescription: true,
+  description: true,
+  thumbnailUrl: true,
+  visibility: true,
+  level: true,
+  language: true,
+  price: true,
+  currency: true,
+  status: true,
+  publishedAt: true,
+  createdAt: true,
+  updatedAt: true,
+} as const;
+
+const courseWithSectionsSelect = {
+  ...courseSelect,
+  sections: {
+    include: {
+      lessons: {
+        where: { status: 'PUBLISHED' },
+        select: { id: true },
+      },
+    },
+  },
+} as const;
+
+const coursePreviewSelect = {
+  ...courseSelect,
+  sections: {
+    where: {
+      lessons: {
+        some: { status: 'PUBLISHED' },
+      },
+    },
+    include: {
+      lessons: {
+        where: { status: 'PUBLISHED' },
+        orderBy: { orderIndex: 'asc' },
+        select: {
+          id: true,
+          title: true,
+          type: true,
+          orderIndex: true,
+          duration: true,
+        },
+      },
+    },
+  },
+} as const;
+
+const courseListSelect = {
+  id: true,
+  title: true,
+  slug: true,
+  shortDescription: true,
+  description: true,
+  thumbnailUrl: true,
+  visibility: true,
+  level: true,
+  language: true,
+  price: true,
+  currency: true,
+  status: true,
+  createdAt: true,
+  updatedAt: true,
+} as const;
+
+const coursePublicSelect = {
+  id: true,
+  title: true,
+  slug: true,
+  shortDescription: true,
+  description: true,
+  thumbnailUrl: true,
+  visibility: true,
+  level: true,
+  language: true,
+  price: true,
+  currency: true,
+  createdAt: true,
+  updatedAt: true,
+} as const;
+
 @Injectable()
 export class CoursesService {
   constructor(private prisma: PrismaService) {}
@@ -47,6 +134,7 @@ export class CoursesService {
   async getCourse(tenantId: string, courseId: string) {
     const course = await this.prisma.course.findFirst({
       where: { id: courseId, tenantId },
+      select: courseSelect,
     });
 
     if (!course) {
@@ -67,6 +155,7 @@ export class CoursesService {
       orderBy: { createdAt: 'desc' },
       take: limit + 1,
       cursor: cursor ? { id: cursor } : undefined,
+      select: courseListSelect,
     });
 
     let nextCursor: string | null = null;

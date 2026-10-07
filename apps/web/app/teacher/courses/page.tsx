@@ -1,3 +1,5 @@
+import Image from 'next/image';
+
 const courses = [
   {
     id: 'c1',
@@ -83,10 +85,12 @@ export default function CoursesPage() {
               <tr key={course.id} style={{ borderBottom: '1px solid var(--border-subtle)' }}>
                 <td style={{ padding: 'var(--space-md)' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-md)' }}>
-                    <img
+                    <Image
                       src={course.thumbnail}
-                      alt=""
-                      style={{ width: 64, height: 36, borderRadius: 'var(--radius-control)', objectFit: 'cover' }}
+                      alt={course.title}
+                      width={64}
+                      height={36}
+                      style={{ borderRadius: 'var(--radius-control)', objectFit: 'cover' }}
                     />
                     <div>
                       <div style={{ fontWeight: 600 }}>{course.title}</div>

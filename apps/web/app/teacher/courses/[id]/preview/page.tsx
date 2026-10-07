@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import Link from 'next/link';
 
 const course = {
@@ -77,10 +78,12 @@ export default function CoursePreviewPage() {
           marginBottom: 'var(--space-lg)',
         }}
       >
-        <img
+        <Image
           src={course.thumbnail}
-          alt=""
-          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+          alt={course.title}
+          fill
+          style={{ objectFit: 'cover' }}
+          priority
         />
         <div
           style={{

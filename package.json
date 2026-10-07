@@ -9,9 +9,11 @@
     "test": "turbo run test",
     "lint": "turbo run lint",
     "format": "turbo run format",
-    "clean": "turbo run clean && rm -rf node_modules"
+    "clean": "turbo run clean && rm -rf node_modules",
+    "export:openapi": "ts-node -r tsconfig-paths/register apps/api/scripts/export-openapi.ts"
   },
   "devDependencies": {
+    "@apidevtools/swagger-parser": "^13.1.0",
     "turbo": "^2.0.0",
     "typescript": "^5.3.3"
   },

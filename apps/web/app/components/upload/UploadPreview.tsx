@@ -19,7 +19,7 @@ export default function UploadPreview({ files, onRemove }: UploadPreviewProps) {
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))', gap: 'var(--space-sm)' }}>
       {imageFiles.map((file) => (
         <div key={file.id} style={{ position: 'relative', aspectRatio: '1', borderRadius: 'var(--radius-control)', overflow: 'hidden', border: '1px solid var(--border-subtle)' }}>
-          <img src={file.preview} alt={file.file.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+          <img src={file.preview} alt={file.file.name} width={100} height={100} style={{ objectFit: 'cover' }} />
           <button
             onClick={() => onRemove(file.id)}
             style={{

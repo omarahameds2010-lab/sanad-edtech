@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import { UploadFile } from '@/app/hooks/useUpload';
 import UploadProgress from './UploadProgress';
 
@@ -28,7 +29,7 @@ export default function UploadItem({ file, onCancel, onRetry, onRemove, showPrev
   return (
     <div className="card" style={{ display: 'flex', gap: 'var(--space-md)', alignItems: 'center', position: 'relative' }}>
       {file.preview && showPreview && (
-        <img src={file.preview} alt="" style={{ width: 64, height: 64, borderRadius: 'var(--radius-control)', objectFit: 'cover' }} />
+        <Image src={file.preview} alt={file.file.name} width={64} height={64} style={{ borderRadius: 'var(--radius-control)', objectFit: 'cover' }} />
       )}
 
       <div style={{ flex: 1, minWidth: 0 }}>

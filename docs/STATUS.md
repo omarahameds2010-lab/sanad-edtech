@@ -104,6 +104,10 @@
 - [ ] Add `REDEEM` action to authorization `Action` enum
 - [ ] Pin single Prisma version in package.json (5.22.0)
 - [ ] Run tenant isolation tests against live DB
+- [ ] **Add LMS Core content types (ASSIGNMENT, EXAM, RESOURCE) to Lesson model**
+- [ ] **Implement Assignment/Exam models with timers (300min/70min)**
+- [ ] **Implement Content Progression System (ENTER_ASSIGNMENT → unlock EXAM, ENTER_EXAM → unlock NEXT LESSON)**
+- [ ] **Implement Assignment/Exam timers with server-authoritative timing**
 
 ---
 
@@ -121,11 +125,11 @@
 
 ## 🎯 NEXT 5 TASKS (Priority Order)
 
-1. **Add `REDEEM` to `Action` enum** in `policy-engine.ts` and regenerate Prisma
-2. **Update package.json Prisma version to 5.22.0** and run `pnpm install`
-3. **Start PostgreSQL via docker-compose** and run `prisma migrate deploy`
-4. **Write and run tenant isolation tests** (tenant A vs tenant B on users, courses, enrollments, orders)
-5. **Commit** with message "docs: update status; fix build; add app_user init; env.example split"
+1. **Add LMS Core content types (ASSIGNMENT, EXAM, RESOURCE) to Lesson model** and update Prisma schema
+2. **Implement Assignment/Exam models with timers** (300min assignment, 70min exam)
+2. **Implement Content Progression System** (ENTER_ASSIGNMENT → unlock EXAM, ENTER_EXAM → unlock NEXT LESSON)
+3. **Implement server-authoritative timers** (300min assignment, 70min exam)
+4. **Implement Content Progression System** (ENTER_ASSIGNMENT → unlock EXAM, ENTER_EXAM → unlock NEXT LESSON)
 
 ---
 

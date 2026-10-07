@@ -90,6 +90,74 @@ pnpm test
 - **Never claim success without `pnpm build` passing and showing output**
 - Prefer small PRs over big rewrites
 
+## LMS Core Requirements (New Phase)
+
+### Content Progression System
+- **Progression by Entry** (not score-based):
+  - ENTER_ASSIGNMENT → unlock EXAM
+  - ENTER_EXAM → unlock NEXT LESSON
+- **Assignment Timer**: 300 minutes (5 hours) default
+- **Exam Timer**: 70 minutes default
+- No score-based unlocking, no pass requirements for progression
+- Timer is server-authoritative (expiresAt is source of truth)
+
+### Assignment Rules
+- Timer starts at `startedAt = server time`, `expiresAt = startedAt + configured duration`
+- Frontend only displays remaining time (never source of truth)
+- Attempt lifecycle: IN_PROGRESS → SUBMITTED / EXPIRED / CANCELLED → GRADED
+- Maximum attempts per assignment configurable
+- Teacher grading flow: Submission → Graded (score + feedback)
+
+### Exam Rules
+- Default timer: 70 minutes (4200 seconds)
+- Server-authoritative timer (expiresAt is authoritative)
+- Attempt states: IN_PROGRESS, SUBMITTED, GRADED, EXPIRED, CANCELLED
+- Auto-submit on expiration
+- Question types: MCQ, TRUE_FALSE, SHORT_ANSWER, ESSAY, MATCHING
+- Never expose correct answers to students
+
+### Assignment/Exam Progression Rules
+- ENTER_ASSIGNMENT → unlock linked Exam
+- ENTER_EXAM → unlock NEXT LESSON
+- No score/pass requirements for progression
+- Future unlock types: COMPLETE_ASSIGNMENT, COMPLETE_EXAM, PASS_EXAM, SCORE_THRESHOLD, TIME_ELAPSED, MANUAL
+
+### Assignment Timer
+- Default: 300 minutes (5 hours / 18000 seconds)
+- Server-authoritative: `expiresAt = startedAt + configured duration`
+- Frontend displays remaining time only (derived from expiresAt)
+- Refresh/browser restart must NOT reset timer
+
+### Exam Timer
+- Default: 70 minutes (4200 seconds)
+- Server-authoritative: `expiresAt = startedAt + configured duration`
+- On refresh: expiresAt unchanged
+- On browser clock manipulation: server time authoritative
+
+### Content Progression System
+- **Progression by Entry** (not completion):
+  - ENTER_ASSIGNMENT → unlock EXAM
+  - ENTER_EXAM → unlock NEXT LESSON
+- No score-based prerequisites
+- No complex prerequisite engine
+- Timer starts on ENTER, not on page load
+
+### Content Unlock Security
+- Frontend MUST NOT control unlock state
+- Never accept `lockStatus: "UNLOCKED"` from student
+- Unlock decisions happen on server:
+  - Student Request → Auth → Tenant → Authorization → Enrollment → Entitlement → Business Rule → Transaction → Progression Update → Audit/Event
+
+### Idempotency for Progression
+- Progression updates must be idempotent
+- Use idempotency keys for unlock operations
+- Database constraints prevent duplicate unlocks
+- Transaction + database constraints protect against concurrent requests
+
+### Content Unlock Types (Active vs Future)
+- **Active now**: ENTER_ASSIGNMENT, ENTER_EXAM
+- **Future extension points**: COMPLETE_ASSIGNMENT, COMPLETE_EXAM, PASS_EXAM, SCORE_THRESHOLD, TIME_ELAPSED, MANUAL
+
 ## Repo Structure
 ```
 learning-platform/
