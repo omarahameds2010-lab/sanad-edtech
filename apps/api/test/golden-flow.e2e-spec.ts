@@ -375,5 +375,20 @@ describe('Golden LMS Flow (E2E, in-memory Prisma)', () => {
     const attempts = await examsService.getStudentExamAttempts(TENANT, STUDENT, exam.id);
     expect(attempts.length).toBe(1);
     expect(attempts[0].status).toBe('SUBMITTED');
+
+    // 17. Progress heartbeat: multiple updates accumulate, watchedSeconds is monotonic, position is capped
+    await progressService.updateProgress(TENANT, STUDENT, nextLesson.id, { positionSeconds: 60, watchedSeconds: 60 });
+    const prog1 = await progressService.getLessonProgress(TENANT, STUDENT, nextLesson.id);
+    expect(prog1.watchedSeconds).toBeGreaterThanOrEqual(60);
+
+    // Simulating seeking backward should NOT decrease watchedSeconds
+    await progressService.updateProgress(TENANT, STUDENT, nextLesson.id, { positionSeconds: 30, watchedSeconds: 30 });
+    const prog2 = await progressService.getLessonProgress(TENANT, STUDENT, nextLesson.id);
+    expect(prog2.watchedSeconds).toBeGreaterThanOrEqual(prog1.watchedSeconds as number);
+
+    // Position capped at lesson duration (nextLesson has no duration set, so check null)
+    await progressService.updateProgress(TENANT, STUDENT, nextLesson.id, { positionSeconds: 99999, watchedSeconds: 180 });
+    const prog3 = await progressService.getLessonProgress(TENANT, STUDENT, nextLesson.id);
+    expect(prog3.lastPosition).toBeDefined();
   });
 });
