@@ -1,7 +1,12 @@
-import { Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
-import { PrismaService } from '../../../tenants/prisma.service';
-import { EntitlementsService } from '../../../entitlements/entitlements.service';
-import { OutboxService } from '../../../outbox/outbox.service';
+import {
+  Injectable,
+  NotFoundException,
+  ConflictException,
+  BadRequestException,
+} from "@nestjs/common";
+import { PrismaService } from "../../../tenants/prisma.service";
+import { EntitlementsService } from "../../../entitlements/entitlements.service";
+import { OutboxService } from "../../../outbox/outbox.service";
 import {
   PaymentProvider,
   ProviderCapabilities,
@@ -12,13 +17,13 @@ import {
   VerifyProviderPaymentInput,
   VerifyWebhookInput,
   VerifiedWebhookResult,
-} from '../payment-provider.interface';
-import { VoucherDiscountType, Voucher } from '@prisma/client';
-import * as crypto from 'crypto';
+} from "../payment-provider.interface";
+import { VoucherDiscountType, Voucher } from "@prisma/client";
+import * as crypto from "crypto";
 
 @Injectable()
 export class VoucherProvider implements PaymentProvider {
-  readonly name = 'voucher';
+  readonly name = "voucher";
   readonly capabilities: ProviderCapabilities = {
     cards: false,
     wallets: false,
@@ -36,11 +41,13 @@ export class VoucherProvider implements PaymentProvider {
     private outboxService: OutboxService,
   ) {}
 
-  async createPayment(input: CreateProviderPaymentInput): Promise<CreateProviderPaymentResult> {
+  async createPayment(
+    input: CreateProviderPaymentInput,
+  ): Promise<CreateProviderPaymentResult> {
     return {
       success: false,
-      errorCode: 'INVALID_OPERATION',
-      errorMessage: 'Use redeemVoucher method for voucher payments',
+      errorCode: "INVALID_OPERATION",
+      errorMessage: "Use redeemVoucher method for voucher payments",
     };
   }
 
@@ -50,7 +57,13 @@ export class VoucherProvider implements PaymentProvider {
     code: string,
     courseId?: string,
     metadata?: Record<string, any>,
-  ): Promise<{ success: boolean; voucher?: Voucher; entitlements?: any[]; errorCode?: string; errorMessage?: string }> {
+  ): Promise<{
+    success: boolean;
+    voucher?: Voucher;
+    entitlements?: any[];
+    errorCode?: string;
+    errorMessage?: string;
+  }> {
     const codeHash = this.hashCode(code);
 
     const voucher = await this.prisma.voucher.findUnique({
@@ -58,7 +71,11 @@ export class VoucherProvider implements PaymentProvider {
     });
 
     if (!voucher) {
-      return { success: false, errorCode: 'VOUCHER_NOT_FOUND', errorMessage: 'Invalid voucher code' };
+      return {
+        success: false,
+        errorCode: "VOUCHER_NOT_FOUND",
+        errorMessage: "Invalid voucher code",
+      };
     }
 
     const validationError = this.validateVoucher(voucher, courseId, userId);
@@ -71,7 +88,11 @@ export class VoucherProvider implements PaymentProvider {
     });
 
     if (existingRedemption) {
-      return { success: false, errorCode: 'ALREADY_REDEEMED', errorMessage: 'Voucher already redeemed by this user' };
+      return {
+        success: false,
+        errorCode: "ALREADY_REDEEMED",
+        errorMessage: "Voucher already redeemed by this user",
+      };
     }
 
     const result = await this.prisma.$transaction(async (tx) => {
@@ -95,7 +116,7 @@ export class VoucherProvider implements PaymentProvider {
           tenantId,
           userId,
           voucher.courseId,
-          'voucher',
+          "voucher",
           { voucherId: voucher.id, redemptionId: redemption.id },
         );
       }
@@ -104,8 +125,8 @@ export class VoucherProvider implements PaymentProvider {
     });
 
     await this.outboxService.publish(tenantId, {
-      eventType: 'voucher.redeemed',
-      aggregateType: 'voucher',
+      eventType: "voucher.redeemed",
+      aggregateType: "voucher",
       aggregateId: voucher.id,
       payload: {
         voucherId: voucher.id,
@@ -123,35 +144,55 @@ export class VoucherProvider implements PaymentProvider {
     };
   }
 
-  private validateVoucher(voucher: Voucher, courseId?: string, userId?: string): { errorCode: string; errorMessage: string } | null {
+  private validateVoucher(
+    voucher: Voucher,
+    courseId?: string,
+    userId?: string,
+  ): { errorCode: string; errorMessage: string } | null {
     if (voucher.disabledAt) {
-      return { errorCode: 'VOUCHER_DISABLED', errorMessage: 'Voucher has been disabled' };
+      return {
+        errorCode: "VOUCHER_DISABLED",
+        errorMessage: "Voucher has been disabled",
+      };
     }
 
     if (voucher.expiresAt && voucher.expiresAt < new Date()) {
-      return { errorCode: 'VOUCHER_EXPIRED', errorMessage: 'Voucher has expired' };
+      return {
+        errorCode: "VOUCHER_EXPIRED",
+        errorMessage: "Voucher has expired",
+      };
     }
 
     if (voucher.usedCount >= voucher.maxUses) {
-      return { errorCode: 'VOUCHER_EXHAUSTED', errorMessage: 'Voucher usage limit reached' };
+      return {
+        errorCode: "VOUCHER_EXHAUSTED",
+        errorMessage: "Voucher usage limit reached",
+      };
     }
 
     if (courseId && voucher.courseId && voucher.courseId !== courseId) {
-      return { errorCode: 'VOUCHER_COURSE_MISMATCH', errorMessage: 'Voucher not valid for this course' };
+      return {
+        errorCode: "VOUCHER_COURSE_MISMATCH",
+        errorMessage: "Voucher not valid for this course",
+      };
     }
 
     return null;
   }
 
   private hashCode(code: string): string {
-    return crypto.createHash('sha256').update(code).digest('hex');
+    return crypto.createHash("sha256").update(code).digest("hex");
   }
 
-  async getPaymentStatus(input: GetProviderPaymentStatusInput): Promise<ProviderPaymentStatus> {
-    return { status: 'CREATED' };
+  async getPaymentStatus(
+    input: GetProviderPaymentStatusInput,
+  ): Promise<ProviderPaymentStatus> {
+    return { status: "CREATED" };
   }
 
-  async verifyPayment(input: VerifyProviderPaymentInput): Promise<ProviderPaymentStatus> {
+  async verifyPayment(
+    input: VerifyProviderPaymentInput,
+  ): Promise<ProviderPaymentStatus> {
     return this.getPaymentStatus({
       providerTransactionId: input.providerTransactionId,
       providerPaymentId: input.providerTransactionId,
@@ -159,19 +200,24 @@ export class VoucherProvider implements PaymentProvider {
     });
   }
 
-  async verifyWebhook(input: VerifyWebhookInput): Promise<VerifiedWebhookResult> {
-    return { valid: false, errorCode: 'NOT_SUPPORTED' };
+  async verifyWebhook(
+    input: VerifyWebhookInput,
+  ): Promise<VerifiedWebhookResult> {
+    return { valid: false, errorCode: "NOT_SUPPORTED" };
   }
 
-  async createVoucher(tenantId: string, data: {
-    code: string;
-    discountType: VoucherDiscountType;
-    discountValue: number;
-    maxUses?: number;
-    courseId?: string;
-    expiresAt?: Date;
-    metadata?: Record<string, any>;
-  }): Promise<Voucher> {
+  async createVoucher(
+    tenantId: string,
+    data: {
+      code: string;
+      discountType: VoucherDiscountType;
+      discountValue: number;
+      maxUses?: number;
+      courseId?: string;
+      expiresAt?: Date;
+      metadata?: Record<string, any>;
+    },
+  ): Promise<Voucher> {
     const codeHash = this.hashCode(data.code);
 
     const existing = await this.prisma.voucher.findUnique({
@@ -179,7 +225,7 @@ export class VoucherProvider implements PaymentProvider {
     });
 
     if (existing) {
-      throw new ConflictException('Voucher code already exists');
+      throw new ConflictException("Voucher code already exists");
     }
 
     return this.prisma.voucher.create({
@@ -203,7 +249,10 @@ export class VoucherProvider implements PaymentProvider {
     });
   }
 
-  async listVouchers(tenantId: string, filters?: { courseId?: string; active?: boolean }) {
+  async listVouchers(
+    tenantId: string,
+    filters?: { courseId?: string; active?: boolean },
+  ) {
     return this.prisma.voucher.findMany({
       where: {
         tenantId,
@@ -213,7 +262,7 @@ export class VoucherProvider implements PaymentProvider {
           expiresAt: filters.active ? { gte: new Date() } : undefined,
         }),
       },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { createdAt: "desc" },
     });
   }
 

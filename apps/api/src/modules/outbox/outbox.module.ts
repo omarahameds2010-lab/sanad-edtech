@@ -1,6 +1,6 @@
-import { Module } from '@nestjs/common';
-import { OutboxService } from './outbox.service';
-import { PrismaService } from '../tenants/prisma.service';
+import { Module } from "@nestjs/common";
+import { OutboxService } from "./outbox.service";
+import { PrismaService } from "../tenants/prisma.service";
 
 @Module({
   providers: [OutboxService, PrismaService],

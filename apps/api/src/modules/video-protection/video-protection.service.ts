@@ -1,8 +1,14 @@
-import { Injectable, ForbiddenException } from '@nestjs/common';
-import { PrismaService } from '../tenants/prisma.service';
-import { FeatureFlagsService } from '../feature-flags/feature-flags.service';
-import { PlaybackSessionService, AuthorizePlaybackInput } from './services/playback-session.service';
-import { SignedTokenService, VideoPlaybackToken } from './services/signed-token.service';
+import { Injectable, ForbiddenException } from "@nestjs/common";
+import { PrismaService } from "../tenants/prisma.service";
+import { FeatureFlagsService } from "../feature-flags/feature-flags.service";
+import {
+  PlaybackSessionService,
+  AuthorizePlaybackInput,
+} from "./services/playback-session.service";
+import {
+  SignedTokenService,
+  VideoPlaybackToken,
+} from "./services/signed-token.service";
 
 interface TenantVideoConfig {
   videoSecurity?: {
@@ -16,7 +22,7 @@ interface TenantVideoConfig {
       positionChangeInterval?: number;
       opacity?: number;
       rotation?: boolean;
-      failurePolicy?: 'STRICT' | 'BALANCED' | 'LOW_RISK';
+      failurePolicy?: "STRICT" | "BALANCED" | "LOW_RISK";
     };
     deviceLimit?: number;
     singleActiveSession?: boolean;
@@ -63,7 +69,7 @@ export class VideoProtectionService {
           positionChangeInterval: 7,
           opacity: 0.65,
           rotation: true,
-          failurePolicy: 'BALANCED' as const,
+          failurePolicy: "BALANCED" as const,
         },
         deviceLimit: 2,
         singleActiveSession: true,
@@ -72,7 +78,7 @@ export class VideoProtectionService {
         captureProtection: {
           native: true,
           webBestEffort: true,
-          onCapture: 'BLACKOUT_AND_PAUSE' as const,
+          onCapture: "BLACKOUT_AND_PAUSE" as const,
         },
         suspiciousActivityDetection: true,
       },
@@ -115,11 +121,11 @@ export class VideoProtectionService {
     });
 
     if (!student) {
-      throw new ForbiddenException('Student not found in tenant');
+      throw new ForbiddenException("Student not found in tenant");
     }
 
-    if (student.status !== 'ACTIVE') {
-      throw new ForbiddenException('Student account not active');
+    if (student.status !== "ACTIVE") {
+      throw new ForbiddenException("Student account not active");
     }
 
     // Get tenant video config
@@ -128,7 +134,9 @@ export class VideoProtectionService {
 
     // Check if video playback is enabled via feature flag
     if (!videoConfig.watermark.enabled) {
-      throw new ForbiddenException('Video playback not enabled for this tenant');
+      throw new ForbiddenException(
+        "Video playback not enabled for this tenant",
+      );
     }
 
     // Delegate to playback session service
@@ -137,10 +145,14 @@ export class VideoProtectionService {
       tenantId,
       input,
       {
-        maxConcurrentSessions: videoConfig.singleActiveSession ? 1 : videoConfig.deviceLimit,
+        maxConcurrentSessions: videoConfig.singleActiveSession
+          ? 1
+          : videoConfig.deviceLimit,
         maxDevices: videoConfig.deviceLimit,
         domainLock: videoConfig.domainLock,
-        captureProtection: videoConfig.captureProtection.native || videoConfig.captureProtection.webBestEffort,
+        captureProtection:
+          videoConfig.captureProtection.native ||
+          videoConfig.captureProtection.webBestEffort,
         watermark: videoConfig.watermark,
       },
     );
@@ -152,9 +164,19 @@ export class VideoProtectionService {
   async handleHeartbeat(
     tenantId: string,
     studentId: string,
-    input: { sessionId: string; position: number; seekCount: number; visible: boolean; focused: boolean },
+    input: {
+      sessionId: string;
+      position: number;
+      seekCount: number;
+      visible: boolean;
+      focused: boolean;
+    },
   ) {
-    return this.playbackSessionService.handleHeartbeat(tenantId, studentId, input);
+    return this.playbackSessionService.handleHeartbeat(
+      tenantId,
+      studentId,
+      input,
+    );
   }
 
   /**
@@ -163,7 +185,11 @@ export class VideoProtectionService {
   async handleCaptureEvent(
     tenantId: string,
     studentId: string,
-    input: { sessionId: string; eventType: string; metadata?: Record<string, any> },
+    input: {
+      sessionId: string;
+      eventType: string;
+      metadata?: Record<string, any>;
+    },
   ) {
     return this.playbackSessionService.handleCaptureEvent(tenantId, studentId, {
       sessionId: input.sessionId,
@@ -176,7 +202,11 @@ export class VideoProtectionService {
    * End playback session
    */
   async endSession(tenantId: string, studentId: string, sessionId: string) {
-    return this.playbackSessionService.endSession(tenantId, studentId, sessionId);
+    return this.playbackSessionService.endSession(
+      tenantId,
+      studentId,
+      sessionId,
+    );
   }
 
   /**
@@ -195,7 +225,7 @@ export class VideoProtectionService {
     });
 
     if (!session || session.tenantId !== tenantId) {
-      throw new ForbiddenException('Session not found');
+      throw new ForbiddenException("Session not found");
     }
 
     return this.playbackSessionService.revokeSession(sessionId, reason);
@@ -218,7 +248,7 @@ export class VideoProtectionService {
       where: { id: payload.playbackSessionId },
     });
 
-    if (!session || session.status !== 'ACTIVE') {
+    if (!session || session.status !== "ACTIVE") {
       return { valid: false };
     }
 
@@ -242,7 +272,7 @@ export class VideoProtectionService {
       revokedSessions,
     ] = await Promise.all([
       this.prisma.playbackSession.count({
-        where: { tenantId, status: 'ACTIVE' },
+        where: { tenantId, status: "ACTIVE" },
       }),
       this.prisma.playbackSession.count({
         where: {
@@ -260,13 +290,13 @@ export class VideoProtectionService {
         where: {
           tenantId,
           createdAt: { gte: new Date(Date.now() - 24 * 60 * 60 * 1000) },
-          eventType: { startsWith: 'VIDEO' },
+          eventType: { startsWith: "VIDEO" },
         },
       }),
       this.prisma.playbackSession.count({
         where: {
           tenantId,
-          status: 'REVOKED',
+          status: "REVOKED",
           endedAt: { gte: new Date(Date.now() - 24 * 60 * 60 * 1000) },
         },
       }),

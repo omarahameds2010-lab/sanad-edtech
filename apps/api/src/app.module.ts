@@ -1,35 +1,36 @@
-import { Module } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
-import { LoggerModule } from 'nestjs-pino';
-import { APP_INTERCEPTOR } from '@nestjs/core';
-import { HealthController } from './common/health.controller';
-import { TenantContextInterceptor } from './common/interceptors/tenant-context.interceptor';
-import { TenantModule } from './modules/tenants/tenant.module';
-import { AuthModule } from './modules/auth/auth.module';
-import { UsersModule } from './modules/users/users.module';
-import { AuditModule } from './modules/audit/audit.module';
-import { OutboxModule } from './modules/outbox/outbox.module';
-import { AuthorizationModule } from './modules/authorization/authorization.module';
-import { FeatureFlagsModule } from './modules/feature-flags/feature-flags.module';
-import { EntitlementsModule } from './modules/entitlements/entitlements.module';
-import { PlansModule } from './modules/plans/plans.module';
-import { VideoProtectionModule } from './modules/video-protection/video-protection.module';
-import { PaymentsModule } from './modules/payments/payments.module';
-import { VideoModule } from './modules/video/video.module';
-import { CoursesModule } from './modules/courses/courses.module';
+import { Module } from "@nestjs/common";
+import { ConfigModule } from "@nestjs/config";
+import { LoggerModule } from "nestjs-pino";
+import { APP_INTERCEPTOR } from "@nestjs/core";
+import { HealthController } from "./common/health.controller";
+import { TenantContextInterceptor } from "./common/interceptors/tenant-context.interceptor";
+import { TenantModule } from "./modules/tenants/tenant.module";
+import { AuthModule } from "./modules/auth/auth.module";
+import { UsersModule } from "./modules/users/users.module";
+import { AuditModule } from "./modules/audit/audit.module";
+import { OutboxModule } from "./modules/outbox/outbox.module";
+import { AuthorizationModule } from "./modules/authorization/authorization.module";
+import { FeatureFlagsModule } from "./modules/feature-flags/feature-flags.module";
+import { EntitlementsModule } from "./modules/entitlements/entitlements.module";
+import { PlansModule } from "./modules/plans/plans.module";
+import { VideoProtectionModule } from "./modules/video-protection/video-protection.module";
+import { PaymentsModule } from "./modules/payments/payments.module";
+import { VideoModule } from "./modules/video/video.module";
+import { CoursesModule } from "./modules/courses/courses.module";
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      envFilePath: ['.env.local', '.env'],
+      envFilePath: [".env.local", ".env"],
     }),
     LoggerModule.forRoot({
       pinoHttp: {
-        transport: process.env.NODE_ENV === 'development'
-          ? { target: 'pino-pretty' }
-          : undefined,
-        level: process.env.LOG_LEVEL || 'info',
+        transport:
+          process.env.NODE_ENV === "development"
+            ? { target: "pino-pretty" }
+            : undefined,
+        level: process.env.LOG_LEVEL || "info",
       },
     }),
     TenantModule,

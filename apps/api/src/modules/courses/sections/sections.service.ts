@@ -1,13 +1,24 @@
-import { Injectable, NotFoundException, BadRequestException, ConflictException } from '@nestjs/common';
-import { PrismaService } from '../../tenants/prisma.service';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+  ConflictException,
+} from "@nestjs/common";
+import { PrismaService } from "../../tenants/prisma.service";
 
 @Injectable()
 export class SectionsService {
   constructor(private prisma: PrismaService) {}
 
-  async createSection(tenantId: string, courseId: string, dto: { title: string; orderIndex?: number }) {
-    const course = await this.prisma.course.findFirst({ where: { id: courseId, tenantId } });
-    if (!course) throw new NotFoundException('Course not found');
+  async createSection(
+    tenantId: string,
+    courseId: string,
+    dto: { title: string; orderIndex?: number },
+  ) {
+    const course = await this.prisma.course.findFirst({
+      where: { id: courseId, tenantId },
+    });
+    if (!course) throw new NotFoundException("Course not found");
 
     let orderIndex = dto.orderIndex;
     if (orderIndex === undefined || orderIndex === null) {
@@ -17,8 +28,11 @@ export class SectionsService {
       });
       orderIndex = (max._max.orderIndex ?? 0) + 1;
     } else {
-      const existing = await this.prisma.section.findFirst({ where: { courseId, tenantId, orderIndex } });
-      if (existing) throw new ConflictException('orderIndex already used in this course');
+      const existing = await this.prisma.section.findFirst({
+        where: { courseId, tenantId, orderIndex },
+      });
+      if (existing)
+        throw new ConflictException("orderIndex already used in this course");
     }
 
     return this.prisma.section.create({
@@ -27,23 +41,41 @@ export class SectionsService {
   }
 
   async listSections(tenantId: string, courseId: string) {
-    const course = await this.prisma.course.findFirst({ where: { id: courseId, tenantId } });
-    if (!course) throw new NotFoundException('Course not found');
+    const course = await this.prisma.course.findFirst({
+      where: { id: courseId, tenantId },
+    });
+    if (!course) throw new NotFoundException("Course not found");
 
     return this.prisma.section.findMany({
       where: { courseId, tenantId },
-      orderBy: { orderIndex: 'asc' },
-      include: { lessons: { select: { id: true, title: true, type: true, orderIndex: true, status: true } } },
+      orderBy: { orderIndex: "asc" },
+      include: {
+        lessons: {
+          select: {
+            id: true,
+            title: true,
+            type: true,
+            orderIndex: true,
+            status: true,
+          },
+        },
+      },
     });
   }
 
   async getSection(tenantId: string, sectionId: string) {
-    const section = await this.prisma.section.findFirst({ where: { id: sectionId, tenantId } });
-    if (!section) throw new NotFoundException('Section not found');
+    const section = await this.prisma.section.findFirst({
+      where: { id: sectionId, tenantId },
+    });
+    if (!section) throw new NotFoundException("Section not found");
     return section;
   }
 
-  async updateSection(tenantId: string, sectionId: string, dto: { title?: string; orderIndex?: number }) {
+  async updateSection(
+    tenantId: string,
+    sectionId: string,
+    dto: { title?: string; orderIndex?: number },
+  ) {
     await this.getSection(tenantId, sectionId);
     return this.prisma.section.update({
       where: { id: sectionId },
@@ -57,14 +89,22 @@ export class SectionsService {
     return { success: true };
   }
 
-  async reorderSections(tenantId: string, courseId: string, items: { id: string; position: number }[]) {
+  async reorderSections(
+    tenantId: string,
+    courseId: string,
+    items: { id: string; position: number }[],
+  ) {
     // Verify all sections belong to this course and tenant
-    const sections = await this.prisma.section.findMany({ where: { courseId, tenantId } });
+    const sections = await this.prisma.section.findMany({
+      where: { courseId, tenantId },
+    });
     const sectionIds = new Set(sections.map((s) => s.id));
 
     for (const item of items) {
       if (!sectionIds.has(item.id)) {
-        throw new BadRequestException(`Section ${item.id} does not belong to this course`);
+        throw new BadRequestException(
+          `Section ${item.id} does not belong to this course`,
+        );
       }
     }
 

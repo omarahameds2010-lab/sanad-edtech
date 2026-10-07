@@ -1,7 +1,7 @@
-import { Injectable, ConflictException } from '@nestjs/common';
-import { PrismaService } from '../../tenants/prisma.service';
-import { Prisma, IdempotencyStatus } from '@prisma/client';
-import * as crypto from 'crypto';
+import { Injectable, ConflictException } from "@nestjs/common";
+import { PrismaService } from "../../tenants/prisma.service";
+import { Prisma, IdempotencyStatus } from "@prisma/client";
+import * as crypto from "crypto";
 
 @Injectable()
 export class IdempotencyService {
@@ -27,23 +27,27 @@ export class IdempotencyService {
         // Expired - allow new request but mark old as failed
         await this.prisma.idempotencyKey.update({
           where: { id: existing.id },
-          data: { status: 'FAILED' },
+          data: { status: "FAILED" },
         });
-      } else if (existing.status === 'COMPLETED') {
+      } else if (existing.status === "COMPLETED") {
         // Return cached response
         return {
           isNew: false,
           existingId: existing.id,
-          response: existing.responseHash ? JSON.parse(existing.responseHash) : undefined,
+          response: existing.responseHash
+            ? JSON.parse(existing.responseHash)
+            : undefined,
         };
-      } else if (existing.status === 'PENDING') {
+      } else if (existing.status === "PENDING") {
         // Same request still processing - could be duplicate or retry
         // Check if request hash matches
         if (existing.requestHash === requestHash) {
           return { isNew: false, existingId: existing.id };
         }
         // Different request with same key - conflict
-        throw new ConflictException('Idempotency key reused with different request');
+        throw new ConflictException(
+          "Idempotency key reused with different request",
+        );
       }
     }
 
@@ -55,7 +59,7 @@ export class IdempotencyService {
         key,
         operation,
         requestHash,
-        status: 'PENDING',
+        status: "PENDING",
         expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours
       },
     });
@@ -63,22 +67,29 @@ export class IdempotencyService {
     return { isNew: true, existingId: newKey.id };
   }
 
-  async markCompleted(tenantId: string, key: string, responseData: any): Promise<void> {
+  async markCompleted(
+    tenantId: string,
+    key: string,
+    responseData: any,
+  ): Promise<void> {
     const responseHash = JSON.stringify(responseData);
     await this.prisma.idempotencyKey.update({
       where: { tenantId_key: { tenantId, key } },
-      data: { status: 'COMPLETED', responseHash },
+      data: { status: "COMPLETED", responseHash },
     });
   }
 
   async markFailed(tenantId: string, key: string): Promise<void> {
     await this.prisma.idempotencyKey.update({
       where: { tenantId_key: { tenantId, key } },
-      data: { status: 'FAILED' },
+      data: { status: "FAILED" },
     });
   }
 
-  async getStatus(tenantId: string, key: string): Promise<IdempotencyStatus | null> {
+  async getStatus(
+    tenantId: string,
+    key: string,
+  ): Promise<IdempotencyStatus | null> {
     const record = await this.prisma.idempotencyKey.findUnique({
       where: { tenantId_key: { tenantId, key } },
       select: { status: true },
@@ -87,8 +98,11 @@ export class IdempotencyService {
   }
 
   private hashRequest(data: any): string {
-    const str = typeof data === 'string' ? data : JSON.stringify(data, Object.keys(data).sort());
-    return crypto.createHash('sha256').update(str).digest('hex');
+    const str =
+      typeof data === "string"
+        ? data
+        : JSON.stringify(data, Object.keys(data).sort());
+    return crypto.createHash("sha256").update(str).digest("hex");
   }
 
   async cleanupExpired(): Promise<number> {

@@ -1,8 +1,12 @@
-import { Injectable, UnauthorizedException, BadRequestException } from '@nestjs/common';
-import { JwtService } from '@nestjs/jwt';
-import * as argon2 from 'argon2';
-import { UsersService } from '../users/users.service';
-import { PrismaService } from '../tenants/prisma.service';
+import {
+  Injectable,
+  UnauthorizedException,
+  BadRequestException,
+} from "@nestjs/common";
+import { JwtService } from "@nestjs/jwt";
+import * as argon2 from "argon2";
+import { UsersService } from "../users/users.service";
+import { PrismaService } from "../tenants/prisma.service";
 
 @Injectable()
 export class AuthService {
@@ -16,17 +20,17 @@ export class AuthService {
     const user = await this.usersService.findByPhoneAndTenant(phone, tenantId);
 
     if (!user) {
-      throw new UnauthorizedException('Invalid credentials');
+      throw new UnauthorizedException("Invalid credentials");
     }
 
-    if (user.status !== 'ACTIVE') {
-      throw new BadRequestException('Account is not active');
+    if (user.status !== "ACTIVE") {
+      throw new BadRequestException("Account is not active");
     }
 
     const isPasswordValid = await argon2.verify(user.passwordHash, password);
 
     if (!isPasswordValid) {
-      throw new UnauthorizedException('Invalid credentials');
+      throw new UnauthorizedException("Invalid credentials");
     }
 
     return user;
@@ -57,7 +61,12 @@ export class AuthService {
     // Store device if fingerprint provided
     if (deviceFingerprint) {
       await this.prisma.device.upsert({
-        where: { tenantId_fingerprint: { tenantId: user.tenantId, fingerprint: deviceFingerprint } },
+        where: {
+          tenantId_fingerprint: {
+            tenantId: user.tenantId,
+            fingerprint: deviceFingerprint,
+          },
+        },
         update: { lastSeen: new Date() },
         create: {
           tenantId: user.tenantId,
@@ -87,11 +96,11 @@ export class AuthService {
     });
 
     if (!session || session.revokedAt) {
-      throw new UnauthorizedException('Invalid refresh token');
+      throw new UnauthorizedException("Invalid refresh token");
     }
 
     if (session.expiresAt < new Date()) {
-      throw new UnauthorizedException('Refresh token expired');
+      throw new UnauthorizedException("Refresh token expired");
     }
 
     // Generate new tokens
@@ -127,6 +136,8 @@ export class AuthService {
   }
 
   private generateRefreshToken(): string {
-    return Buffer.from(Date.now().toString() + Math.random().toString()).toString('base64');
+    return Buffer.from(
+      Date.now().toString() + Math.random().toString(),
+    ).toString("base64");
   }
 }

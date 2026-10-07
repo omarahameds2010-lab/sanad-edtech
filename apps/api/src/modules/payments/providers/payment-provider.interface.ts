@@ -1,4 +1,8 @@
-import { PaymentMethod, PaymentStatus, PaymentAttemptStatus } from '@prisma/client';
+import {
+  PaymentMethod,
+  PaymentStatus,
+  PaymentAttemptStatus,
+} from "@prisma/client";
 
 export { PaymentMethod, PaymentStatus, PaymentAttemptStatus };
 
@@ -107,15 +111,22 @@ export interface VerifiedWebhookResult {
   errorCode?: string;
 }
 
-export type RefundStatus = 'PENDING' | 'PROCESSING' | 'SUCCEEDED' | 'FAILED' | 'EXPIRED' | 'CANCELLED';
+export type RefundStatus =
+  "PENDING" | "PROCESSING" | "SUCCEEDED" | "FAILED" | "EXPIRED" | "CANCELLED";
 
 export interface PaymentProvider {
   readonly name: string;
   readonly capabilities: ProviderCapabilities;
 
-  createPayment(input: CreateProviderPaymentInput): Promise<CreateProviderPaymentResult>;
-  getPaymentStatus(input: GetProviderPaymentStatusInput): Promise<ProviderPaymentStatus>;
-  verifyPayment(input: VerifyProviderPaymentInput): Promise<ProviderPaymentStatus>;
+  createPayment(
+    input: CreateProviderPaymentInput,
+  ): Promise<CreateProviderPaymentResult>;
+  getPaymentStatus(
+    input: GetProviderPaymentStatusInput,
+  ): Promise<ProviderPaymentStatus>;
+  verifyPayment(
+    input: VerifyProviderPaymentInput,
+  ): Promise<ProviderPaymentStatus>;
   refund?(input: ProviderRefundInput): Promise<ProviderRefundResult>;
   verifyWebhook(input: VerifyWebhookInput): Promise<VerifiedWebhookResult>;
 }
@@ -123,14 +134,14 @@ export interface PaymentProvider {
 export interface ProviderConfig {
   name: string;
   enabled: boolean;
-  environment: 'sandbox' | 'production';
+  environment: "sandbox" | "production";
   credentials: Record<string, string>;
   settings?: Record<string, any>;
 }
 
 export interface ProviderHealthStatus {
   provider: string;
-  status: 'HEALTHY' | 'DEGRADED' | 'UNAVAILABLE' | 'DISABLED';
+  status: "HEALTHY" | "DEGRADED" | "UNAVAILABLE" | "DISABLED";
   lastCheck: Date;
   latencyMs?: number;
   errorRate?: number;

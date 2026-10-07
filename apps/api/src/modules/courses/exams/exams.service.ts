@@ -4,11 +4,11 @@ import {
   BadRequestException,
   ConflictException,
   ForbiddenException,
-} from '@nestjs/common';
-import { PrismaService } from '../../tenants/prisma.service';
-import { Prisma, ExamStatus, AttemptStatus, LessonType } from '@prisma/client';
-import { IdempotencyService } from '../../payments/security/idempotency.service';
-import { ProgressionService } from '../progression/progression.service';
+} from "@nestjs/common";
+import { PrismaService } from "../../tenants/prisma.service";
+import { Prisma, ExamStatus, AttemptStatus, LessonType } from "@prisma/client";
+import { IdempotencyService } from "../../payments/security/idempotency.service";
+import { ProgressionService } from "../progression/progression.service";
 
 @Injectable()
 export class ExamsService {
@@ -36,18 +36,22 @@ export class ExamsService {
     });
 
     if (!lesson) {
-      throw new NotFoundException('Lesson not found');
+      throw new NotFoundException("Lesson not found");
     }
     if (lesson.exam) {
-      throw new ConflictException('Lesson already has an exam');
+      throw new ConflictException("Lesson already has an exam");
     }
     if (lesson.type !== LessonType.EXAM) {
-      throw new BadRequestException('Lesson type must be EXAM to create an exam');
+      throw new BadRequestException(
+        "Lesson type must be EXAM to create an exam",
+      );
     }
 
     const timerMinutes = dto.timerMinutes ?? this.DEFAULT_TIMER_MINUTES;
     if (timerMinutes > this.MAX_TIMER_MINUTES) {
-      throw new BadRequestException(`Timer cannot exceed ${this.MAX_TIMER_MINUTES} minutes`);
+      throw new BadRequestException(
+        `Timer cannot exceed ${this.MAX_TIMER_MINUTES} minutes`,
+      );
     }
 
     const exam = await this.prisma.exam.create({
@@ -77,7 +81,12 @@ export class ExamsService {
     return exam;
   }
 
-  async getExam(tenantId: string, examId: string, includeQuestions = false, includeAttempts = false) {
+  async getExam(
+    tenantId: string,
+    examId: string,
+    includeQuestions = false,
+    includeAttempts = false,
+  ) {
     const exam = await this.prisma.exam.findFirst({
       where: { id: examId, tenantId },
       include: {
@@ -86,7 +95,7 @@ export class ExamsService {
         },
         questions: includeQuestions
           ? {
-              orderBy: { position: 'asc' },
+              orderBy: { position: "asc" },
             }
           : false,
         attempts: includeAttempts,
@@ -94,7 +103,7 @@ export class ExamsService {
     });
 
     if (!exam) {
-      throw new NotFoundException('Exam not found');
+      throw new NotFoundException("Exam not found");
     }
 
     // Hide correct answers from students
@@ -110,7 +119,12 @@ export class ExamsService {
 
   async listExams(
     tenantId: string,
-    filters: { lessonId?: string; status?: ExamStatus; cursor?: string; limit?: number },
+    filters: {
+      lessonId?: string;
+      status?: ExamStatus;
+      cursor?: string;
+      limit?: number;
+    },
   ) {
     const where: Prisma.ExamWhereInput = { tenantId };
     if (filters.lessonId) where.lessonId = filters.lessonId;
@@ -119,7 +133,7 @@ export class ExamsService {
     const limit = filters.limit ?? 20;
     const exams = await this.prisma.exam.findMany({
       where,
-      orderBy: { createdAt: 'desc' },
+      orderBy: { createdAt: "desc" },
       take: limit + 1,
       cursor: filters.cursor ? { id: filters.cursor } : undefined,
       include: { lesson: { select: { id: true, title: true } } },
@@ -146,7 +160,9 @@ export class ExamsService {
         },
       });
       if (activeAttempts > 0) {
-        throw new BadRequestException('Cannot change timer while there are active attempts');
+        throw new BadRequestException(
+          "Cannot change timer while there are active attempts",
+        );
       }
     }
 
@@ -185,7 +201,7 @@ export class ExamsService {
     // Also publish the lesson if it's not published
     await this.prisma.lesson.update({
       where: { id: exam.lessonId },
-      data: { status: 'PUBLISHED', publishedAt: new Date() },
+      data: { status: "PUBLISHED", publishedAt: new Date() },
     });
 
     return updated;
@@ -214,13 +230,13 @@ export class ExamsService {
     });
 
     if (!attempt) {
-      throw new NotFoundException('Attempt not found');
+      throw new NotFoundException("Attempt not found");
     }
     if (attempt.status === AttemptStatus.GRADED) {
-      throw new ConflictException('Attempt already graded');
+      throw new ConflictException("Attempt already graded");
     }
     if (dto.score < 0 || dto.score > 100) {
-      throw new BadRequestException('Score must be between 0 and 100');
+      throw new BadRequestException("Score must be between 0 and 100");
     }
 
     const passed = dto.score >= attempt.exam.passingScore;
@@ -255,12 +271,12 @@ export class ExamsService {
       where: {
         userId,
         courseId: lesson.section.courseId,
-        status: 'ACTIVE',
+        status: "ACTIVE",
       },
     });
 
     if (!enrollment) {
-      throw new ForbiddenException('Not enrolled in this course');
+      throw new ForbiddenException("Not enrolled in this course");
     }
 
     // Get student's attempts
@@ -268,7 +284,11 @@ export class ExamsService {
     const attemptCount = attempts.length;
 
     // Check if can attempt
-    const canAttempt = await this.canStudentAttempt(exam, attemptCount, attempts);
+    const canAttempt = await this.canStudentAttempt(
+      exam,
+      attemptCount,
+      attempts,
+    );
 
     // Get active attempt (in progress)
     const activeAttempt = attempts.find(
@@ -282,7 +302,10 @@ export class ExamsService {
       const now = new Date();
       const expiresAt = new Date(activeAttempt.startedAt);
       expiresAt.setMinutes(expiresAt.getMinutes() + exam.timerMinutes);
-      timeRemainingSeconds = Math.max(0, Math.floor((expiresAt.getTime() - now.getTime()) / 1000));
+      timeRemainingSeconds = Math.max(
+        0,
+        Math.floor((expiresAt.getTime() - now.getTime()) / 1000),
+      );
       isExpired = timeRemainingSeconds === 0;
     }
 
@@ -334,7 +357,7 @@ export class ExamsService {
       tenantId,
       userId,
       idempotencyKey,
-      'exam:start',
+      "exam:start",
       { examId },
     );
 
@@ -346,7 +369,7 @@ export class ExamsService {
     const exam = await this.getExam(tenantId, examId, true);
 
     if (exam.status !== ExamStatus.PUBLISHED) {
-      throw new BadRequestException('Exam is not published');
+      throw new BadRequestException("Exam is not published");
     }
 
     // Check enrollment
@@ -359,12 +382,12 @@ export class ExamsService {
       where: {
         userId,
         courseId: lesson.section.courseId,
-        status: 'ACTIVE',
+        status: "ACTIVE",
       },
     });
 
     if (!enrollment) {
-      throw new ForbiddenException('Not enrolled in this course');
+      throw new ForbiddenException("Not enrolled in this course");
     }
 
     // Check attempt count
@@ -373,7 +396,7 @@ export class ExamsService {
     });
 
     if (attemptCount >= exam.maxAttempts) {
-      throw new BadRequestException('Maximum attempts reached');
+      throw new BadRequestException("Maximum attempts reached");
     }
 
     // Check for active attempt
@@ -386,7 +409,7 @@ export class ExamsService {
     });
 
     if (activeAttempt) {
-      throw new ConflictException('You already have an active attempt');
+      throw new ConflictException("You already have an active attempt");
     }
 
     // Get attempt number
@@ -443,7 +466,11 @@ export class ExamsService {
     };
 
     // Store idempotency response
-    await this.idempotencyService.markCompleted(tenantId, idempotencyKey, response);
+    await this.idempotencyService.markCompleted(
+      tenantId,
+      idempotencyKey,
+      response,
+    );
 
     // Trigger progression: ENTER_EXAM → unlock next lesson
     await this.progressionService.handleEnterExam(
@@ -468,7 +495,7 @@ export class ExamsService {
       tenantId,
       userId,
       dto.idempotencyKey,
-      'exam:submit',
+      "exam:submit",
       { examId, answers: dto.answers },
     );
 
@@ -487,7 +514,7 @@ export class ExamsService {
     });
 
     if (!attempt) {
-      throw new NotFoundException('No active attempt found');
+      throw new NotFoundException("No active attempt found");
     }
 
     const exam = attempt.exam;
@@ -518,11 +545,15 @@ export class ExamsService {
       submittedAt: updated.submittedAt,
       isTimedOut: status === AttemptStatus.TIMED_OUT,
       message: isExpired
-        ? 'Exam submitted: timer expired'
-        : 'Exam submitted successfully',
+        ? "Exam submitted: timer expired"
+        : "Exam submitted successfully",
     };
 
-    await this.idempotencyService.markCompleted(tenantId, dto.idempotencyKey, response);
+    await this.idempotencyService.markCompleted(
+      tenantId,
+      dto.idempotencyKey,
+      response,
+    );
     return response;
   }
 
@@ -537,14 +568,17 @@ export class ExamsService {
     });
 
     if (!attempt) {
-      throw new NotFoundException('No active attempt found');
+      throw new NotFoundException("No active attempt found");
     }
 
     const exam = attempt.exam;
     const now = new Date();
     const expiresAt = new Date(attempt.startedAt);
     expiresAt.setMinutes(expiresAt.getMinutes() + exam.timerMinutes);
-    const timeRemainingSeconds = Math.max(0, Math.floor((expiresAt.getTime() - now.getTime()) / 1000));
+    const timeRemainingSeconds = Math.max(
+      0,
+      Math.floor((expiresAt.getTime() - now.getTime()) / 1000),
+    );
     const isExpired = timeRemainingSeconds === 0;
 
     return {
@@ -555,18 +589,32 @@ export class ExamsService {
     };
   }
 
-  async getStudentExamAttempts(tenantId: string, userId: string, examId: string) {
+  async getStudentExamAttempts(
+    tenantId: string,
+    userId: string,
+    examId: string,
+  ) {
     const attempts = await this.prisma.examAttempt.findMany({
       where: { examId, studentId: userId, tenantId },
-      orderBy: { startedAt: 'desc' },
-      include: { exam: { select: { timerMinutes: true, passingScore: true, showResults: true } } },
+      orderBy: { startedAt: "desc" },
+      include: {
+        exam: {
+          select: { timerMinutes: true, passingScore: true, showResults: true },
+        },
+      },
     });
 
     return attempts.map((a) => {
       const expiresAt = new Date(a.startedAt);
-      expiresAt.setMinutes(expiresAt.getMinutes() + (a.exam?.timerMinutes ?? this.DEFAULT_TIMER_MINUTES));
+      expiresAt.setMinutes(
+        expiresAt.getMinutes() +
+          (a.exam?.timerMinutes ?? this.DEFAULT_TIMER_MINUTES),
+      );
       const now = new Date();
-      const timeRemainingSeconds = Math.max(0, Math.floor((expiresAt.getTime() - now.getTime()) / 1000));
+      const timeRemainingSeconds = Math.max(
+        0,
+        Math.floor((expiresAt.getTime() - now.getTime()) / 1000),
+      );
       const isExpired = timeRemainingSeconds === 0;
 
       // Hide answers if showResults is false
@@ -594,12 +642,14 @@ export class ExamsService {
     const limit = filters.limit ?? 20;
     const attempts = await this.prisma.examAttempt.findMany({
       where,
-      orderBy: { startedAt: 'asc' }, // Oldest first for grading queue
+      orderBy: { startedAt: "asc" }, // Oldest first for grading queue
       take: limit + 1,
       cursor: filters.cursor ? { id: filters.cursor } : undefined,
       include: {
         student: { select: { id: true, name: true, phone: true, email: true } },
-        exam: { select: { timerMinutes: true, passingScore: true, maxAttempts: true } },
+        exam: {
+          select: { timerMinutes: true, passingScore: true, maxAttempts: true },
+        },
       },
     });
 
@@ -612,9 +662,15 @@ export class ExamsService {
     return {
       attempts: attempts.map((a) => {
         const expiresAt = new Date(a.startedAt);
-        expiresAt.setMinutes(expiresAt.getMinutes() + (a.exam?.timerMinutes ?? this.DEFAULT_TIMER_MINUTES));
+        expiresAt.setMinutes(
+          expiresAt.getMinutes() +
+            (a.exam?.timerMinutes ?? this.DEFAULT_TIMER_MINUTES),
+        );
         const now = new Date();
-        const timeRemainingSeconds = Math.max(0, Math.floor((expiresAt.getTime() - now.getTime()) / 1000));
+        const timeRemainingSeconds = Math.max(
+          0,
+          Math.floor((expiresAt.getTime() - now.getTime()) / 1000),
+        );
         const isExpired = timeRemainingSeconds === 0;
         return {
           ...a,

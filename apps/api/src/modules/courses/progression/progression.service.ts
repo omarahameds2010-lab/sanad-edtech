@@ -1,8 +1,17 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
-import { PrismaService } from '../../tenants/prisma.service';
-import { Prisma, ContentUnlockType, ContentLockStatus, LessonType } from '@prisma/client';
-import { IdempotencyService } from '../../payments/security/idempotency.service';
-import { AuditService } from '../../audit/audit.service';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+} from "@nestjs/common";
+import { PrismaService } from "../../tenants/prisma.service";
+import {
+  Prisma,
+  ContentUnlockType,
+  ContentLockStatus,
+  LessonType,
+} from "@prisma/client";
+import { IdempotencyService } from "../../payments/security/idempotency.service";
+import { AuditService } from "../../audit/audit.service";
 
 @Injectable()
 export class ProgressionService {
@@ -28,7 +37,7 @@ export class ProgressionService {
       tenantId,
       userId,
       idempotencyKey,
-      'progression:enter_assignment',
+      "progression:enter_assignment",
       { assignmentId, lessonId },
     );
 
@@ -56,7 +65,11 @@ export class ProgressionService {
     if (lessonsToUnlock.length === 0) {
       // No lessons to unlock - this is normal
       const response = { unlocked: 0, lessonIds: [] };
-      await this.idempotencyService.markCompleted(tenantId, idempotencyKey, response);
+      await this.idempotencyService.markCompleted(
+        tenantId,
+        idempotencyKey,
+        response,
+      );
       return response;
     }
 
@@ -69,7 +82,7 @@ export class ProgressionService {
         where: {
           userId,
           courseId: lesson.section.courseId,
-          status: 'ACTIVE',
+          status: "ACTIVE",
         },
       });
 
@@ -89,8 +102,8 @@ export class ProgressionService {
       await this.auditService.log({
         tenantId,
         actorUserId: userId,
-        action: 'CONTENT_UNLOCKED',
-        resourceType: 'lesson',
+        action: "CONTENT_UNLOCKED",
+        resourceType: "lesson",
         resourceId: lesson.id,
         metadata: {
           unlockType: ContentUnlockType.ENTER_ASSIGNMENT,
@@ -105,7 +118,11 @@ export class ProgressionService {
       lessonIds: unlockedLessonIds,
     };
 
-    await this.idempotencyService.markCompleted(tenantId, idempotencyKey, response);
+    await this.idempotencyService.markCompleted(
+      tenantId,
+      idempotencyKey,
+      response,
+    );
     return response;
   }
 
@@ -125,7 +142,7 @@ export class ProgressionService {
       tenantId,
       userId,
       idempotencyKey,
-      'progression:enter_exam',
+      "progression:enter_exam",
       { examId, lessonId },
     );
 
@@ -153,7 +170,11 @@ export class ProgressionService {
     if (lessonsToUnlock.length === 0) {
       // No lessons to unlock - this is normal
       const response = { unlocked: 0, lessonIds: [] };
-      await this.idempotencyService.markCompleted(tenantId, idempotencyKey, response);
+      await this.idempotencyService.markCompleted(
+        tenantId,
+        idempotencyKey,
+        response,
+      );
       return response;
     }
 
@@ -166,7 +187,7 @@ export class ProgressionService {
         where: {
           userId,
           courseId: lesson.section.courseId,
-          status: 'ACTIVE',
+          status: "ACTIVE",
         },
       });
 
@@ -186,8 +207,8 @@ export class ProgressionService {
       await this.auditService.log({
         tenantId,
         actorUserId: userId,
-        action: 'CONTENT_UNLOCKED',
-        resourceType: 'lesson',
+        action: "CONTENT_UNLOCKED",
+        resourceType: "lesson",
         resourceId: lesson.id,
         metadata: {
           unlockType: ContentUnlockType.ENTER_EXAM,
@@ -202,7 +223,11 @@ export class ProgressionService {
       lessonIds: unlockedLessonIds,
     };
 
-    await this.idempotencyService.markCompleted(tenantId, idempotencyKey, response);
+    await this.idempotencyService.markCompleted(
+      tenantId,
+      idempotencyKey,
+      response,
+    );
     return response;
   }
 
@@ -217,7 +242,7 @@ export class ProgressionService {
     });
 
     if (!currentLesson) {
-      throw new NotFoundException('Current lesson not found');
+      throw new NotFoundException("Current lesson not found");
     }
 
     const nextLesson = await this.prisma.lesson.findFirst({
@@ -226,7 +251,7 @@ export class ProgressionService {
         sectionId: currentLesson.sectionId,
         orderIndex: { gt: currentLesson.orderIndex },
       },
-      orderBy: { orderIndex: 'asc' },
+      orderBy: { orderIndex: "asc" },
     });
 
     return nextLesson;
@@ -245,7 +270,7 @@ export class ProgressionService {
     });
 
     if (!lesson) {
-      throw new NotFoundException('Lesson not found');
+      throw new NotFoundException("Lesson not found");
     }
 
     const assignment = await this.prisma.assignment.findFirst({
@@ -253,7 +278,7 @@ export class ProgressionService {
     });
 
     if (!assignment) {
-      throw new NotFoundException('Assignment not found');
+      throw new NotFoundException("Assignment not found");
     }
 
     const updated = await this.prisma.lesson.update({
@@ -281,7 +306,7 @@ export class ProgressionService {
     });
 
     if (!lesson) {
-      throw new NotFoundException('Lesson not found');
+      throw new NotFoundException("Lesson not found");
     }
 
     const exam = await this.prisma.exam.findFirst({
@@ -289,7 +314,7 @@ export class ProgressionService {
     });
 
     if (!exam) {
-      throw new NotFoundException('Exam not found');
+      throw new NotFoundException("Exam not found");
     }
 
     const updated = await this.prisma.lesson.update({
@@ -316,12 +341,12 @@ export class ProgressionService {
       where: {
         userId,
         courseId,
-        status: 'ACTIVE',
+        status: "ACTIVE",
       },
     });
 
     if (!enrollment) {
-      throw new NotFoundException('Not enrolled in this course');
+      throw new NotFoundException("Not enrolled in this course");
     }
 
     const lessons = await this.prisma.lesson.findMany({
@@ -334,7 +359,7 @@ export class ProgressionService {
         assignment: true,
         exam: true,
       },
-      orderBy: { orderIndex: 'asc' },
+      orderBy: { orderIndex: "asc" },
     });
 
     const progression = lessons.map((lesson) => {
@@ -348,7 +373,10 @@ export class ProgressionService {
         unlockInfo = {
           unlockType: lesson.unlockType,
           unlockTargetId: lesson.unlockTargetId,
-          description: this.getUnlockDescription(lesson.unlockType, lesson.unlockTargetId),
+          description: this.getUnlockDescription(
+            lesson.unlockType,
+            lesson.unlockTargetId,
+          ),
         };
       }
 
@@ -386,7 +414,7 @@ export class ProgressionService {
     });
 
     if (!lesson) {
-      throw new NotFoundException('Lesson not found');
+      throw new NotFoundException("Lesson not found");
     }
 
     const updated = await this.prisma.lesson.update({
@@ -398,8 +426,8 @@ export class ProgressionService {
     await this.auditService.log({
       tenantId,
       actorUserId: userId,
-      action: 'CONTENT_MANUALLY_UNLOCKED',
-      resourceType: 'lesson',
+      action: "CONTENT_MANUALLY_UNLOCKED",
+      resourceType: "lesson",
       resourceId: lessonId,
       metadata: { reason },
     });
@@ -416,7 +444,7 @@ export class ProgressionService {
     });
 
     if (!lesson) {
-      throw new NotFoundException('Lesson not found');
+      throw new NotFoundException("Lesson not found");
     }
 
     const updated = await this.prisma.lesson.update({
@@ -432,8 +460,8 @@ export class ProgressionService {
     await this.auditService.log({
       tenantId,
       actorUserId: userId,
-      action: 'CONTENT_LOCK_RESET',
-      resourceType: 'lesson',
+      action: "CONTENT_LOCK_RESET",
+      resourceType: "lesson",
       resourceId: lessonId,
       metadata: {},
     });
@@ -443,26 +471,29 @@ export class ProgressionService {
 
   // ==================== HELPER METHODS ====================
 
-  private getUnlockDescription(unlockType: ContentUnlockType, unlockTargetId: string): string {
+  private getUnlockDescription(
+    unlockType: ContentUnlockType,
+    unlockTargetId: string,
+  ): string {
     switch (unlockType) {
       case ContentUnlockType.ENTER_ASSIGNMENT:
-        return 'Unlocks when you enter the assignment';
+        return "Unlocks when you enter the assignment";
       case ContentUnlockType.ENTER_EXAM:
-        return 'Unlocks when you enter the exam';
+        return "Unlocks when you enter the exam";
       case ContentUnlockType.COMPLETE_ASSIGNMENT:
-        return 'Unlocks when you complete the assignment';
+        return "Unlocks when you complete the assignment";
       case ContentUnlockType.COMPLETE_EXAM:
-        return 'Unlocks when you complete the exam';
+        return "Unlocks when you complete the exam";
       case ContentUnlockType.PASS_EXAM:
-        return 'Unlocks when you pass the exam';
+        return "Unlocks when you pass the exam";
       case ContentUnlockType.SCORE_THRESHOLD:
-        return 'Unlocks when you reach a score threshold';
+        return "Unlocks when you reach a score threshold";
       case ContentUnlockType.TIME_ELAPSED:
-        return 'Unlocks after a certain time';
+        return "Unlocks after a certain time";
       case ContentUnlockType.MANUAL:
-        return 'Unlocked by teacher';
+        return "Unlocked by teacher";
       default:
-        return 'Unknown unlock condition';
+        return "Unknown unlock condition";
     }
   }
 }

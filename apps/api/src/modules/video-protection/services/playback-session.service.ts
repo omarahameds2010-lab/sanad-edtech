@@ -1,10 +1,21 @@
-import { Injectable, BadRequestException, NotFoundException, ForbiddenException } from '@nestjs/common';
-import { PrismaService } from '../../tenants/prisma.service';
-import { EntitlementsService } from '../../entitlements/entitlements.service';
-import { SignedTokenService, VideoPlaybackToken } from './signed-token.service';
-import { WatermarkEngine, WatermarkPayload } from './watermark-engine';
-import { Prisma, PlaybackSessionStatus, RiskLevel, CaptureEventType, SecurityEventSeverity } from '@prisma/client';
-import * as crypto from 'crypto';
+import {
+  Injectable,
+  BadRequestException,
+  NotFoundException,
+  ForbiddenException,
+} from "@nestjs/common";
+import { PrismaService } from "../../tenants/prisma.service";
+import { EntitlementsService } from "../../entitlements/entitlements.service";
+import { SignedTokenService, VideoPlaybackToken } from "./signed-token.service";
+import { WatermarkEngine, WatermarkPayload } from "./watermark-engine";
+import {
+  Prisma,
+  PlaybackSessionStatus,
+  RiskLevel,
+  CaptureEventType,
+  SecurityEventSeverity,
+} from "@prisma/client";
+import * as crypto from "crypto";
 
 export interface AuthorizePlaybackInput {
   lessonId: string;
@@ -81,7 +92,7 @@ export class PlaybackSessionService {
         positionChangeInterval: number;
         opacity: number;
         rotation: boolean;
-        failurePolicy: 'STRICT' | 'BALANCED' | 'LOW_RISK';
+        failurePolicy: "STRICT" | "BALANCED" | "LOW_RISK";
       };
     },
   ): Promise<VideoPlaybackToken> {
@@ -92,22 +103,22 @@ export class PlaybackSessionService {
     });
 
     if (!lesson) {
-      throw new NotFoundException('Lesson not found');
+      throw new NotFoundException("Lesson not found");
     }
 
     if (lesson.tenantId !== tenantId) {
-      throw new ForbiddenException('Cross-tenant access denied');
+      throw new ForbiddenException("Cross-tenant access denied");
     }
 
-    if (lesson.status !== 'PUBLISHED' && lesson.status !== 'READY') {
-      throw new ForbiddenException('Lesson not available');
+    if (lesson.status !== "PUBLISHED" && lesson.status !== "READY") {
+      throw new ForbiddenException("Lesson not available");
     }
 
     // Check if lesson is free or requires entitlement
     if (!lesson.isFree) {
       const hasEntitlement = await this.entitlementsService.hasEntitlement(
         studentId,
-        'lesson',
+        "lesson",
         input.lessonId,
       );
 
@@ -115,22 +126,36 @@ export class PlaybackSessionService {
         // Check course entitlement
         const courseEntitlement = await this.entitlementsService.hasEntitlement(
           studentId,
-          'course',
+          "course",
           lesson.section.courseId,
         );
 
         if (!courseEntitlement) {
-          await this.logSecurityEvent(tenantId, studentId, 'VIDEO_ACCESS_DENIED', SecurityEventSeverity.WARNING, {
-            lessonId: input.lessonId,
-            reason: 'NO_ENTITLEMENT',
+          await this.logSecurityEvent(
+            tenantId,
+            studentId,
+            "VIDEO_ACCESS_DENIED",
+            SecurityEventSeverity.WARNING,
+            {
+              lessonId: input.lessonId,
+              reason: "NO_ENTITLEMENT",
+            },
+          );
+          throw new ForbiddenException({
+            code: "NO_ENTITLEMENT",
+            message: "No active entitlement for this lesson",
           });
-          throw new ForbiddenException({ code: 'NO_ENTITLEMENT', message: 'No active entitlement for this lesson' });
         }
       }
     }
 
     // 2. Get or register device
-    const device = await this.getOrRegisterDevice(tenantId, studentId, input.deviceId, input.deviceFingerprint);
+    const device = await this.getOrRegisterDevice(
+      tenantId,
+      studentId,
+      input.deviceId,
+      input.deviceFingerprint,
+    );
 
     // 3. Check device limit
     const deviceCount = await this.prisma.device.count({
@@ -138,14 +163,20 @@ export class PlaybackSessionService {
     });
 
     if (deviceCount > tenantConfig.maxDevices) {
-      await this.logSecurityEvent(tenantId, studentId, 'DEVICE_LIMIT_EXCEEDED', SecurityEventSeverity.WARNING, {
-        deviceCount,
-        maxDevices: tenantConfig.maxDevices,
-        deviceId: input.deviceId,
-      });
-      throw new ForbiddenException({ 
-        code: 'DEVICE_LIMIT', 
-        message: `Device limit exceeded. Max ${tenantConfig.maxDevices} devices allowed.` 
+      await this.logSecurityEvent(
+        tenantId,
+        studentId,
+        "DEVICE_LIMIT_EXCEEDED",
+        SecurityEventSeverity.WARNING,
+        {
+          deviceCount,
+          maxDevices: tenantConfig.maxDevices,
+          deviceId: input.deviceId,
+        },
+      );
+      throw new ForbiddenException({
+        code: "DEVICE_LIMIT",
+        message: `Device limit exceeded. Max ${tenantConfig.maxDevices} devices allowed.`,
       });
     }
 
@@ -163,31 +194,48 @@ export class PlaybackSessionService {
       if (tenantConfig.maxConcurrentSessions === 1) {
         const oldestSession = await this.prisma.playbackSession.findFirst({
           where: { tenantId, studentId, status: PlaybackSessionStatus.ACTIVE },
-          orderBy: { startedAt: 'asc' },
+          orderBy: { startedAt: "asc" },
         });
 
         if (oldestSession) {
-          await this.revokeSession(oldestSession.id, 'NEW_SESSION_STARTED');
+          await this.revokeSession(oldestSession.id, "NEW_SESSION_STARTED");
         }
       } else {
-        await this.logSecurityEvent(tenantId, studentId, 'CONCURRENT_SESSION_LIMIT', SecurityEventSeverity.WARNING, {
-          activeSessions,
-          maxSessions: tenantConfig.maxConcurrentSessions,
-        });
-        throw new ForbiddenException({ 
-          code: 'SESSION_CONFLICT', 
-          message: 'Maximum concurrent sessions reached' 
+        await this.logSecurityEvent(
+          tenantId,
+          studentId,
+          "CONCURRENT_SESSION_LIMIT",
+          SecurityEventSeverity.WARNING,
+          {
+            activeSessions,
+            maxSessions: tenantConfig.maxConcurrentSessions,
+          },
+        );
+        throw new ForbiddenException({
+          code: "SESSION_CONFLICT",
+          message: "Maximum concurrent sessions reached",
         });
       }
     }
 
     // 5. Check for suspicious activity (IP change, etc.)
-    const riskSignals = await this.evaluateRiskSignals(studentId, tenantId, input.ip, device.id);
+    const riskSignals = await this.evaluateRiskSignals(
+      studentId,
+      tenantId,
+      input.ip,
+      device.id,
+    );
     if (riskSignals.ipChangeDetected) {
-      await this.logSecurityEvent(tenantId, studentId, 'IP_CHANGE_DETECTED', SecurityEventSeverity.WARNING, {
-        sessionId: 'new',
-        ip: input.ip,
-      });
+      await this.logSecurityEvent(
+        tenantId,
+        studentId,
+        "IP_CHANGE_DETECTED",
+        SecurityEventSeverity.WARNING,
+        {
+          sessionId: "new",
+          ip: input.ip,
+        },
+      );
     }
 
     // 6. Get video info (from lesson or video provider)
@@ -195,15 +243,23 @@ export class PlaybackSessionService {
     const videoDurationSec = lesson.duration || 3600; // Default 1 hour if not set
 
     // 7. Build watermark payload
-    const student = await this.prisma.user.findUnique({ where: { id: studentId } });
-    const tenant = await this.prisma.tenant.findUnique({ where: { id: tenantId } });
+    const student = await this.prisma.user.findUnique({
+      where: { id: studentId },
+    });
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { id: tenantId },
+    });
 
     const watermarkPayload: WatermarkPayload = {
-      studentName: tenantConfig.watermark.showName ? student?.name || 'Student' : '',
-      studentPhone: tenantConfig.watermark.showPhone ? student?.phone || '' : '',
-      studentId: tenantConfig.watermark.showStudentId ? studentId : '',
-      tenantName: tenant?.name || '',
-      enrollmentId: '', // Could be populated from enrollment
+      studentName: tenantConfig.watermark.showName
+        ? student?.name || "Student"
+        : "",
+      studentPhone: tenantConfig.watermark.showPhone
+        ? student?.phone || ""
+        : "",
+      studentId: tenantConfig.watermark.showStudentId ? studentId : "",
+      tenantName: tenant?.name || "",
+      enrollmentId: "", // Could be populated from enrollment
       issuedAt: Date.now(),
     };
 
@@ -236,11 +292,17 @@ export class PlaybackSessionService {
     });
 
     // 10. Log audit
-    await this.logSecurityEvent(tenantId, studentId, 'PLAYBACK_AUTHORIZED', SecurityEventSeverity.INFO, {
-      sessionId: session.id,
-      lessonId: input.lessonId,
-      deviceId: device.id,
-    });
+    await this.logSecurityEvent(
+      tenantId,
+      studentId,
+      "PLAYBACK_AUTHORIZED",
+      SecurityEventSeverity.INFO,
+      {
+        sessionId: session.id,
+        lessonId: input.lessonId,
+        deviceId: device.id,
+      },
+    );
 
     return token;
   }
@@ -248,8 +310,12 @@ export class PlaybackSessionService {
   /**
    * Handle heartbeat from player
    */
-  async handleHeartbeat(tenantId: string, studentId: string, input: HeartbeatInput): Promise<{
-    action: 'ALLOW' | 'CHALLENGE' | 'REVOKE';
+  async handleHeartbeat(
+    tenantId: string,
+    studentId: string,
+    input: HeartbeatInput,
+  ): Promise<{
+    action: "ALLOW" | "CHALLENGE" | "REVOKE";
     videoToken?: string;
   }> {
     const session = await this.prisma.playbackSession.findUnique({
@@ -257,15 +323,15 @@ export class PlaybackSessionService {
     });
 
     if (!session) {
-      throw new NotFoundException('Playback session not found');
+      throw new NotFoundException("Playback session not found");
     }
 
     if (session.tenantId !== tenantId || session.studentId !== studentId) {
-      throw new ForbiddenException('Session access denied');
+      throw new ForbiddenException("Session access denied");
     }
 
     if (session.status !== PlaybackSessionStatus.ACTIVE) {
-      return { action: 'REVOKE' };
+      return { action: "REVOKE" };
     }
 
     // Update last heartbeat
@@ -276,13 +342,34 @@ export class PlaybackSessionService {
 
     // Persist video progress into the LMS progress model
     const existing = await this.prisma.lessonProgress.findUnique({
-      where: { tenantId_userId_lessonId: { tenantId, userId: studentId, lessonId: session.lessonId } },
+      where: {
+        tenantId_userId_lessonId: {
+          tenantId,
+          userId: studentId,
+          lessonId: session.lessonId,
+        },
+      },
     });
     const position = Math.max(0, Math.floor(input.position));
     await this.prisma.lessonProgress.upsert({
-      where: { tenantId_userId_lessonId: { tenantId, userId: studentId, lessonId: session.lessonId } },
-      create: { tenantId, userId: studentId, lessonId: session.lessonId, watchedSeconds: position, lastPosition: position },
-      update: { watchedSeconds: Math.max(existing?.watchedSeconds ?? 0, position), lastPosition: position },
+      where: {
+        tenantId_userId_lessonId: {
+          tenantId,
+          userId: studentId,
+          lessonId: session.lessonId,
+        },
+      },
+      create: {
+        tenantId,
+        userId: studentId,
+        lessonId: session.lessonId,
+        watchedSeconds: position,
+        lastPosition: position,
+      },
+      update: {
+        watchedSeconds: Math.max(existing?.watchedSeconds ?? 0, position),
+        lastPosition: position,
+      },
     });
 
     // Evaluate risk based on heartbeat data
@@ -297,27 +384,35 @@ export class PlaybackSessionService {
 
     // Take action based on risk level
     if (riskLevel === RiskLevel.HIGH) {
-      await this.revokeSession(input.sessionId, 'HIGH_RISK');
-      return { action: 'REVOKE' };
+      await this.revokeSession(input.sessionId, "HIGH_RISK");
+      return { action: "REVOKE" };
     }
 
     if (riskLevel === RiskLevel.MEDIUM) {
       // Could issue new token with tighter restrictions
-      return { action: 'CHALLENGE' };
+      return { action: "CHALLENGE" };
     }
 
-    return { action: 'ALLOW' };
+    return { action: "ALLOW" };
   }
 
   /**
    * Handle capture event from client (screenshot, screen recording, watermark tamper)
    */
-  async handleCaptureEvent(tenantId: string, studentId: string, input: CaptureEventInput): Promise<void> {
+  async handleCaptureEvent(
+    tenantId: string,
+    studentId: string,
+    input: CaptureEventInput,
+  ): Promise<void> {
     const session = await this.prisma.playbackSession.findUnique({
       where: { id: input.sessionId },
     });
 
-    if (!session || session.tenantId !== tenantId || session.studentId !== studentId) {
+    if (
+      !session ||
+      session.tenantId !== tenantId ||
+      session.studentId !== studentId
+    ) {
       return; // Silently ignore invalid sessions
     }
 
@@ -345,29 +440,46 @@ export class PlaybackSessionService {
     });
 
     // Log security event
-    await this.logSecurityEvent(tenantId, studentId, `CAPTURE_${input.eventType}`, SecurityEventSeverity.WARNING, {
-      sessionId: input.sessionId,
-      riskIncrement,
-      newRiskScore,
-      metadata: input.metadata,
-    });
+    await this.logSecurityEvent(
+      tenantId,
+      studentId,
+      `CAPTURE_${input.eventType}`,
+      SecurityEventSeverity.WARNING,
+      {
+        sessionId: input.sessionId,
+        riskIncrement,
+        newRiskScore,
+        metadata: input.metadata,
+      },
+    );
 
     // Take action if risk is high
     if (newRiskLevel === RiskLevel.HIGH) {
-      await this.revokeSession(input.sessionId, `CAPTURE_EVENT_${input.eventType}`);
+      await this.revokeSession(
+        input.sessionId,
+        `CAPTURE_EVENT_${input.eventType}`,
+      );
     }
   }
 
   /**
    * End playback session
    */
-  async endSession(tenantId: string, studentId: string, sessionId: string): Promise<void> {
+  async endSession(
+    tenantId: string,
+    studentId: string,
+    sessionId: string,
+  ): Promise<void> {
     const session = await this.prisma.playbackSession.findUnique({
       where: { id: sessionId },
     });
 
-    if (!session || session.tenantId !== tenantId || session.studentId !== studentId) {
-      throw new NotFoundException('Session not found');
+    if (
+      !session ||
+      session.tenantId !== tenantId ||
+      session.studentId !== studentId
+    ) {
+      throw new NotFoundException("Session not found");
     }
 
     await this.prisma.playbackSession.update({
@@ -378,10 +490,16 @@ export class PlaybackSessionService {
       },
     });
 
-    await this.logSecurityEvent(tenantId, studentId, 'PLAYBACK_ENDED', SecurityEventSeverity.INFO, {
-      sessionId,
-      duration: Date.now() - session.startedAt.getTime(),
-    });
+    await this.logSecurityEvent(
+      tenantId,
+      studentId,
+      "PLAYBACK_ENDED",
+      SecurityEventSeverity.INFO,
+      {
+        sessionId,
+        duration: Date.now() - session.startedAt.getTime(),
+      },
+    );
   }
 
   /**
@@ -407,7 +525,7 @@ export class PlaybackSessionService {
         studentId,
         status: PlaybackSessionStatus.ACTIVE,
       },
-      orderBy: { startedAt: 'desc' },
+      orderBy: { startedAt: "desc" },
     });
   }
 
@@ -419,8 +537,12 @@ export class PlaybackSessionService {
       where: { id: sessionId },
     });
 
-    if (!session || session.tenantId !== tenantId || session.studentId !== studentId) {
-      throw new NotFoundException('Session not found');
+    if (
+      !session ||
+      session.tenantId !== tenantId ||
+      session.studentId !== studentId
+    ) {
+      throw new NotFoundException("Session not found");
     }
 
     return session;
@@ -487,7 +609,10 @@ export class PlaybackSessionService {
     ip: string;
     userAgent: string;
   }) {
-    const watermarkData = this.watermarkEngine.createWatermarkData(params.watermarkPayload, 3600);
+    const watermarkData = this.watermarkEngine.createWatermarkData(
+      params.watermarkPayload,
+      3600,
+    );
 
     return this.prisma.playbackSession.create({
       data: {
@@ -526,12 +651,13 @@ export class PlaybackSessionService {
       select: { ipHash: true, deviceId: true },
     });
 
-    const uniqueIps = new Set(recentSessions.map(s => s.ipHash)).size;
-    const uniqueDevices = new Set(recentSessions.map(s => s.deviceId)).size;
+    const uniqueIps = new Set(recentSessions.map((s) => s.ipHash)).size;
+    const uniqueDevices = new Set(recentSessions.map((s) => s.deviceId)).size;
     const currentIpHash = this.hashValue(currentIp);
 
-    const ipChangeDetected = recentSessions.length > 0 && 
-      !recentSessions.some(s => s.ipHash === currentIpHash);
+    const ipChangeDetected =
+      recentSessions.length > 0 &&
+      !recentSessions.some((s) => s.ipHash === currentIpHash);
 
     return {
       concurrentSessions: await this.prisma.playbackSession.count({
@@ -590,7 +716,11 @@ export class PlaybackSessionService {
   }
 
   private hashValue(value: string): string {
-    return crypto.createHash('sha256').update(value).digest('hex').substring(0, 32);
+    return crypto
+      .createHash("sha256")
+      .update(value)
+      .digest("hex")
+      .substring(0, 32);
   }
 
   private async logSecurityEvent(

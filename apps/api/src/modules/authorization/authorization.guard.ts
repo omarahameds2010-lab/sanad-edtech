@@ -1,6 +1,14 @@
-import { Injectable, CanActivate, ExecutionContext, ForbiddenException } from '@nestjs/common';
-import { AuthorizationService, AuthorizationError } from './authorization.service';
-import { PolicyEngine, Action, ResourceType } from './policy-engine';
+import {
+  Injectable,
+  CanActivate,
+  ExecutionContext,
+  ForbiddenException,
+} from "@nestjs/common";
+import {
+  AuthorizationService,
+  AuthorizationError,
+} from "./authorization.service";
+import { PolicyEngine, Action, ResourceType } from "./policy-engine";
 
 export interface RequirePermissionOptions {
   action: Action;
@@ -33,11 +41,19 @@ export class AuthorizationGuard implements CanActivate {
         resource = { id: request.params[options.resourceIdParam] };
       }
       if (options.resourceResolver) {
-        resource = { ...resource, ...(await options.resourceResolver(request)) };
+        resource = {
+          ...resource,
+          ...(await options.resourceResolver(request)),
+        };
       }
 
       // Check permission
-      await this.authService.canOrThrow(authContext, options.action, options.resourceType, resource);
+      await this.authService.canOrThrow(
+        authContext,
+        options.action,
+        options.resourceType,
+        resource,
+      );
 
       return true;
     } catch (error) {
@@ -52,26 +68,32 @@ export class AuthorizationGuard implements CanActivate {
     }
   }
 
-  private getOptions(context: ExecutionContext): RequirePermissionOptions | null {
+  private getOptions(
+    context: ExecutionContext,
+  ): RequirePermissionOptions | null {
     const handler = context.getHandler();
     const controller = context.getClass();
 
     // Check handler metadata first, then controller metadata
-    const handlerOptions = Reflect.getMetadata('authz:options', handler);
-    const controllerOptions = Reflect.getMetadata('authz:options', controller);
+    const handlerOptions = Reflect.getMetadata("authz:options", handler);
+    const controllerOptions = Reflect.getMetadata("authz:options", controller);
 
     return handlerOptions || controllerOptions || null;
   }
 }
 
 export function RequirePermission(options: RequirePermissionOptions) {
-  return (target: any, propertyKey?: string, descriptor?: PropertyDescriptor) => {
+  return (
+    target: any,
+    propertyKey?: string,
+    descriptor?: PropertyDescriptor,
+  ) => {
     if (propertyKey && descriptor) {
       // Method decorator
-      Reflect.defineMetadata('authz:options', options, descriptor.value);
+      Reflect.defineMetadata("authz:options", options, descriptor.value);
     } else {
       // Class decorator
-      Reflect.defineMetadata('authz:options', options, target);
+      Reflect.defineMetadata("authz:options", options, target);
     }
     return descriptor || target;
   };

@@ -1,5 +1,5 @@
-import { Injectable } from '@nestjs/common';
-import { PrismaService } from '../tenants/prisma.service';
+import { Injectable } from "@nestjs/common";
+import { PrismaService } from "../tenants/prisma.service";
 
 interface OutboxEvent {
   eventType: string;
@@ -29,7 +29,7 @@ export class OutboxService {
   async getUnpublishedEvents(limit = 100) {
     return this.prisma.outboxEvent.findMany({
       where: { publishedAt: null },
-      orderBy: { createdAt: 'asc' },
+      orderBy: { createdAt: "asc" },
       take: limit,
     });
   }

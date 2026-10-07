@@ -1,9 +1,17 @@
-import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
-import { PrismaService } from '../tenants/prisma.service';
-import { Prisma, EntitlementStatus as PrismaEntitlementStatus } from '@prisma/client';
+import {
+  Injectable,
+  NotFoundException,
+  ConflictException,
+} from "@nestjs/common";
+import { PrismaService } from "../tenants/prisma.service";
+import {
+  Prisma,
+  EntitlementStatus as PrismaEntitlementStatus,
+} from "@prisma/client";
 
-export type EntitlementSource = 'purchase' | 'voucher' | 'subscription' | 'admin_grant' | 'trial';
-export type EntitlementStatus = 'ACTIVE' | 'EXPIRED' | 'REVOKED' | 'PENDING';
+export type EntitlementSource =
+  "purchase" | "voucher" | "subscription" | "admin_grant" | "trial";
+export type EntitlementStatus = "ACTIVE" | "EXPIRED" | "REVOKED" | "PENDING";
 
 export interface Entitlement {
   id: string;
@@ -42,15 +50,15 @@ export class EntitlementsService {
 
   // Resource types that can have entitlements
   private readonly entitleableResources = [
-    'course',
-    'lesson',
-    'exam',
-    'video',
-    'liveSession',
-    'certificate',
-    'assignment',
-    'questionBank',
-    'community',
+    "course",
+    "lesson",
+    "exam",
+    "video",
+    "liveSession",
+    "certificate",
+    "assignment",
+    "questionBank",
+    "community",
   ];
 
   private mapEntitlement(e: any): Entitlement {
@@ -65,13 +73,16 @@ export class EntitlementsService {
     return status.toUpperCase() as EntitlementStatus;
   }
 
-  async getUserEntitlements(userId: string, status: EntitlementStatus[] = ['ACTIVE']): Promise<Entitlement[]> {
+  async getUserEntitlements(
+    userId: string,
+    status: EntitlementStatus[] = ["ACTIVE"],
+  ): Promise<Entitlement[]> {
     const entitlements = await this.prisma.entitlement.findMany({
       where: {
         userId,
         status: { in: status as PrismaEntitlementStatus[] },
       },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { createdAt: "desc" },
     });
     return entitlements.map(this.mapEntitlement);
   }
@@ -86,9 +97,9 @@ export class EntitlementsService {
         userId,
         resourceType,
         resourceId,
-        status: 'ACTIVE',
+        status: "ACTIVE",
       },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { createdAt: "desc" },
     });
     return entitlement ? this.mapEntitlement(entitlement) : null;
   }
@@ -98,7 +109,11 @@ export class EntitlementsService {
     resourceType: string,
     resourceId: string,
   ): Promise<boolean> {
-    const entitlement = await this.getEntitlement(userId, resourceType, resourceId);
+    const entitlement = await this.getEntitlement(
+      userId,
+      resourceType,
+      resourceId,
+    );
     if (!entitlement) return false;
 
     // Check expiration
@@ -111,15 +126,22 @@ export class EntitlementsService {
       return false;
     }
 
-    return entitlement.status === 'ACTIVE';
+    return entitlement.status === "ACTIVE";
   }
 
   async grantEntitlement(input: GrantEntitlementInput): Promise<Entitlement> {
     // Check if already has active entitlement
-    const existing = await this.getEntitlement(input.userId, input.resourceType, input.resourceId);
-    if (existing && existing.status === 'ACTIVE') {
+    const existing = await this.getEntitlement(
+      input.userId,
+      input.resourceType,
+      input.resourceId,
+    );
+    if (existing && existing.status === "ACTIVE") {
       // Update existing entitlement if new one has later expiry
-      if (input.expiresAt && (!existing.expiresAt || input.expiresAt > existing.expiresAt)) {
+      if (
+        input.expiresAt &&
+        (!existing.expiresAt || input.expiresAt > existing.expiresAt)
+      ) {
         return this.updateEntitlement(existing.id, {
           expiresAt: input.expiresAt,
           metadata: { ...existing.metadata, ...input.metadata },
@@ -138,7 +160,7 @@ export class EntitlementsService {
         source: input.source,
         startsAt: input.startsAt || new Date(),
         expiresAt: input.expiresAt,
-        status: 'ACTIVE',
+        status: "ACTIVE",
         metadata: input.metadata || {},
       },
     });
@@ -156,7 +178,7 @@ export class EntitlementsService {
     const courseEntitlement = await this.grantEntitlement({
       tenantId,
       userId,
-      resourceType: 'course',
+      resourceType: "course",
       resourceId: courseId,
       source,
       metadata,
@@ -167,7 +189,7 @@ export class EntitlementsService {
       where: {
         tenantId,
         section: { courseId },
-        status: 'PUBLISHED',
+        status: "PUBLISHED",
       },
       select: { id: true },
     });
@@ -177,7 +199,7 @@ export class EntitlementsService {
         this.grantEntitlement({
           tenantId,
           userId,
-          resourceType: 'lesson',
+          resourceType: "lesson",
           resourceId: lesson.id,
           source,
           metadata: { courseId, ...metadata },
@@ -187,7 +209,11 @@ export class EntitlementsService {
 
     // Get exams for the course
     const exams = await this.prisma.exam.findMany({
-      where: { tenantId, status: 'PUBLISHED', lesson: { section: { courseId } } },
+      where: {
+        tenantId,
+        status: "PUBLISHED",
+        lesson: { section: { courseId } },
+      },
       select: { id: true },
     });
 
@@ -196,7 +222,7 @@ export class EntitlementsService {
         this.grantEntitlement({
           tenantId,
           userId,
-          resourceType: 'exam',
+          resourceType: "exam",
           resourceId: exam.id,
           source,
           metadata: { courseId, ...metadata },
@@ -211,21 +237,24 @@ export class EntitlementsService {
     const updated = await this.prisma.entitlement.update({
       where: { id },
       data: {
-        status: 'REVOKED',
+        status: "REVOKED",
         metadata: { revokedAt: new Date(), revokedReason: reason },
       },
     });
     return this.mapEntitlement(updated);
   }
 
-  async revokeUserEntitlements(userId: string, resourceType?: string): Promise<number> {
-    const where: any = { userId, status: 'ACTIVE' };
+  async revokeUserEntitlements(
+    userId: string,
+    resourceType?: string,
+  ): Promise<number> {
+    const where: any = { userId, status: "ACTIVE" };
     if (resourceType) where.resourceType = resourceType;
 
     const result = await this.prisma.entitlement.updateMany({
       where,
       data: {
-        status: 'REVOKED',
+        status: "REVOKED",
         metadata: { revokedAt: new Date() },
       },
     });
@@ -236,16 +265,24 @@ export class EntitlementsService {
   async expireEntitlements(): Promise<number> {
     const result = await this.prisma.entitlement.updateMany({
       where: {
-        status: 'ACTIVE',
+        status: "ACTIVE",
         expiresAt: { lt: new Date() },
       },
-      data: { status: 'EXPIRED' },
+      data: { status: "EXPIRED" },
     });
 
     return result.count;
   }
 
-  async updateEntitlement(id: string, data: Partial<Omit<Entitlement, 'id' | 'tenantId' | 'userId' | 'createdAt' | 'updatedAt'>>): Promise<Entitlement> {
+  async updateEntitlement(
+    id: string,
+    data: Partial<
+      Omit<
+        Entitlement,
+        "id" | "tenantId" | "userId" | "createdAt" | "updatedAt"
+      >
+    >,
+  ): Promise<Entitlement> {
     const updated = await this.prisma.entitlement.update({
       where: { id },
       data: { ...data, updatedAt: new Date() },
@@ -255,7 +292,11 @@ export class EntitlementsService {
 
   async getTenantEntitlements(
     tenantId: string,
-    filters?: { userId?: string; resourceType?: string; status?: EntitlementStatus },
+    filters?: {
+      userId?: string;
+      resourceType?: string;
+      status?: EntitlementStatus;
+    },
   ): Promise<Entitlement[]> {
     const entitlements = await this.prisma.entitlement.findMany({
       where: {
@@ -263,7 +304,7 @@ export class EntitlementsService {
         ...filters,
         status: filters?.status as PrismaEntitlementStatus | undefined,
       },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { createdAt: "desc" },
       include: {
         user: { select: { id: true, name: true, phone: true, email: true } },
       },
@@ -279,31 +320,44 @@ export class EntitlementsService {
     bySource: Record<string, number>;
     byResourceType: Record<string, number>;
   }> {
-    const [total, active, expired, revoked, bySource, byResourceType] = await Promise.all([
-      this.prisma.entitlement.count({ where: { tenantId } }),
-      this.prisma.entitlement.count({ where: { tenantId, status: 'ACTIVE' } }),
-      this.prisma.entitlement.count({ where: { tenantId, status: 'EXPIRED' } }),
-      this.prisma.entitlement.count({ where: { tenantId, status: 'REVOKED' } }),
-      this.prisma.entitlement.groupBy({
-        by: ['source'],
-        where: { tenantId },
-        _count: { source: true },
-      }),
-      this.prisma.entitlement.groupBy({
-        by: ['resourceType'],
-        where: { tenantId },
-        _count: { resourceType: true },
-      }),
-    ]);
+    const [total, active, expired, revoked, bySource, byResourceType] =
+      await Promise.all([
+        this.prisma.entitlement.count({ where: { tenantId } }),
+        this.prisma.entitlement.count({
+          where: { tenantId, status: "ACTIVE" },
+        }),
+        this.prisma.entitlement.count({
+          where: { tenantId, status: "EXPIRED" },
+        }),
+        this.prisma.entitlement.count({
+          where: { tenantId, status: "REVOKED" },
+        }),
+        this.prisma.entitlement.groupBy({
+          by: ["source"],
+          where: { tenantId },
+          _count: { source: true },
+        }),
+        this.prisma.entitlement.groupBy({
+          by: ["resourceType"],
+          where: { tenantId },
+          _count: { resourceType: true },
+        }),
+      ]);
 
     return {
       total,
       active,
       expired,
       revoked,
-      bySource: bySource.reduce((acc, item) => ({ ...acc, [item.source]: item._count.source }), {}),
+      bySource: bySource.reduce(
+        (acc, item) => ({ ...acc, [item.source]: item._count.source }),
+        {},
+      ),
       byResourceType: byResourceType.reduce(
-        (acc, item) => ({ ...acc, [item.resourceType]: item._count.resourceType }),
+        (acc, item) => ({
+          ...acc,
+          [item.resourceType]: item._count.resourceType,
+        }),
         {},
       ),
     };
@@ -315,22 +369,26 @@ export class EntitlementsService {
     resourceType: string,
     resourceId: string,
   ): Promise<{ allowed: boolean; entitlement?: Entitlement; reason?: string }> {
-    const entitlement = await this.getEntitlement(userId, resourceType, resourceId);
+    const entitlement = await this.getEntitlement(
+      userId,
+      resourceType,
+      resourceId,
+    );
 
     if (!entitlement) {
-      return { allowed: false, reason: 'NO_ENTITLEMENT' };
+      return { allowed: false, reason: "NO_ENTITLEMENT" };
     }
 
-    if (entitlement.status !== 'ACTIVE') {
+    if (entitlement.status !== "ACTIVE") {
       return { allowed: false, reason: `ENTITLEMENT_${entitlement.status}` };
     }
 
     if (entitlement.expiresAt && entitlement.expiresAt < new Date()) {
-      return { allowed: false, reason: 'ENTITLEMENT_EXPIRED' };
+      return { allowed: false, reason: "ENTITLEMENT_EXPIRED" };
     }
 
     if (entitlement.startsAt && entitlement.startsAt > new Date()) {
-      return { allowed: false, reason: 'ENTITLEMENT_NOT_STARTED' };
+      return { allowed: false, reason: "ENTITLEMENT_NOT_STARTED" };
     }
 
     return { allowed: true, entitlement };

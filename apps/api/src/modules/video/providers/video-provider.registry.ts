@@ -1,8 +1,8 @@
-import { Injectable, OnModuleInit, Inject } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { VideoProvider } from './video-provider.interface';
-import { BunnyStreamProvider } from './bunny-stream.provider';
-import { VdoCipherProvider } from './vdocipher.provider';
+import { Injectable, OnModuleInit, Inject } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
+import { VideoProvider } from "./video-provider.interface";
+import { BunnyStreamProvider } from "./bunny-stream.provider";
+import { VdoCipherProvider } from "./vdocipher.provider";
 
 @Injectable()
 export class VideoProviderRegistry implements OnModuleInit {
@@ -16,8 +16,10 @@ export class VideoProviderRegistry implements OnModuleInit {
   ) {}
 
   async onModuleInit() {
-    this.defaultProvider = this.configService.get<string>('VIDEO_DEFAULT_PROVIDER') || 'bunny-stream';
-    
+    this.defaultProvider =
+      this.configService.get<string>("VIDEO_DEFAULT_PROVIDER") ||
+      "bunny-stream";
+
     // Register all providers
     this.registerProvider(this.bunnyStreamProvider);
     this.registerProvider(this.vdoCipherProvider);
@@ -25,7 +27,9 @@ export class VideoProviderRegistry implements OnModuleInit {
 
   registerProvider(provider: VideoProvider): void {
     if (this.providers.has(provider.name)) {
-      console.warn(`[VideoProviderRegistry] Provider ${provider.name} already registered, overwriting`);
+      console.warn(
+        `[VideoProviderRegistry] Provider ${provider.name} already registered, overwriting`,
+      );
     }
     this.providers.set(provider.name, provider);
   }
@@ -33,9 +37,11 @@ export class VideoProviderRegistry implements OnModuleInit {
   getProvider(name?: string): VideoProvider | undefined {
     const providerName = name || this.defaultProvider;
     const provider = this.providers.get(providerName);
-    
+
     if (!provider) {
-      console.warn(`[VideoProviderRegistry] Provider ${providerName} not found`);
+      console.warn(
+        `[VideoProviderRegistry] Provider ${providerName} not found`,
+      );
       return undefined;
     }
 
@@ -43,9 +49,9 @@ export class VideoProviderRegistry implements OnModuleInit {
   }
 
   getEnabledProviders(): VideoProvider[] {
-    return Array.from(this.providers.values()).filter(p => {
+    return Array.from(this.providers.values()).filter((p) => {
       // Check if provider has required config
-      return p.name === 'bunny-stream' || p.name === 'vdocipher';
+      return p.name === "bunny-stream" || p.name === "vdocipher";
     });
   }
 

@@ -1,8 +1,8 @@
-import { Module } from '@nestjs/common';
-import { TenantService } from './tenant.service';
-import { TenantController } from './tenant.controller';
-import { PrismaService } from './prisma.service';
-import { TenantResolverMiddleware } from './tenant-resolver.middleware';
+import { Module } from "@nestjs/common";
+import { TenantService } from "./tenant.service";
+import { TenantController } from "./tenant.controller";
+import { PrismaService } from "./prisma.service";
+import { TenantResolverMiddleware } from "./tenant-resolver.middleware";
 
 @Module({
   controllers: [TenantController],
@@ -11,6 +11,6 @@ import { TenantResolverMiddleware } from './tenant-resolver.middleware';
 })
 export class TenantModule {
   configure(consumer: any) {
-    consumer.apply(TenantResolverMiddleware).forRoutes('*');
+    consumer.apply(TenantResolverMiddleware).forRoutes("*");
   }
 }

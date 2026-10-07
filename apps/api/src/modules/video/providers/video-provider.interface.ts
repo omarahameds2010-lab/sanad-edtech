@@ -57,21 +57,16 @@ export interface WebhookPayload {
 }
 
 export type VideoStatus =
-  | 'UPLOADING'
-  | 'PROCESSING'
-  | 'READY'
-  | 'PUBLISHED'
-  | 'FAILED'
-  | 'ARCHIVED';
+  "UPLOADING" | "PROCESSING" | "READY" | "PUBLISHED" | "FAILED" | "ARCHIVED";
 
 export type VideoWebhookEventType =
-  | 'video.upload.started'
-  | 'video.upload.completed'
-  | 'video.processing.started'
-  | 'video.processing.completed'
-  | 'video.processing.failed'
-  | 'video.published'
-  | 'video.deleted';
+  | "video.upload.started"
+  | "video.upload.completed"
+  | "video.processing.started"
+  | "video.processing.completed"
+  | "video.processing.failed"
+  | "video.published"
+  | "video.deleted";
 
 export interface VideoProvider {
   readonly name: string;
@@ -80,8 +75,16 @@ export interface VideoProvider {
 
   createUpload(input: CreateUploadInput): Promise<CreateUploadResult>;
   getStatus(videoId: string): Promise<VideoStatusResult>;
-  getPlaybackToken(videoId: string, sessionId: string, tenantId: string, studentId: string): Promise<PlaybackTokenResult>;
+  getPlaybackToken(
+    videoId: string,
+    sessionId: string,
+    tenantId: string,
+    studentId: string,
+  ): Promise<PlaybackTokenResult>;
   deleteVideo(videoId: string): Promise<DeleteVideoResult>;
   handleWebhook(payload: WebhookPayload): Promise<void>;
-  verifyWebhook(payload: string | Buffer, headers: Record<string, string>): Promise<boolean>;
+  verifyWebhook(
+    payload: string | Buffer,
+    headers: Record<string, string>,
+  ): Promise<boolean>;
 }

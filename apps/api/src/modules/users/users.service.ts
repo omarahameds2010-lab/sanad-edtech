@@ -1,6 +1,10 @@
-import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
-import { PrismaService } from '../tenants/prisma.service';
-import * as argon2 from 'argon2';
+import {
+  Injectable,
+  NotFoundException,
+  ConflictException,
+} from "@nestjs/common";
+import { PrismaService } from "../tenants/prisma.service";
+import * as argon2 from "argon2";
 
 @Injectable()
 export class UsersService {
@@ -25,17 +29,20 @@ export class UsersService {
 
   async create(data: {
     tenantId: string;
-    role: 'STUDENT' | 'TEACHER' | 'ADMIN' | 'PARENT' | 'SUPER_ADMIN';
+    role: "STUDENT" | "TEACHER" | "ADMIN" | "PARENT" | "SUPER_ADMIN";
     name: string;
     phone: string;
     email?: string;
     password: string;
     grade?: string;
   }) {
-    const existingUser = await this.findByPhoneAndTenant(data.phone, data.tenantId);
+    const existingUser = await this.findByPhoneAndTenant(
+      data.phone,
+      data.tenantId,
+    );
 
     if (existingUser) {
-      throw new ConflictException('User with this phone already exists');
+      throw new ConflictException("User with this phone already exists");
     }
 
     const passwordHash = await argon2.hash(data.password);

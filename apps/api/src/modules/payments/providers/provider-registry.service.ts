@@ -1,12 +1,16 @@
-import { Injectable, OnModuleInit } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { PaymentProvider, ProviderConfig, ProviderHealthStatus } from './payment-provider.interface';
-import { PaymobProvider } from './paymob/paymob.provider';
-import { FawryProvider } from './fawry/fawry.provider';
-import { InstapayProvider } from './instapay/instapay.provider';
-import { VodafoneCashProvider } from './vodafone-cash/vodafone-cash.provider';
-import { EandMoneyProvider } from './eand-money/eand-money.provider';
-import { VoucherProvider } from './voucher/voucher.provider';
+import { Injectable, OnModuleInit } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
+import {
+  PaymentProvider,
+  ProviderConfig,
+  ProviderHealthStatus,
+} from "./payment-provider.interface";
+import { PaymobProvider } from "./paymob/paymob.provider";
+import { FawryProvider } from "./fawry/fawry.provider";
+import { InstapayProvider } from "./instapay/instapay.provider";
+import { VodafoneCashProvider } from "./vodafone-cash/vodafone-cash.provider";
+import { EandMoneyProvider } from "./eand-money/eand-money.provider";
+import { VoucherProvider } from "./voucher/voucher.provider";
 
 @Injectable()
 export class ProviderRegistryService implements OnModuleInit {
@@ -30,13 +34,16 @@ export class ProviderRegistryService implements OnModuleInit {
   }
 
   private async loadConfigs() {
-    const providersConfig = this.configService.get<Record<string, ProviderConfig>>('payment.providers') || {};
-    
+    const providersConfig =
+      this.configService.get<Record<string, ProviderConfig>>(
+        "payment.providers",
+      ) || {};
+
     for (const [name, config] of Object.entries(providersConfig)) {
       this.configs.set(name, config);
       this.healthStatus.set(name, {
         provider: name,
-        status: config.enabled ? 'HEALTHY' : 'DISABLED',
+        status: config.enabled ? "HEALTHY" : "DISABLED",
         lastCheck: new Date(),
       });
     }
@@ -69,7 +76,7 @@ export class ProviderRegistryService implements OnModuleInit {
   }
 
   getEnabledProviders(): PaymentProvider[] {
-    return Array.from(this.providers.values()).filter(p => {
+    return Array.from(this.providers.values()).filter((p) => {
       const config = this.configs.get(p.name);
       return config?.enabled;
     });
@@ -90,19 +97,19 @@ export class ProviderRegistryService implements OnModuleInit {
     if (!provider || !config?.enabled) {
       return {
         provider: name,
-        status: 'DISABLED',
+        status: "DISABLED",
         lastCheck: new Date(),
       };
     }
 
     const startTime = Date.now();
-    let status: 'HEALTHY' | 'DEGRADED' | 'UNAVAILABLE' = 'HEALTHY';
+    let status: "HEALTHY" | "DEGRADED" | "UNAVAILABLE" = "HEALTHY";
     let errorRate = 0;
 
     try {
       await this.performHealthCheck(provider);
     } catch (error) {
-      status = 'UNAVAILABLE';
+      status = "UNAVAILABLE";
       errorRate = 1;
     }
 
@@ -121,7 +128,7 @@ export class ProviderRegistryService implements OnModuleInit {
 
   private async performHealthCheck(provider: PaymentProvider): Promise<void> {
     if (!provider.name) {
-      throw new Error('Provider not properly initialized');
+      throw new Error("Provider not properly initialized");
     }
   }
 
@@ -135,13 +142,13 @@ export class ProviderRegistryService implements OnModuleInit {
 
   isProviderAvailable(name: string): boolean {
     const health = this.healthStatus.get(name);
-    return health?.status === 'HEALTHY' || health?.status === 'DEGRADED';
+    return health?.status === "HEALTHY" || health?.status === "DEGRADED";
   }
 
   disableProvider(name: string): void {
     const health = this.healthStatus.get(name);
     if (health) {
-      health.status = 'DISABLED';
+      health.status = "DISABLED";
       this.healthStatus.set(name, health);
     }
   }
@@ -149,7 +156,7 @@ export class ProviderRegistryService implements OnModuleInit {
   enableProvider(name: string): void {
     const health = this.healthStatus.get(name);
     if (health) {
-      health.status = 'HEALTHY';
+      health.status = "HEALTHY";
       this.healthStatus.set(name, health);
     }
   }

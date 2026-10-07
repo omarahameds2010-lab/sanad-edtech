@@ -1,13 +1,20 @@
-import { Injectable, BadRequestException, NotFoundException, ForbiddenException, Inject, forwardRef } from '@nestjs/common';
-import { PrismaService } from '../tenants/prisma.service';
-import { ConfigService } from '@nestjs/config';
-import { VideoProviderRegistry } from './providers/video-provider.registry';
-import { FeatureFlagsService } from '../feature-flags/feature-flags.service';
-import { EntitlementsService } from '../entitlements/entitlements.service';
-import { AuditService } from '../audit/audit.service';
-import { OutboxService } from '../outbox/outbox.service';
-import { Prisma, VideoStatus } from '@prisma/client';
-import * as crypto from 'crypto';
+import {
+  Injectable,
+  BadRequestException,
+  NotFoundException,
+  ForbiddenException,
+  Inject,
+  forwardRef,
+} from "@nestjs/common";
+import { PrismaService } from "../tenants/prisma.service";
+import { ConfigService } from "@nestjs/config";
+import { VideoProviderRegistry } from "./providers/video-provider.registry";
+import { FeatureFlagsService } from "../feature-flags/feature-flags.service";
+import { EntitlementsService } from "../entitlements/entitlements.service";
+import { AuditService } from "../audit/audit.service";
+import { OutboxService } from "../outbox/outbox.service";
+import { Prisma, VideoStatus } from "@prisma/client";
+import * as crypto from "crypto";
 
 export interface CreateVideoInput {
   lessonId: string;
@@ -46,7 +53,10 @@ export class VideoService {
   /**
    * Get tenant video quotas from config or use defaults
    */
-  private getTenantQuotas(tenantId: string): { maxFileSize: number; maxStoredHours: number } {
+  private getTenantQuotas(tenantId: string): {
+    maxFileSize: number;
+    maxStoredHours: number;
+  } {
     const defaultQuotas = {
       maxFileSize: 5 * 1024 * 1024 * 1024, // 5GB default
       maxStoredHours: 100, // 100 hours default
@@ -59,23 +69,28 @@ export class VideoService {
   /**
    * Check tenant video quotas before allowing upload
    */
-  async checkQuotas(tenantId: string, fileSize: number): Promise<VideoQuotaResult> {
+  async checkQuotas(
+    tenantId: string,
+    fileSize: number,
+  ): Promise<VideoQuotaResult> {
     const quotas = this.getTenantQuotas(tenantId);
-    
+
     // Get current usage
     const [totalSize, totalHours] = await Promise.all([
       this.prisma.video.aggregate({
-        where: { tenantId, status: { not: 'ARCHIVED' } },
+        where: { tenantId, status: { not: "ARCHIVED" } },
         _sum: { fileSize: true },
       }),
       this.prisma.video.aggregate({
-        where: { tenantId, status: { not: 'ARCHIVED' } },
+        where: { tenantId, status: { not: "ARCHIVED" } },
         _sum: { duration: true },
       }),
     ]);
 
     const currentFileSize = Number(totalSize._sum.fileSize || 0);
-    const currentStoredHours = Math.ceil(Number(totalHours._sum.duration || 0) / 3600);
+    const currentStoredHours = Math.ceil(
+      Number(totalHours._sum.duration || 0) / 3600,
+    );
 
     const newFileSize = currentFileSize + fileSize;
     const newStoredHours = currentStoredHours + Math.ceil(0); // Duration unknown at upload time
@@ -84,8 +99,14 @@ export class VideoService {
       return {
         allowed: false,
         reason: `File size would exceed tenant quota of ${this.formatBytes(quotas.maxFileSize)}`,
-        currentUsage: { fileSize: currentFileSize, storedHours: currentStoredHours },
-        limits: { maxFileSize: quotas.maxFileSize, maxStoredHours: quotas.maxStoredHours },
+        currentUsage: {
+          fileSize: currentFileSize,
+          storedHours: currentStoredHours,
+        },
+        limits: {
+          maxFileSize: quotas.maxFileSize,
+          maxStoredHours: quotas.maxStoredHours,
+        },
       };
     }
 
@@ -93,15 +114,27 @@ export class VideoService {
       return {
         allowed: false,
         reason: `Stored hours would exceed tenant quota of ${quotas.maxStoredHours} hours`,
-        currentUsage: { fileSize: currentFileSize, storedHours: currentStoredHours },
-        limits: { maxFileSize: quotas.maxFileSize, maxStoredHours: quotas.maxStoredHours },
+        currentUsage: {
+          fileSize: currentFileSize,
+          storedHours: currentStoredHours,
+        },
+        limits: {
+          maxFileSize: quotas.maxFileSize,
+          maxStoredHours: quotas.maxStoredHours,
+        },
       };
     }
 
     return {
       allowed: true,
-      currentUsage: { fileSize: currentFileSize, storedHours: currentStoredHours },
-      limits: { maxFileSize: quotas.maxFileSize, maxStoredHours: quotas.maxStoredHours },
+      currentUsage: {
+        fileSize: currentFileSize,
+        storedHours: currentStoredHours,
+      },
+      limits: {
+        maxFileSize: quotas.maxFileSize,
+        maxStoredHours: quotas.maxStoredHours,
+      },
     };
   }
 
@@ -119,12 +152,12 @@ export class VideoService {
       mimeType: string;
       fileSize: number;
     },
-    providerName?: string
+    providerName?: string,
   ) {
     // Check feature flag
     const flags = await this.featureFlagsService.getTenantFlags(tenantId);
     if (!flags.videoPlayback?.enabled) {
-      throw new ForbiddenException('Video uploads not enabled for this tenant');
+      throw new ForbiddenException("Video uploads not enabled for this tenant");
     }
 
     // Verify lesson exists and user has access
@@ -134,11 +167,11 @@ export class VideoService {
     });
 
     if (!lesson) {
-      throw new NotFoundException('Lesson not found');
+      throw new NotFoundException("Lesson not found");
     }
 
-    if (lesson.type !== 'VIDEO') {
-      throw new BadRequestException('Lesson is not a video type');
+    if (lesson.type !== "VIDEO") {
+      throw new BadRequestException("Lesson is not a video type");
     }
 
     // Check quotas
@@ -150,16 +183,20 @@ export class VideoService {
     // Get provider
     const provider = this.videoProviderRegistry.getProvider(providerName);
     if (!provider) {
-      throw new BadRequestException('Video provider not available');
+      throw new BadRequestException("Video provider not available");
     }
 
     // Check file type and size against provider limits
     if (!provider.supportedMimeTypes.includes(input.mimeType)) {
-      throw new BadRequestException(`File type ${input.mimeType} not supported by provider`);
+      throw new BadRequestException(
+        `File type ${input.mimeType} not supported by provider`,
+      );
     }
 
     if (input.fileSize > provider.maxFileSize) {
-      throw new BadRequestException(`File size exceeds provider limit of ${this.formatBytes(provider.maxFileSize)}`);
+      throw new BadRequestException(
+        `File size exceeds provider limit of ${this.formatBytes(provider.maxFileSize)}`,
+      );
     }
 
     // Create video record in database
@@ -169,8 +206,8 @@ export class VideoService {
         lessonId: input.lessonId,
         title: input.title,
         description: input.description,
-        status: 'UPLOADING',
-        provider: 'bunny-stream', // default provider
+        status: "UPLOADING",
+        provider: "bunny-stream", // default provider
         fileSize: BigInt(input.fileSize),
         mimeType: input.mimeType,
         uploadedBy: userId,
@@ -179,20 +216,24 @@ export class VideoService {
     });
 
     // Create signed upload URL via provider
-    const providerResult = await this.videoProviderRegistry.getProvider().createUpload({
-      lessonId: input.lessonId,
-      tenantId,
-      userId,
-      fileName: input.fileName,
-      mimeType: input.mimeType,
-      fileSize: input.fileSize,
-    });
+    const providerResult = await this.videoProviderRegistry
+      .getProvider()
+      .createUpload({
+        lessonId: input.lessonId,
+        tenantId,
+        userId,
+        fileName: input.fileName,
+        mimeType: input.mimeType,
+        fileSize: input.fileSize,
+      });
 
     // Update video with provider info
     const updatedVideo = await this.prisma.video.update({
       where: { id: video.id },
       data: {
-        provider: this.videoProviderRegistry.getDefaultProvider()?.name || 'bunny-stream',
+        provider:
+          this.videoProviderRegistry.getDefaultProvider()?.name ||
+          "bunny-stream",
         providerVideoId: providerResult.providerVideoId,
         providerUploadUrl: providerResult.uploadUrl,
         uploadUrlExpiresAt: providerResult.uploadUrlExpiresAt,
@@ -203,8 +244,8 @@ export class VideoService {
     await this.auditService.log({
       tenantId,
       actorUserId: userId,
-      action: 'VIDEO_UPLOAD_INITIATED',
-      resourceType: 'video',
+      action: "VIDEO_UPLOAD_INITIATED",
+      resourceType: "video",
       resourceId: updatedVideo.id,
       metadata: {
         fileName: input.fileName,
@@ -212,13 +253,13 @@ export class VideoService {
         mimeType: input.mimeType,
         provider: updatedVideo.provider,
         providerVideoId: updatedVideo.providerVideoId,
-      }
+      },
     });
 
     // Publish event
     await this.outboxService.publish(tenantId, {
-      eventType: 'video.upload.initiated',
-      aggregateType: 'video',
+      eventType: "video.upload.initiated",
+      aggregateType: "video",
       aggregateId: updatedVideo.id,
       payload: {
         videoId: updatedVideo.id,
@@ -245,12 +286,12 @@ export class VideoService {
     });
 
     if (!video) {
-      throw new NotFoundException('Video not found');
+      throw new NotFoundException("Video not found");
     }
 
     const provider = this.videoProviderRegistry.getProvider(video.provider);
     if (!provider) {
-      throw new BadRequestException('Video provider not available');
+      throw new BadRequestException("Video provider not available");
     }
 
     const status = await provider.getStatus(video.providerVideoId!);
@@ -267,8 +308,10 @@ export class VideoService {
         dashManifestUrl: status.dashManifestUrl,
         thumbnailUrl: status.thumbnailUrl,
         errorMessage: status.errorMessage,
-        processedAt: ['READY', 'PUBLISHED'].includes(status.status) ? new Date() : null,
-        publishedAt: status.status === 'PUBLISHED' ? new Date() : null,
+        processedAt: ["READY", "PUBLISHED"].includes(status.status)
+          ? new Date()
+          : null,
+        publishedAt: status.status === "PUBLISHED" ? new Date() : null,
       },
     });
 
@@ -282,31 +325,31 @@ export class VideoService {
     tenantId: string,
     videoId: string,
     sessionId: string,
-    studentId: string
+    studentId: string,
   ) {
     const video = await this.prisma.video.findFirst({
       where: { id: videoId, tenantId },
     });
 
     if (!video) {
-      throw new NotFoundException('Video not found');
+      throw new NotFoundException("Video not found");
     }
 
     // Check video is ready for playback
-    if (!['READY', 'PUBLISHED'].includes(video.status)) {
-      throw new ForbiddenException('Video not ready for playback');
+    if (!["READY", "PUBLISHED"].includes(video.status)) {
+      throw new ForbiddenException("Video not ready for playback");
     }
 
     const provider = this.videoProviderRegistry.getProvider(video.provider);
     if (!provider) {
-      throw new BadRequestException('Video provider not available');
+      throw new BadRequestException("Video provider not available");
     }
 
     const tokenResult = await provider.getPlaybackToken(
       video.providerVideoId!,
       sessionId,
       tenantId,
-      studentId
+      studentId,
     );
 
     return {
@@ -326,42 +369,51 @@ export class VideoService {
     });
 
     if (!video) {
-      throw new NotFoundException('Video not found');
+      throw new NotFoundException("Video not found");
     }
 
     const provider = this.videoProviderRegistry.getProvider(video.provider);
     if (!provider) {
-      throw new BadRequestException('Video provider not available');
+      throw new BadRequestException("Video provider not available");
     }
 
     const result = await provider.deleteVideo(video.providerVideoId!);
 
     if (!result.success) {
-      throw new BadRequestException(result.errorMessage || 'Failed to delete video from provider');
+      throw new BadRequestException(
+        result.errorMessage || "Failed to delete video from provider",
+      );
     }
 
     // Mark as archived instead of deleting (for audit trail)
     await this.prisma.video.update({
       where: { id: videoId },
-      data: { status: 'ARCHIVED' },
+      data: { status: "ARCHIVED" },
     });
 
     // Audit log
     await this.auditService.log({
       tenantId,
       actorUserId: userId,
-      action: 'VIDEO_DELETED',
-      resourceType: 'video',
+      action: "VIDEO_DELETED",
+      resourceType: "video",
       resourceId: videoId,
-      metadata: { provider: video.provider, providerVideoId: video.providerVideoId }
+      metadata: {
+        provider: video.provider,
+        providerVideoId: video.providerVideoId,
+      },
     });
 
     // Publish event
     await this.outboxService.publish(tenantId, {
-      eventType: 'video.deleted',
-      aggregateType: 'video',
+      eventType: "video.deleted",
+      aggregateType: "video",
       aggregateId: videoId,
-      payload: { videoId, provider: video.provider, providerVideoId: video.providerVideoId },
+      payload: {
+        videoId,
+        provider: video.provider,
+        providerVideoId: video.providerVideoId,
+      },
     });
 
     return { success: true };
@@ -382,23 +434,27 @@ export class VideoService {
   async listVideosByLesson(tenantId: string, lessonId: string) {
     return this.prisma.video.findMany({
       where: { lessonId, tenantId },
-      orderBy: { createdAt: 'asc' },
+      orderBy: { createdAt: "asc" },
     });
   }
 
   /**
    * Handle provider webhook
    */
-  async handleProviderWebhook(providerName: string, payload: any, headers: Record<string, string>) {
+  async handleProviderWebhook(
+    providerName: string,
+    payload: any,
+    headers: Record<string, string>,
+  ) {
     const provider = this.videoProviderRegistry.getProvider(providerName);
     if (!provider) {
-      throw new BadRequestException('Provider not found');
+      throw new BadRequestException("Provider not found");
     }
 
     // Verify webhook signature
     const isValid = await provider.verifyWebhook(payload, headers);
     if (!isValid) {
-      throw new BadRequestException('Invalid webhook signature');
+      throw new BadRequestException("Invalid webhook signature");
     }
 
     // Process webhook
@@ -406,20 +462,20 @@ export class VideoService {
 
     // Log webhook
     await this.auditService.log({
-      tenantId: 'system',
+      tenantId: "system",
       actorUserId: undefined,
-      action: 'VIDEO_WEBHOOK_RECEIVED',
-      resourceType: 'video',
+      action: "VIDEO_WEBHOOK_RECEIVED",
+      resourceType: "video",
       resourceId: payload.providerVideoId,
-      metadata: { provider: providerName, eventType: payload.eventType }
+      metadata: { provider: providerName, eventType: payload.eventType },
     });
   }
 
   private formatBytes(bytes: number): string {
-    if (bytes === 0) return '0 Bytes';
+    if (bytes === 0) return "0 Bytes";
     const k = 1024;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+    const sizes = ["Bytes", "KB", "MB", "GB", "TB"];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
   }
 }

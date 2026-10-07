@@ -1,5 +1,10 @@
-import { Injectable, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
-import { PrismaService } from '../../tenants/prisma.service';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+  ForbiddenException,
+} from "@nestjs/common";
+import { PrismaService } from "../../tenants/prisma.service";
 
 @Injectable()
 export class ProgressService {
@@ -8,21 +13,31 @@ export class ProgressService {
   /**
    * Shared guard: verify the student has access to the lesson's course.
    */
-  private async assertAccess(tenantId: string, userId: string, lessonId: string) {
+  private async assertAccess(
+    tenantId: string,
+    userId: string,
+    lessonId: string,
+  ) {
     const lesson = await this.prisma.lesson.findFirst({
       where: { id: lessonId, tenantId },
       include: { section: { select: { courseId: true } } },
     });
 
-    if (!lesson) throw new NotFoundException('Lesson not found');
+    if (!lesson) throw new NotFoundException("Lesson not found");
 
     if (lesson.isFree) return lesson;
 
     const enrollment = await this.prisma.enrollment.findFirst({
-      where: { tenantId, userId, courseId: lesson.section.courseId, status: 'ACTIVE' },
+      where: {
+        tenantId,
+        userId,
+        courseId: lesson.section.courseId,
+        status: "ACTIVE",
+      },
     });
 
-    if (!enrollment) throw new ForbiddenException('Not enrolled in this course');
+    if (!enrollment)
+      throw new ForbiddenException("Not enrolled in this course");
 
     return lesson;
   }
@@ -35,7 +50,13 @@ export class ProgressService {
     });
 
     if (!progress) {
-      return { lessonId, watchedSeconds: 0, lastPosition: null, completed: false, completedAt: null };
+      return {
+        lessonId,
+        watchedSeconds: 0,
+        lastPosition: null,
+        completed: false,
+        completedAt: null,
+      };
     }
 
     return {
@@ -49,10 +70,11 @@ export class ProgressService {
 
   async getCourseProgress(tenantId: string, userId: string, courseId: string) {
     const enrollment = await this.prisma.enrollment.findFirst({
-      where: { tenantId, userId, courseId, status: 'ACTIVE' },
+      where: { tenantId, userId, courseId, status: "ACTIVE" },
     });
 
-    if (!enrollment) throw new ForbiddenException('Not enrolled in this course');
+    if (!enrollment)
+      throw new ForbiddenException("Not enrolled in this course");
 
     const lessons = await this.prisma.lesson.findMany({
       where: { tenantId, section: { courseId } },
@@ -65,7 +87,10 @@ export class ProgressService {
 
     const total = lessons.length;
     const completed = progress.filter((p) => p.completedAt !== null).length;
-    const watchedSeconds = progress.reduce((sum, p) => sum + p.watchedSeconds, 0);
+    const watchedSeconds = progress.reduce(
+      (sum, p) => sum + p.watchedSeconds,
+      0,
+    );
 
     return {
       courseId,
@@ -74,9 +99,10 @@ export class ProgressService {
       progressPercent: total === 0 ? 0 : Math.round((completed / total) * 100),
       totalWatchedSeconds: watchedSeconds,
       completed: completed > 0 && completed === total,
-      lastActivityAt: progress.length > 0
-        ? new Date(Math.max(...progress.map((p) => p.updatedAt.getTime())))
-        : null,
+      lastActivityAt:
+        progress.length > 0
+          ? new Date(Math.max(...progress.map((p) => p.updatedAt.getTime())))
+          : null,
     };
   }
 
@@ -90,8 +116,10 @@ export class ProgressService {
     lessonId: string,
     dto: { positionSeconds: number; watchedSeconds?: number },
   ) {
-    if (typeof dto.positionSeconds !== 'number' || dto.positionSeconds < 0) {
-      throw new BadRequestException('positionSeconds must be a non-negative number');
+    if (typeof dto.positionSeconds !== "number" || dto.positionSeconds < 0) {
+      throw new BadRequestException(
+        "positionSeconds must be a non-negative number",
+      );
     }
 
     const lesson = await this.assertAccess(tenantId, userId, lessonId);
@@ -107,7 +135,10 @@ export class ProgressService {
     });
 
     // watchedSeconds is monotonic — never let it go backwards
-    const watched = Math.max(existing?.watchedSeconds ?? 0, dto.watchedSeconds ?? 0);
+    const watched = Math.max(
+      existing?.watchedSeconds ?? 0,
+      dto.watchedSeconds ?? 0,
+    );
 
     const progress = await this.prisma.lessonProgress.upsert({
       where: { tenantId_userId_lessonId: { tenantId, userId, lessonId } },

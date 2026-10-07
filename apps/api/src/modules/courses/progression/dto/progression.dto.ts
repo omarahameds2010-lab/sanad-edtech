@@ -1,54 +1,63 @@
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsString, IsOptional, IsEnum, IsArray, ValidateNested } from 'class-validator';
-import { Type } from 'class-transformer';
-import { ContentUnlockType, ContentLockStatus } from '@prisma/client';
+import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
+import {
+  IsString,
+  IsOptional,
+  IsEnum,
+  IsArray,
+  ValidateNested,
+} from "class-validator";
+import { Type } from "class-transformer";
+import { ContentUnlockType, ContentLockStatus } from "@prisma/client";
 
 export class UnlockContentDto {
-  @ApiProperty({ 
-    example: 'lesson-123', 
-    description: 'ID of the content to unlock (lesson/exam/assignment)' 
+  @ApiProperty({
+    example: "lesson-123",
+    description: "ID of the content to unlock (lesson/exam/assignment)",
   })
   @IsString()
   targetId: string;
 
-  @ApiProperty({ 
-    enum: ContentUnlockType, 
-    example: 'ENTER_ASSIGNMENT',
-    description: 'Type of unlock trigger' 
+  @ApiProperty({
+    enum: ContentUnlockType,
+    example: "ENTER_ASSIGNMENT",
+    description: "Type of unlock trigger",
   })
   @IsEnum(ContentUnlockType)
   unlockType: ContentUnlockType;
 
-  @ApiPropertyOptional({ 
-    example: 'assignment-456', 
-    description: 'ID of the assignment/exam that triggered the unlock' 
+  @ApiPropertyOptional({
+    example: "assignment-456",
+    description: "ID of the assignment/exam that triggered the unlock",
   })
   @IsOptional()
   @IsString()
   sourceId?: string;
 
-  @ApiProperty({ example: 'idem-key-abc', description: 'Idempotency key for safe retries' })
+  @ApiProperty({
+    example: "idem-key-abc",
+    description: "Idempotency key for safe retries",
+  })
   @IsString()
   idempotencyKey: string;
 }
 
 export class ContentLockStatusResponseDto {
-  @ApiProperty({ example: 'lesson-123' })
+  @ApiProperty({ example: "lesson-123" })
   contentId: string;
 
-  @ApiProperty({ enum: ContentLockStatus, example: 'LOCKED' })
+  @ApiProperty({ enum: ContentLockStatus, example: "LOCKED" })
   lockStatus: ContentLockStatus;
 
-  @ApiProperty({ enum: ContentUnlockType, example: 'ENTER_ASSIGNMENT' })
+  @ApiProperty({ enum: ContentUnlockType, example: "ENTER_ASSIGNMENT" })
   unlockType: ContentUnlockType;
 
-  @ApiPropertyOptional({ example: 'assignment-456' })
+  @ApiPropertyOptional({ example: "assignment-456" })
   unlockTargetId?: string;
 
-  @ApiPropertyOptional({ example: 'assignment-456' })
+  @ApiPropertyOptional({ example: "assignment-456" })
   assignmentId?: string;
 
-  @ApiPropertyOptional({ example: 'exam-789' })
+  @ApiPropertyOptional({ example: "exam-789" })
   examId?: string;
 
   @ApiPropertyOptional()
@@ -157,12 +166,18 @@ export class StudentSectionProgressDto {
 }
 
 export class BulkUnlockCheckDto {
-  @ApiProperty({ type: [String], example: ['lesson-1', 'lesson-2', 'lesson-3'] })
+  @ApiProperty({
+    type: [String],
+    example: ["lesson-1", "lesson-2", "lesson-3"],
+  })
   @IsArray()
   @IsString({ each: true })
   contentIds: string[];
 
-  @ApiProperty({ example: 'idem-key-bulk', description: 'Idempotency key for safe retries' })
+  @ApiProperty({
+    example: "idem-key-bulk",
+    description: "Idempotency key for safe retries",
+  })
   @IsString()
   idempotencyKey: string;
 }

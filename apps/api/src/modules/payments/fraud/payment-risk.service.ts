@@ -1,6 +1,6 @@
-import { Injectable } from '@nestjs/common';
-import { PrismaService } from '../../tenants/prisma.service';
-import { Prisma, RiskSeverity } from '@prisma/client';
+import { Injectable } from "@nestjs/common";
+import { PrismaService } from "../../tenants/prisma.service";
+import { Prisma, RiskSeverity } from "@prisma/client";
 
 export interface RiskFactors {
   rapidAttempts: number;
@@ -41,7 +41,13 @@ export class PaymentRiskService {
 
     // Log risk event if score is significant
     if (score >= this.thresholds.low) {
-      await this.logRiskEvent(tenantId, userId, 'PAYMENT_ATTEMPT_RISK', score, factors);
+      await this.logRiskEvent(
+        tenantId,
+        userId,
+        "PAYMENT_ATTEMPT_RISK",
+        score,
+        factors,
+      );
     }
 
     return score;
@@ -70,7 +76,7 @@ export class PaymentRiskService {
       }),
       // Accounts on same device
       this.prisma.device.groupBy({
-        by: ['fingerprint'],
+        by: ["fingerprint"],
         where: { userId, tenantId },
         _count: { userId: true },
       }),
@@ -83,7 +89,7 @@ export class PaymentRiskService {
       }),
       // User's average payment amount
       this.prisma.payment.aggregate({
-        where: { tenantId, userId, status: 'PAID' },
+        where: { tenantId, userId, status: "PAID" },
         _avg: { amountMinor: true },
       }),
       // Voucher redemption attempts
@@ -99,16 +105,20 @@ export class PaymentRiskService {
         where: {
           tenantId,
           payment: { userId },
-          status: 'FAILED',
+          status: "FAILED",
           initiatedAt: { gte: new Date(Date.now() - 60 * 60 * 1000) },
         },
       }),
     ]);
 
-    const accountsPerDevice = Math.max(...deviceAccounts.map(d => d._count.userId), 1);
+    const accountsPerDevice = Math.max(
+      ...deviceAccounts.map((d) => d._count.userId),
+      1,
+    );
     const avgAmount = Number(userAvgAmount._avg.amountMinor || 0n);
     const currentAmount = Number(amountMinor);
-    const amountDeviation = avgAmount > 0 ? Math.abs(currentAmount - avgAmount) / avgAmount : 0;
+    const amountDeviation =
+      avgAmount > 0 ? Math.abs(currentAmount - avgAmount) / avgAmount : 0;
 
     return {
       rapidAttempts: recentAttempts,
@@ -138,10 +148,10 @@ export class PaymentRiskService {
     score: number,
     details: RiskFactors,
   ): Promise<void> {
-    let severity: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL' = 'LOW';
-    if (score >= this.thresholds.high) severity = 'CRITICAL';
-    else if (score >= this.thresholds.medium) severity = 'HIGH';
-    else if (score >= this.thresholds.low) severity = 'MEDIUM';
+    let severity: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL" = "LOW";
+    if (score >= this.thresholds.high) severity = "CRITICAL";
+    else if (score >= this.thresholds.medium) severity = "HIGH";
+    else if (score >= this.thresholds.low) severity = "MEDIUM";
 
     await this.prisma.paymentRiskEvent.create({
       data: {
@@ -155,27 +165,33 @@ export class PaymentRiskService {
     });
   }
 
-  async getRiskProfile(tenantId: string, userId: string): Promise<{
+  async getRiskProfile(
+    tenantId: string,
+    userId: string,
+  ): Promise<{
     currentScore: number;
     recentEvents: any[];
-    riskLevel: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+    riskLevel: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
   }> {
     const recentEvents = await this.prisma.paymentRiskEvent.findMany({
       where: { tenantId, userId },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { createdAt: "desc" },
       take: 10,
     });
 
     const currentScore = recentEvents[0]?.score || 0;
-    let riskLevel: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL' = 'LOW';
-    if (currentScore >= this.thresholds.high) riskLevel = 'CRITICAL';
-    else if (currentScore >= this.thresholds.medium) riskLevel = 'HIGH';
-    else if (currentScore >= this.thresholds.low) riskLevel = 'MEDIUM';
+    let riskLevel: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL" = "LOW";
+    if (currentScore >= this.thresholds.high) riskLevel = "CRITICAL";
+    else if (currentScore >= this.thresholds.medium) riskLevel = "HIGH";
+    else if (currentScore >= this.thresholds.low) riskLevel = "MEDIUM";
 
     return { currentScore, recentEvents, riskLevel };
   }
 
-  async checkVoucherAbuse(tenantId: string, userId: string): Promise<{ abusive: boolean; score: number }> {
+  async checkVoucherAbuse(
+    tenantId: string,
+    userId: string,
+  ): Promise<{ abusive: boolean; score: number }> {
     const recentRedemptions = await this.prisma.voucherRedemption.count({
       where: {
         tenantId,

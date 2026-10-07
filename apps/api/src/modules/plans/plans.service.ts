@@ -1,6 +1,9 @@
-import { Injectable } from '@nestjs/common';
-import { PrismaService } from '../tenants/prisma.service';
-import { Prisma, SubscriptionStatus as PrismaSubscriptionStatus } from '@prisma/client';
+import { Injectable } from "@nestjs/common";
+import { PrismaService } from "../tenants/prisma.service";
+import {
+  Prisma,
+  SubscriptionStatus as PrismaSubscriptionStatus,
+} from "@prisma/client";
 
 export interface Plan {
   id: string;
@@ -9,7 +12,7 @@ export interface Plan {
   description?: string;
   price: number;
   currency: string;
-  interval: 'monthly' | 'yearly' | 'lifetime';
+  interval: "monthly" | "yearly" | "lifetime";
   features: PlanFeature[];
   limits: PlanLimits;
   isActive: boolean;
@@ -60,36 +63,31 @@ export interface Subscription {
 }
 
 export type SubscriptionStatus =
-  | 'TRIALING'
-  | 'ACTIVE'
-  | 'PAST_DUE'
-  | 'CANCELED'
-  | 'UNPAID'
-  | 'PAUSED';
+  "TRIALING" | "ACTIVE" | "PAST_DUE" | "CANCELED" | "UNPAID" | "PAUSED";
 
 @Injectable()
 export class PlansService {
   private readonly plans: Plan[] = [
     {
-      id: 'free',
-      name: 'Free',
-      displayName: 'مجاني',
-      description: 'للبدء والتجربة',
+      id: "free",
+      name: "Free",
+      displayName: "مجاني",
+      description: "للبدء والتجربة",
       price: 0,
-      currency: 'EGP',
-      interval: 'monthly',
+      currency: "EGP",
+      interval: "monthly",
       isActive: true,
       sortOrder: 0,
       features: [
-        { key: 'courses', name: 'الدورات', enabled: true, limits: { max: 1 } },
-        { key: 'students', name: 'الطلاب', enabled: true, limits: { max: 50 } },
-        { key: 'videoPlayback', name: 'تشغيل الفيديو', enabled: true },
-        { key: 'exams', name: 'الاختبارات', enabled: true },
-        { key: 'certificates', name: 'الشهادات', enabled: true },
-        { key: 'assignments', name: 'الواجبات', enabled: true },
-        { key: 'customDomain', name: 'نطاق مخصص', enabled: true },
-        { key: 'branding', name: 'العلامة التجارية', enabled: true },
-        { key: 'landingTemplates', name: 'قوالب الهبوط', enabled: true },
+        { key: "courses", name: "الدورات", enabled: true, limits: { max: 1 } },
+        { key: "students", name: "الطلاب", enabled: true, limits: { max: 50 } },
+        { key: "videoPlayback", name: "تشغيل الفيديو", enabled: true },
+        { key: "exams", name: "الاختبارات", enabled: true },
+        { key: "certificates", name: "الشهادات", enabled: true },
+        { key: "assignments", name: "الواجبات", enabled: true },
+        { key: "customDomain", name: "نطاق مخصص", enabled: true },
+        { key: "branding", name: "العلامة التجارية", enabled: true },
+        { key: "landingTemplates", name: "قوالب الهبوط", enabled: true },
       ],
       limits: {
         maxCourses: 1,
@@ -109,26 +107,36 @@ export class PlansService {
       },
     },
     {
-      id: 'starter',
-      name: 'Starter',
-      displayName: 'البداية',
-      description: 'للمدرسين الجدد',
+      id: "starter",
+      name: "Starter",
+      displayName: "البداية",
+      description: "للمدرسين الجدد",
       price: 299,
-      currency: 'EGP',
-      interval: 'monthly',
+      currency: "EGP",
+      interval: "monthly",
       isActive: true,
       sortOrder: 1,
       features: [
-        { key: 'courses', name: 'الدورات', enabled: true, limits: { max: 5 } },
-        { key: 'students', name: 'الطلاب', enabled: true, limits: { max: 200 } },
-        { key: 'videoPlayback', name: 'تشغيل الفيديو', enabled: true },
-        { key: 'exams', name: 'الاختبارات', enabled: true },
-        { key: 'certificates', name: 'الشهادات', enabled: true },
-        { key: 'assignments', name: 'الواجبات', enabled: true },
-        { key: 'analytics', name: 'التحليلات', enabled: true, limits: { retentionDays: 30 } },
-        { key: 'customDomain', name: 'نطاق مخصص', enabled: true },
-        { key: 'branding', name: 'العلامة التجارية', enabled: true },
-        { key: 'landingTemplates', name: 'قوالب الهبوط', enabled: true },
+        { key: "courses", name: "الدورات", enabled: true, limits: { max: 5 } },
+        {
+          key: "students",
+          name: "الطلاب",
+          enabled: true,
+          limits: { max: 200 },
+        },
+        { key: "videoPlayback", name: "تشغيل الفيديو", enabled: true },
+        { key: "exams", name: "الاختبارات", enabled: true },
+        { key: "certificates", name: "الشهادات", enabled: true },
+        { key: "assignments", name: "الواجبات", enabled: true },
+        {
+          key: "analytics",
+          name: "التحليلات",
+          enabled: true,
+          limits: { retentionDays: 30 },
+        },
+        { key: "customDomain", name: "نطاق مخصص", enabled: true },
+        { key: "branding", name: "العلامة التجارية", enabled: true },
+        { key: "landingTemplates", name: "قوالب الهبوط", enabled: true },
       ],
       limits: {
         maxCourses: 5,
@@ -148,32 +156,52 @@ export class PlansService {
       },
     },
     {
-      id: 'pro',
-      name: 'Pro',
-      displayName: 'احترافي',
-      description: 'للمدرسين النشطين',
+      id: "pro",
+      name: "Pro",
+      displayName: "احترافي",
+      description: "للمدرسين النشطين",
       price: 799,
-      currency: 'EGP',
-      interval: 'monthly',
+      currency: "EGP",
+      interval: "monthly",
       isActive: true,
       isPopular: true,
       sortOrder: 2,
       features: [
-        { key: 'courses', name: 'الدورات', enabled: true, limits: { max: 20 } },
-        { key: 'students', name: 'الطلاب', enabled: true, limits: { max: 1000 } },
-        { key: 'videoPlayback', name: 'تشغيل الفيديو', enabled: true },
-        { key: 'exams', name: 'الاختبارات', enabled: true },
-        { key: 'liveSessions', name: 'الجلسات المباشرة', enabled: true, limits: { maxParticipants: 100 } },
-        { key: 'certificates', name: 'الشهادات', enabled: true },
-        { key: 'assignments', name: 'الواجبات', enabled: true },
-        { key: 'community', name: 'المجتمع', enabled: true },
-        { key: 'gamification', name: 'الألعاب', enabled: true },
-        { key: 'analytics', name: 'التحليلات', enabled: true, limits: { retentionDays: 365 } },
-        { key: 'ai', name: 'ميزات الذكاء الاصطناعي', enabled: true, limits: { monthlyTokens: 100000 } },
-        { key: 'customDomain', name: 'نطاق مخصص', enabled: true },
-        { key: 'branding', name: 'العلامة التجارية', enabled: true },
-        { key: 'landingTemplates', name: 'قوالب الهبوط', enabled: true },
-        { key: 'affiliate', name: 'برنامج الشركاء', enabled: true },
+        { key: "courses", name: "الدورات", enabled: true, limits: { max: 20 } },
+        {
+          key: "students",
+          name: "الطلاب",
+          enabled: true,
+          limits: { max: 1000 },
+        },
+        { key: "videoPlayback", name: "تشغيل الفيديو", enabled: true },
+        { key: "exams", name: "الاختبارات", enabled: true },
+        {
+          key: "liveSessions",
+          name: "الجلسات المباشرة",
+          enabled: true,
+          limits: { maxParticipants: 100 },
+        },
+        { key: "certificates", name: "الشهادات", enabled: true },
+        { key: "assignments", name: "الواجبات", enabled: true },
+        { key: "community", name: "المجتمع", enabled: true },
+        { key: "gamification", name: "الألعاب", enabled: true },
+        {
+          key: "analytics",
+          name: "التحليلات",
+          enabled: true,
+          limits: { retentionDays: 365 },
+        },
+        {
+          key: "ai",
+          name: "ميزات الذكاء الاصطناعي",
+          enabled: true,
+          limits: { monthlyTokens: 100000 },
+        },
+        { key: "customDomain", name: "نطاق مخصص", enabled: true },
+        { key: "branding", name: "العلامة التجارية", enabled: true },
+        { key: "landingTemplates", name: "قوالب الهبوط", enabled: true },
+        { key: "affiliate", name: "برنامج الشركاء", enabled: true },
       ],
       limits: {
         maxCourses: 20,
@@ -193,36 +221,66 @@ export class PlansService {
       },
     },
     {
-      id: 'business',
-      name: 'Business',
-      displayName: 'الأعمال',
-      description: 'للمؤسسات والأكاديميات',
+      id: "business",
+      name: "Business",
+      displayName: "الأعمال",
+      description: "للمؤسسات والأكاديميات",
       price: 1999,
-      currency: 'EGP',
-      interval: 'monthly',
+      currency: "EGP",
+      interval: "monthly",
       isActive: true,
       sortOrder: 3,
       features: [
-        { key: 'courses', name: 'الدورات', enabled: true, limits: { max: 100 } },
-        { key: 'students', name: 'الطلاب', enabled: true, limits: { max: 5000 } },
-        { key: 'videoPlayback', name: 'تشغيل الفيديو', enabled: true },
-        { key: 'exams', name: 'الاختبارات', enabled: true },
-        { key: 'liveSessions', name: 'الجلسات المباشرة', enabled: true, limits: { maxParticipants: 500 } },
-        { key: 'certificates', name: 'الشهادات', enabled: true },
-        { key: 'assignments', name: 'الواجبات', enabled: true },
-        { key: 'community', name: 'المجتمع', enabled: true },
-        { key: 'gamification', name: 'الألعاب', enabled: true },
-        { key: 'parentsPortal', name: 'بوابة أولياء الأمور', enabled: true },
-        { key: 'analytics', name: 'التحليلات', enabled: true, limits: { retentionDays: 1095 } },
-        { key: 'ai', name: 'ميزات الذكاء الاصطناعي', enabled: true, limits: { monthlyTokens: 1000000 } },
-        { key: 'customDomain', name: 'نطاق مخصص', enabled: true },
-        { key: 'branding', name: 'العلامة التجارية', enabled: true },
-        { key: 'landingTemplates', name: 'قوالب الهبوط', enabled: true },
-        { key: 'whiteLabel', name: 'العلامة البيضاء', enabled: true },
-        { key: 'apiAccess', name: 'الوصول للـ API', enabled: true, limits: { rateLimit: 1000 } },
-        { key: 'webhooks', name: 'Webhooks', enabled: true },
-        { key: 'affiliate', name: 'برنامج الشركاء', enabled: true },
-        { key: 'mobileApp', name: 'تطبيق الموبايل', enabled: true },
+        {
+          key: "courses",
+          name: "الدورات",
+          enabled: true,
+          limits: { max: 100 },
+        },
+        {
+          key: "students",
+          name: "الطلاب",
+          enabled: true,
+          limits: { max: 5000 },
+        },
+        { key: "videoPlayback", name: "تشغيل الفيديو", enabled: true },
+        { key: "exams", name: "الاختبارات", enabled: true },
+        {
+          key: "liveSessions",
+          name: "الجلسات المباشرة",
+          enabled: true,
+          limits: { maxParticipants: 500 },
+        },
+        { key: "certificates", name: "الشهادات", enabled: true },
+        { key: "assignments", name: "الواجبات", enabled: true },
+        { key: "community", name: "المجتمع", enabled: true },
+        { key: "gamification", name: "الألعاب", enabled: true },
+        { key: "parentsPortal", name: "بوابة أولياء الأمور", enabled: true },
+        {
+          key: "analytics",
+          name: "التحليلات",
+          enabled: true,
+          limits: { retentionDays: 1095 },
+        },
+        {
+          key: "ai",
+          name: "ميزات الذكاء الاصطناعي",
+          enabled: true,
+          limits: { monthlyTokens: 1000000 },
+        },
+        { key: "customDomain", name: "نطاق مخصص", enabled: true },
+        { key: "branding", name: "العلامة التجارية", enabled: true },
+        { key: "landingTemplates", name: "قوالب الهبوط", enabled: true },
+        { key: "whiteLabel", name: "العلامة البيضاء", enabled: true },
+        {
+          key: "apiAccess",
+          name: "الوصول للـ API",
+          enabled: true,
+          limits: { rateLimit: 1000 },
+        },
+        { key: "webhooks", name: "Webhooks", enabled: true },
+        { key: "affiliate", name: "برنامج الشركاء", enabled: true },
+        { key: "mobileApp", name: "تطبيق الموبايل", enabled: true },
       ],
       limits: {
         maxCourses: 100,
@@ -242,36 +300,56 @@ export class PlansService {
       },
     },
     {
-      id: 'enterprise',
-      name: 'Enterprise',
-      displayName: 'المؤسسات الكبرى',
-      description: 'للجامعات والمؤسسات الكبيرة',
+      id: "enterprise",
+      name: "Enterprise",
+      displayName: "المؤسسات الكبرى",
+      description: "للجامعات والمؤسسات الكبيرة",
       price: 4999,
-      currency: 'EGP',
-      interval: 'monthly',
+      currency: "EGP",
+      interval: "monthly",
       isActive: true,
       sortOrder: 4,
       features: [
-        { key: 'courses', name: 'الدورات', enabled: true, limits: { max: -1 } },
-        { key: 'students', name: 'الطلاب', enabled: true, limits: { max: -1 } },
-        { key: 'videoPlayback', name: 'تشغيل الفيديو', enabled: true },
-        { key: 'exams', name: 'الاختبارات', enabled: true },
-        { key: 'liveSessions', name: 'الجلسات المباشرة', enabled: true, limits: { maxParticipants: 2000 } },
-        { key: 'certificates', name: 'الشهادات', enabled: true },
-        { key: 'assignments', name: 'الواجبات', enabled: true },
-        { key: 'community', name: 'المجتمع', enabled: true },
-        { key: 'gamification', name: 'الألعاب', enabled: true },
-        { key: 'parentsPortal', name: 'بوابة أولياء الأمور', enabled: true },
-        { key: 'analytics', name: 'التحليلات', enabled: true, limits: { retentionDays: -1 } },
-        { key: 'ai', name: 'ميزات الذكاء الاصطناعي', enabled: true, limits: { monthlyTokens: 10000000 } },
-        { key: 'customDomain', name: 'نطاق مخصص', enabled: true },
-        { key: 'branding', name: 'العلامة التجارية', enabled: true },
-        { key: 'landingTemplates', name: 'قوالب الهبوط', enabled: true },
-        { key: 'whiteLabel', name: 'العلامة البيضاء', enabled: true },
-        { key: 'apiAccess', name: 'الوصول للـ API', enabled: true, limits: { rateLimit: 10000 } },
-        { key: 'webhooks', name: 'Webhooks', enabled: true },
-        { key: 'affiliate', name: 'برنامج الشركاء', enabled: true },
-        { key: 'mobileApp', name: 'تطبيق الموبايل', enabled: true },
+        { key: "courses", name: "الدورات", enabled: true, limits: { max: -1 } },
+        { key: "students", name: "الطلاب", enabled: true, limits: { max: -1 } },
+        { key: "videoPlayback", name: "تشغيل الفيديو", enabled: true },
+        { key: "exams", name: "الاختبارات", enabled: true },
+        {
+          key: "liveSessions",
+          name: "الجلسات المباشرة",
+          enabled: true,
+          limits: { maxParticipants: 2000 },
+        },
+        { key: "certificates", name: "الشهادات", enabled: true },
+        { key: "assignments", name: "الواجبات", enabled: true },
+        { key: "community", name: "المجتمع", enabled: true },
+        { key: "gamification", name: "الألعاب", enabled: true },
+        { key: "parentsPortal", name: "بوابة أولياء الأمور", enabled: true },
+        {
+          key: "analytics",
+          name: "التحليلات",
+          enabled: true,
+          limits: { retentionDays: -1 },
+        },
+        {
+          key: "ai",
+          name: "ميزات الذكاء الاصطناعي",
+          enabled: true,
+          limits: { monthlyTokens: 10000000 },
+        },
+        { key: "customDomain", name: "نطاق مخصص", enabled: true },
+        { key: "branding", name: "العلامة التجارية", enabled: true },
+        { key: "landingTemplates", name: "قوالب الهبوط", enabled: true },
+        { key: "whiteLabel", name: "العلامة البيضاء", enabled: true },
+        {
+          key: "apiAccess",
+          name: "الوصول للـ API",
+          enabled: true,
+          limits: { rateLimit: 10000 },
+        },
+        { key: "webhooks", name: "Webhooks", enabled: true },
+        { key: "affiliate", name: "برنامج الشركاء", enabled: true },
+        { key: "mobileApp", name: "تطبيق الموبايل", enabled: true },
       ],
       limits: {
         maxCourses: -1,
@@ -295,7 +373,9 @@ export class PlansService {
   constructor(private prisma: PrismaService) {}
 
   getAllPlans(): Plan[] {
-    return this.plans.filter((p) => p.isActive).sort((a, b) => a.sortOrder - b.sortOrder);
+    return this.plans
+      .filter((p) => p.isActive)
+      .sort((a, b) => a.sortOrder - b.sortOrder);
   }
 
   getPlan(planId: string): Plan | undefined {
@@ -317,7 +397,11 @@ export class PlansService {
     return feature?.enabled ?? false;
   }
 
-  getFeatureLimit(planId: string, featureKey: string, limitKey: string): number | undefined {
+  getFeatureLimit(
+    planId: string,
+    featureKey: string,
+    limitKey: string,
+  ): number | undefined {
     const plan = this.getPlan(planId);
     if (!plan) return undefined;
     const feature = plan.features.find((f) => f.key === featureKey);
@@ -349,7 +433,8 @@ export class PlansService {
     remaining: number;
   }> {
     const limits = await this.getTenantLimits(tenantId);
-    if (!limits) return { allowed: true, limit: -1, currentUsage, remaining: -1 };
+    if (!limits)
+      return { allowed: true, limit: -1, currentUsage, remaining: -1 };
 
     const limit = limits[limitKey];
     if (limit === undefined || limit === -1) {
@@ -387,14 +472,18 @@ export class PlansService {
 
     const now = new Date();
     const trialDays = options?.trialDays || 0;
-    const trialEnd = trialDays > 0 ? new Date(now.getTime() + trialDays * 24 * 60 * 60 * 1000) : null;
-    const periodEnd = trialEnd || new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000); // 30 days default
+    const trialEnd =
+      trialDays > 0
+        ? new Date(now.getTime() + trialDays * 24 * 60 * 60 * 1000)
+        : null;
+    const periodEnd =
+      trialEnd || new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000); // 30 days default
 
     const subscription = await this.prisma.subscription.upsert({
       where: { tenantId },
       update: {
         planId,
-        status: trialDays > 0 ? 'TRIALING' : 'ACTIVE',
+        status: trialDays > 0 ? "TRIALING" : "ACTIVE",
         currentPeriodStart: now,
         currentPeriodEnd: periodEnd,
         trialEnd,
@@ -404,7 +493,7 @@ export class PlansService {
       create: {
         tenantId,
         planId,
-        status: trialDays > 0 ? 'TRIALING' : 'ACTIVE',
+        status: trialDays > 0 ? "TRIALING" : "ACTIVE",
         currentPeriodStart: now,
         currentPeriodEnd: periodEnd,
         trialEnd,
@@ -419,13 +508,16 @@ export class PlansService {
     };
   }
 
-  async cancelSubscription(tenantId: string, atPeriodEnd = true): Promise<Subscription> {
+  async cancelSubscription(
+    tenantId: string,
+    atPeriodEnd = true,
+  ): Promise<Subscription> {
     const subscription = await this.prisma.subscription.update({
       where: { tenantId },
       data: {
         cancelAtPeriodEnd: atPeriodEnd,
         cancelledAt: atPeriodEnd ? null : new Date(),
-        status: atPeriodEnd ? 'ACTIVE' : 'CANCELED',
+        status: atPeriodEnd ? "ACTIVE" : "CANCELED",
       },
     });
 
@@ -436,7 +528,10 @@ export class PlansService {
     };
   }
 
-  async updateSubscriptionPlan(tenantId: string, newPlanId: string): Promise<Subscription> {
+  async updateSubscriptionPlan(
+    tenantId: string,
+    newPlanId: string,
+  ): Promise<Subscription> {
     const plan = this.getPlan(newPlanId);
     if (!plan) throw new Error(`Plan ${newPlanId} not found`);
 
@@ -455,6 +550,9 @@ export class PlansService {
   async isSubscriptionActive(tenantId: string): Promise<boolean> {
     const sub = await this.getTenantSubscription(tenantId);
     if (!sub) return false;
-    return ['ACTIVE', 'TRIALING'].includes(sub.status) && sub.currentPeriodEnd > new Date();
+    return (
+      ["ACTIVE", "TRIALING"].includes(sub.status) &&
+      sub.currentPeriodEnd > new Date()
+    );
   }
 }

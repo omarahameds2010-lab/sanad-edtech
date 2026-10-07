@@ -1,52 +1,52 @@
-import { Injectable } from '@nestjs/common';
-import { PrismaService } from '../tenants/prisma.service';
+import { Injectable } from "@nestjs/common";
+import { PrismaService } from "../tenants/prisma.service";
 
 export type ResourceType =
-  | 'course'
-  | 'lesson'
-  | 'exam'
-  | 'attempt'
-  | 'enrollment'
-  | 'order'
-  | 'payment'
-  | 'voucher'
-  | 'user'
-  | 'tenant'
-  | 'certificate'
-  | 'assignment'
-  | 'question'
-  | 'questionBank'
-  | 'video'
-  | 'liveSession'
-  | 'community'
-  | 'notification'
-  | 'analytics'
-  | 'settings'
-  | 'section';
+  | "course"
+  | "lesson"
+  | "exam"
+  | "attempt"
+  | "enrollment"
+  | "order"
+  | "payment"
+  | "voucher"
+  | "user"
+  | "tenant"
+  | "certificate"
+  | "assignment"
+  | "question"
+  | "questionBank"
+  | "video"
+  | "liveSession"
+  | "community"
+  | "notification"
+  | "analytics"
+  | "settings"
+  | "section";
 
 export type Action =
-  | 'create'
-  | 'read'
-  | 'update'
-  | 'delete'
-  | 'publish'
-  | 'unpublish'
-  | 'enroll'
-  | 'unenroll'
-  | 'watch'
-  | 'submit'
-  | 'grade'
-  | 'attempt'
-  | 'download'
-  | 'join'
-  | 'moderate'
-  | 'manage'
-  | 'view'
-  | 'export'
-  | 'configure'
-  | 'redeem'
-  | 'archive'
-  | 'reorder';
+  | "create"
+  | "read"
+  | "update"
+  | "delete"
+  | "publish"
+  | "unpublish"
+  | "enroll"
+  | "unenroll"
+  | "watch"
+  | "submit"
+  | "grade"
+  | "attempt"
+  | "download"
+  | "join"
+  | "moderate"
+  | "manage"
+  | "view"
+  | "export"
+  | "configure"
+  | "redeem"
+  | "archive"
+  | "reorder";
 
 export interface AuthorizationContext {
   userId: string;
@@ -62,10 +62,10 @@ export interface AuthorizationContext {
 export interface Entitlement {
   resourceType: string;
   resourceId: string;
-  source: 'purchase' | 'voucher' | 'subscription' | 'admin_grant' | 'trial';
+  source: "purchase" | "voucher" | "subscription" | "admin_grant" | "trial";
   startsAt?: Date;
   expiresAt?: Date;
-  status: 'ACTIVE' | 'EXPIRED' | 'REVOKED' | 'PENDING';
+  status: "ACTIVE" | "EXPIRED" | "REVOKED" | "PENDING";
 }
 
 export interface PolicyDecision {
@@ -75,9 +75,18 @@ export interface PolicyDecision {
 }
 
 export interface PolicyCondition {
-  type: 'time' | 'ownership' | 'entitlement' | 'feature' | 'plan' | 'device' | 'location' | 'custom';
+  type:
+    | "time"
+    | "ownership"
+    | "entitlement"
+    | "feature"
+    | "plan"
+    | "device"
+    | "location"
+    | "custom";
   field?: string;
-  operator?: 'eq' | 'ne' | 'gt' | 'gte' | 'lt' | 'lte' | 'in' | 'nin' | 'contains';
+  operator?:
+    "eq" | "ne" | "gt" | "gte" | "lt" | "lte" | "in" | "nin" | "contains";
   value?: any;
   message?: string;
 }
@@ -88,7 +97,7 @@ export interface PolicyRule {
   description?: string;
   resourceType: ResourceType;
   action: Action;
-  effect: 'allow' | 'deny';
+  effect: "allow" | "deny";
   priority: number;
   conditions: PolicyCondition[];
   roles?: string[];
@@ -104,7 +113,12 @@ export class PolicyEngine {
     context: AuthorizationContext,
     action: Action,
     resourceType: ResourceType,
-    resource?: { id?: string; tenantId?: string; ownerId?: string; [key: string]: any },
+    resource?: {
+      id?: string;
+      tenantId?: string;
+      ownerId?: string;
+      [key: string]: any;
+    },
   ): Promise<PolicyDecision> {
     const decisions: PolicyDecision[] = [];
 
@@ -124,22 +138,40 @@ export class PolicyEngine {
     if (!ownershipDecision.allowed) return ownershipDecision;
 
     // 4. Check entitlements
-    const entitlementDecision = await this.checkEntitlements(context, action, resourceType, resource);
+    const entitlementDecision = await this.checkEntitlements(
+      context,
+      action,
+      resourceType,
+      resource,
+    );
     decisions.push(entitlementDecision);
     if (!entitlementDecision.allowed) return entitlementDecision;
 
     // 5. Check feature flags
-    const featureDecision = await this.checkFeatureFlags(context, action, resourceType);
+    const featureDecision = await this.checkFeatureFlags(
+      context,
+      action,
+      resourceType,
+    );
     decisions.push(featureDecision);
     if (!featureDecision.allowed) return featureDecision;
 
     // 6. Check tenant policies (custom rules)
-    const tenantPolicyDecision = await this.checkTenantPolicies(context, action, resourceType, resource);
+    const tenantPolicyDecision = await this.checkTenantPolicies(
+      context,
+      action,
+      resourceType,
+      resource,
+    );
     decisions.push(tenantPolicyDecision);
     if (!tenantPolicyDecision.allowed) return tenantPolicyDecision;
 
     // 7. Check plan limits
-    const planDecision = await this.checkPlanLimits(context, action, resourceType);
+    const planDecision = await this.checkPlanLimits(
+      context,
+      action,
+      resourceType,
+    );
     decisions.push(planDecision);
     if (!planDecision.allowed) return planDecision;
 
@@ -157,11 +189,11 @@ export class PolicyEngine {
     if (resource?.tenantId && resource.tenantId !== context.tenantId) {
       return {
         allowed: false,
-        reason: 'CROSS_TENANT_ACCESS_DENIED',
+        reason: "CROSS_TENANT_ACCESS_DENIED",
         conditions: [
           {
-            type: 'custom',
-            message: 'Access denied: resource belongs to a different tenant',
+            type: "custom",
+            message: "Access denied: resource belongs to a different tenant",
           },
         ],
       };
@@ -175,116 +207,159 @@ export class PolicyEngine {
     resourceType: ResourceType,
   ): Promise<PolicyDecision> {
     // Super admin bypasses all RBAC
-    if (context.role === 'SUPER_ADMIN') {
+    if (context.role === "SUPER_ADMIN") {
       return { allowed: true };
     }
 
     // Define role permissions
     const rolePermissions: Record<string, Record<ResourceType, Action[]>> = {
       ADMIN: {
-        course: ['create', 'read', 'update', 'delete', 'publish', 'unpublish', 'manage'],
-        section: ['create', 'read', 'update', 'delete', 'publish', 'unpublish', 'manage', 'reorder'],
-        lesson: ['create', 'read', 'update', 'delete', 'publish', 'unpublish', 'manage'],
-        exam: ['create', 'read', 'update', 'delete', 'publish', 'unpublish', 'grade', 'manage'],
-        attempt: ['read', 'grade', 'manage'],
-        enrollment: ['create', 'read', 'update', 'delete', 'manage'],
-        order: ['read', 'manage'],
-        payment: ['read', 'manage'],
-        voucher: ['create', 'read', 'update', 'delete', 'manage'],
-        user: ['read', 'update', 'manage'],
-        tenant: ['read', 'update', 'configure'],
-        certificate: ['create', 'read', 'manage'],
-        assignment: ['create', 'read', 'update', 'delete', 'grade', 'manage'],
-        question: ['create', 'read', 'update', 'delete', 'manage'],
-        questionBank: ['create', 'read', 'update', 'delete', 'manage'],
-        video: ['create', 'read', 'update', 'delete', 'manage'],
-        liveSession: ['create', 'read', 'update', 'delete', 'manage'],
-        community: ['read', 'moderate', 'manage'],
-        notification: ['create', 'read', 'manage'],
-        analytics: ['read', 'export', 'manage'],
-        settings: ['read', 'update', 'manage'],
+        course: [
+          "create",
+          "read",
+          "update",
+          "delete",
+          "publish",
+          "unpublish",
+          "manage",
+        ],
+        section: [
+          "create",
+          "read",
+          "update",
+          "delete",
+          "publish",
+          "unpublish",
+          "manage",
+          "reorder",
+        ],
+        lesson: [
+          "create",
+          "read",
+          "update",
+          "delete",
+          "publish",
+          "unpublish",
+          "manage",
+        ],
+        exam: [
+          "create",
+          "read",
+          "update",
+          "delete",
+          "publish",
+          "unpublish",
+          "grade",
+          "manage",
+        ],
+        attempt: ["read", "grade", "manage"],
+        enrollment: ["create", "read", "update", "delete", "manage"],
+        order: ["read", "manage"],
+        payment: ["read", "manage"],
+        voucher: ["create", "read", "update", "delete", "manage"],
+        user: ["read", "update", "manage"],
+        tenant: ["read", "update", "configure"],
+        certificate: ["create", "read", "manage"],
+        assignment: ["create", "read", "update", "delete", "grade", "manage"],
+        question: ["create", "read", "update", "delete", "manage"],
+        questionBank: ["create", "read", "update", "delete", "manage"],
+        video: ["create", "read", "update", "delete", "manage"],
+        liveSession: ["create", "read", "update", "delete", "manage"],
+        community: ["read", "moderate", "manage"],
+        notification: ["create", "read", "manage"],
+        analytics: ["read", "export", "manage"],
+        settings: ["read", "update", "manage"],
       },
       TEACHER: {
-        course: ['create', 'read', 'update', 'publish', 'unpublish'],
-        section: ['create', 'read', 'update', 'delete', 'publish', 'unpublish', 'reorder'],
-        lesson: ['create', 'read', 'update', 'publish', 'unpublish'],
-        exam: ['create', 'read', 'update', 'publish', 'unpublish', 'grade'],
-        attempt: ['read', 'grade'],
-        enrollment: ['read'],
-        order: ['read'],
-        payment: ['read'],
-        voucher: ['create', 'read'],
-        user: ['read'],
-        tenant: ['read'],
-        certificate: ['create', 'read'],
-        assignment: ['create', 'read', 'update', 'grade'],
-        question: ['create', 'read', 'update', 'delete'],
-        questionBank: ['create', 'read', 'update', 'delete'],
-        video: ['create', 'read', 'update', 'delete'],
-        liveSession: ['create', 'read', 'update', 'delete', 'manage'],
-        community: ['read', 'moderate'],
-        notification: ['create', 'read'],
-        analytics: ['read'],
-        settings: ['read', 'update'],
+        course: ["create", "read", "update", "publish", "unpublish"],
+        section: [
+          "create",
+          "read",
+          "update",
+          "delete",
+          "publish",
+          "unpublish",
+          "reorder",
+        ],
+        lesson: ["create", "read", "update", "publish", "unpublish"],
+        exam: ["create", "read", "update", "publish", "unpublish", "grade"],
+        attempt: ["read", "grade"],
+        enrollment: ["read"],
+        order: ["read"],
+        payment: ["read"],
+        voucher: ["create", "read"],
+        user: ["read"],
+        tenant: ["read"],
+        certificate: ["create", "read"],
+        assignment: ["create", "read", "update", "grade"],
+        question: ["create", "read", "update", "delete"],
+        questionBank: ["create", "read", "update", "delete"],
+        video: ["create", "read", "update", "delete"],
+        liveSession: ["create", "read", "update", "delete", "manage"],
+        community: ["read", "moderate"],
+        notification: ["create", "read"],
+        analytics: ["read"],
+        settings: ["read", "update"],
       },
       STUDENT: {
-        course: ['read'],
-        section: ['read'],
-        lesson: ['read', 'watch'],
-        exam: ['read', 'attempt'],
-        attempt: ['create', 'read', 'submit'],
-        enrollment: ['create', 'read'],
-        order: ['create', 'read'],
-        payment: ['create', 'read'],
-        voucher: ['read'],
-        user: ['read', 'update'],
-        tenant: ['read'],
-        certificate: ['read'],
-        assignment: ['read', 'submit'],
-        question: ['read'],
+        course: ["read"],
+        section: ["read"],
+        lesson: ["read", "watch"],
+        exam: ["read", "attempt"],
+        attempt: ["create", "read", "submit"],
+        enrollment: ["create", "read"],
+        order: ["create", "read"],
+        payment: ["create", "read"],
+        voucher: ["read"],
+        user: ["read", "update"],
+        tenant: ["read"],
+        certificate: ["read"],
+        assignment: ["read", "submit"],
+        question: ["read"],
         questionBank: [],
-        video: ['watch'],
-        liveSession: ['read', 'join'],
-        community: ['read', 'create'],
-        notification: ['read'],
+        video: ["watch"],
+        liveSession: ["read", "join"],
+        community: ["read", "create"],
+        notification: ["read"],
         analytics: [],
-        settings: ['read', 'update'],
+        settings: ["read", "update"],
       },
       PARENT: {
-        course: ['read'],
-        section: ['read'],
-        lesson: ['read'],
-        exam: ['read'],
-        attempt: ['read'],
-        enrollment: ['read'],
-        order: ['read'],
-        payment: ['read'],
+        course: ["read"],
+        section: ["read"],
+        lesson: ["read"],
+        exam: ["read"],
+        attempt: ["read"],
+        enrollment: ["read"],
+        order: ["read"],
+        payment: ["read"],
         voucher: [],
-        user: ['read'],
-        tenant: ['read'],
-        certificate: ['read'],
-        assignment: ['read'],
+        user: ["read"],
+        tenant: ["read"],
+        certificate: ["read"],
+        assignment: ["read"],
         question: [],
         questionBank: [],
-        video: ['watch'],
-        liveSession: ['read'],
+        video: ["watch"],
+        liveSession: ["read"],
         community: [],
-        notification: ['read'],
-        analytics: ['read'],
-        settings: ['read'],
+        notification: ["read"],
+        analytics: ["read"],
+        settings: ["read"],
       },
     };
 
     const permissions = rolePermissions[context.role]?.[resourceType] || [];
-    const hasPermission = permissions.includes(action) || permissions.includes('manage');
+    const hasPermission =
+      permissions.includes(action) || permissions.includes("manage");
 
     if (!hasPermission) {
       return {
         allowed: false,
-        reason: 'INSUFFICIENT_PERMISSIONS',
+        reason: "INSUFFICIENT_PERMISSIONS",
         conditions: [
           {
-            type: 'custom',
+            type: "custom",
             message: `Role ${context.role} does not have permission ${action} on ${resourceType}`,
           },
         ],
@@ -301,14 +376,20 @@ export class PolicyEngine {
     if (!resource) return { allowed: true };
 
     const ownerId = resource.ownerId || resource.userId;
-    if (ownerId && ownerId !== context.userId && context.role !== 'ADMIN' && context.role !== 'TEACHER' && context.role !== 'SUPER_ADMIN') {
+    if (
+      ownerId &&
+      ownerId !== context.userId &&
+      context.role !== "ADMIN" &&
+      context.role !== "TEACHER" &&
+      context.role !== "SUPER_ADMIN"
+    ) {
       return {
         allowed: false,
-        reason: 'NOT_RESOURCE_OWNER',
+        reason: "NOT_RESOURCE_OWNER",
         conditions: [
           {
-            type: 'ownership',
-            message: 'You do not own this resource',
+            type: "ownership",
+            message: "You do not own this resource",
           },
         ],
       };
@@ -323,17 +404,26 @@ export class PolicyEngine {
     resource?: { id?: string },
   ): Promise<PolicyDecision> {
     // Actions that require entitlements
-    const entitlementRequiredActions: Action[] = ['watch', 'attempt', 'submit', 'download', 'join'];
+    const entitlementRequiredActions: Action[] = [
+      "watch",
+      "attempt",
+      "submit",
+      "download",
+      "join",
+    ];
     const entitlementRequiredResources: ResourceType[] = [
-      'lesson',
-      'exam',
-      'video',
-      'liveSession',
-      'certificate',
-      'assignment',
+      "lesson",
+      "exam",
+      "video",
+      "liveSession",
+      "certificate",
+      "assignment",
     ];
 
-    if (!entitlementRequiredActions.includes(action) || !entitlementRequiredResources.includes(resourceType)) {
+    if (
+      !entitlementRequiredActions.includes(action) ||
+      !entitlementRequiredResources.includes(resourceType)
+    ) {
       return { allowed: true };
     }
 
@@ -346,7 +436,7 @@ export class PolicyEngine {
       (e) =>
         e.resourceType === resourceType &&
         e.resourceId === resource!.id &&
-        e.status === 'ACTIVE' &&
+        e.status === "ACTIVE" &&
         (!e.startsAt || e.startsAt <= new Date()) &&
         (!e.expiresAt || e.expiresAt >= new Date()),
     );
@@ -354,10 +444,10 @@ export class PolicyEngine {
     if (!hasEntitlement) {
       return {
         allowed: false,
-        reason: 'NO_ENTITLEMENT',
+        reason: "NO_ENTITLEMENT",
         conditions: [
           {
-            type: 'entitlement',
+            type: "entitlement",
             message: `No active entitlement for ${resourceType} ${resource.id}`,
           },
         ],
@@ -374,16 +464,16 @@ export class PolicyEngine {
   ): Promise<PolicyDecision> {
     // Map actions/resources to feature flags
     const featureMap: Record<string, string> = {
-      'lesson:watch': 'videoPlayback',
-      'video:watch': 'videoPlayback',
-      'exam:attempt': 'exams',
-      'liveSession:join': 'liveSessions',
-      'certificate:create': 'certificates',
-      'assignment:submit': 'assignments',
-      'community:create': 'community',
-      'gamification:create': 'gamification',
-      'analytics:read': 'analytics',
-      'ai:generate': 'ai',
+      "lesson:watch": "videoPlayback",
+      "video:watch": "videoPlayback",
+      "exam:attempt": "exams",
+      "liveSession:join": "liveSessions",
+      "certificate:create": "certificates",
+      "assignment:submit": "assignments",
+      "community:create": "community",
+      "gamification:create": "gamification",
+      "analytics:read": "analytics",
+      "ai:generate": "ai",
     };
 
     const featureKey = `${resourceType}:${action}`;
@@ -397,10 +487,10 @@ export class PolicyEngine {
     if (!isEnabled) {
       return {
         allowed: false,
-        reason: 'FEATURE_DISABLED',
+        reason: "FEATURE_DISABLED",
         conditions: [
           {
-            type: 'feature',
+            type: "feature",
             field: featureFlag,
             message: `Feature ${featureFlag} is not enabled for this tenant`,
           },

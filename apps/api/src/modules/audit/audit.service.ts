@@ -1,5 +1,5 @@
-import { Injectable } from '@nestjs/common';
-import { PrismaService } from '../tenants/prisma.service';
+import { Injectable } from "@nestjs/common";
+import { PrismaService } from "../tenants/prisma.service";
 
 @Injectable()
 export class AuditService {
@@ -23,7 +23,7 @@ export class AuditService {
   async getTenantAuditLogs(tenantId: string, limit = 100) {
     return this.prisma.auditLog.findMany({
       where: { tenantId },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { createdAt: "desc" },
       take: limit,
       include: {
         actorUser: {

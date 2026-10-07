@@ -1,9 +1,15 @@
-import { Injectable, NotFoundException, BadRequestException, ConflictException, ForbiddenException } from '@nestjs/common';
-import { PrismaService } from '../tenants/prisma.service';
-import { CreateCourseRequest } from './dto/create-course.dto';
-import { UpdateCourseRequest } from './dto/create-course.dto';
-import { CourseStatus } from '@prisma/client';
-import { Prisma } from '@prisma/client';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
+} from "@nestjs/common";
+import { PrismaService } from "../tenants/prisma.service";
+import { CreateCourseRequest } from "./dto/create-course.dto";
+import { UpdateCourseRequest } from "./dto/create-course.dto";
+import { CourseStatus } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 
 const courseSelect = {
   id: true,
@@ -28,7 +34,7 @@ const courseWithSectionsSelect = {
   sections: {
     include: {
       lessons: {
-        where: { status: 'PUBLISHED' },
+        where: { status: "PUBLISHED" },
         select: { id: true },
       },
     },
@@ -40,13 +46,13 @@ const coursePreviewSelect = {
   sections: {
     where: {
       lessons: {
-        some: { status: 'PUBLISHED' },
+        some: { status: "PUBLISHED" },
       },
     },
     include: {
       lessons: {
-        where: { status: 'PUBLISHED' },
-        orderBy: { orderIndex: 'asc' },
+        where: { status: "PUBLISHED" },
+        orderBy: { orderIndex: "asc" },
         select: {
           id: true,
           title: true,
@@ -96,7 +102,11 @@ const coursePublicSelect = {
 export class CoursesService {
   constructor(private prisma: PrismaService) {}
 
-  async createCourse(tenantId: string, userId: string, input: CreateCourseRequest) {
+  async createCourse(
+    tenantId: string,
+    userId: string,
+    input: CreateCourseRequest,
+  ) {
     // Check if slug is already taken in this tenant
     const existingCourse = await this.prisma.course.findUnique({
       where: {
@@ -108,7 +118,7 @@ export class CoursesService {
     });
 
     if (existingCourse) {
-      throw new ConflictException('Course with this slug already exists');
+      throw new ConflictException("Course with this slug already exists");
     }
 
     const course = await this.prisma.course.create({
@@ -123,7 +133,7 @@ export class CoursesService {
         level: input.level,
         language: input.language,
         price: input.price ?? 0,
-        currency: input.currency || 'EGP',
+        currency: input.currency || "EGP",
         status: CourseStatus.DRAFT,
       },
     });
@@ -138,13 +148,18 @@ export class CoursesService {
     });
 
     if (!course) {
-      throw new NotFoundException('Course not found');
+      throw new NotFoundException("Course not found");
     }
 
     return course;
   }
 
-  async getCourses(tenantId: string, cursor?: string, limit = 20, status?: string) {
+  async getCourses(
+    tenantId: string,
+    cursor?: string,
+    limit = 20,
+    status?: string,
+  ) {
     const where: Prisma.CourseWhereInput = { tenantId };
     if (status) {
       where.status = status as any;
@@ -152,7 +167,7 @@ export class CoursesService {
 
     const courses = await this.prisma.course.findMany({
       where,
-      orderBy: { createdAt: 'desc' },
+      orderBy: { createdAt: "desc" },
       take: limit + 1,
       cursor: cursor ? { id: cursor } : undefined,
       select: courseListSelect,
@@ -167,14 +182,18 @@ export class CoursesService {
     return { courses, nextCursor };
   }
 
-  async updateCourse(tenantId: string, courseId: string, input: UpdateCourseRequest) {
+  async updateCourse(
+    tenantId: string,
+    courseId: string,
+    input: UpdateCourseRequest,
+  ) {
     // Check if course exists and belongs to tenant
     const course = await this.prisma.course.findFirst({
       where: { id: courseId, tenantId },
     });
 
     if (!course) {
-      throw new NotFoundException('Course not found');
+      throw new NotFoundException("Course not found");
     }
 
     // Check slug uniqueness if being updated
@@ -189,7 +208,7 @@ export class CoursesService {
       });
 
       if (existingCourse) {
-        throw new ConflictException('Course with this slug already exists');
+        throw new ConflictException("Course with this slug already exists");
       }
     }
 
@@ -218,13 +237,13 @@ export class CoursesService {
     });
 
     if (!course) {
-      throw new NotFoundException('Course not found');
+      throw new NotFoundException("Course not found");
     }
 
     // Archive instead of hard delete
     await this.prisma.course.update({
       where: { id: courseId },
-      data: { status: 'ARCHIVED' },
+      data: { status: "ARCHIVED" },
     });
 
     return { success: true };
@@ -237,7 +256,7 @@ export class CoursesService {
         sections: {
           include: {
             lessons: {
-              where: { status: 'PUBLISHED' },
+              where: { status: "PUBLISHED" },
               select: { id: true },
             },
           },
@@ -246,10 +265,10 @@ export class CoursesService {
     });
 
     if (!course) {
-      throw new NotFoundException('Course not found');
+      throw new NotFoundException("Course not found");
     }
 
-    if (course.status === 'PUBLISHED') {
+    if (course.status === "PUBLISHED") {
       return course; // Already published
     }
 
@@ -257,19 +276,19 @@ export class CoursesService {
     const errors: string[] = [];
 
     if (!course.title?.trim()) {
-      errors.push('Course must have a title');
+      errors.push("Course must have a title");
     }
 
     if (!course.shortDescription?.trim()) {
-      errors.push('Course must have a short description');
+      errors.push("Course must have a short description");
     }
 
     if (!course.thumbnailUrl) {
-      errors.push('Course must have a thumbnail');
+      errors.push("Course must have a thumbnail");
     }
 
     if (!course.sections || course.sections.length === 0) {
-      errors.push('Course must have at least one section');
+      errors.push("Course must have at least one section");
     }
 
     const hasPublishedLesson = course.sections.some(
@@ -277,16 +296,16 @@ export class CoursesService {
     );
 
     if (!hasPublishedLesson) {
-      errors.push('Course must have at least one published lesson');
+      errors.push("Course must have at least one published lesson");
     }
 
     if (course.price && Number(course.price) > 0 && !course.currency) {
-      errors.push('Paid course must have a valid currency');
+      errors.push("Paid course must have a valid currency");
     }
 
     if (errors.length > 0) {
       throw new BadRequestException({
-        message: 'Course cannot be published',
+        message: "Course cannot be published",
         errors,
       });
     }
@@ -294,7 +313,7 @@ export class CoursesService {
     const publishedCourse = await this.prisma.course.update({
       where: { id: courseId },
       data: {
-        status: 'PUBLISHED',
+        status: "PUBLISHED",
         publishedAt: new Date(),
       },
     });
@@ -308,12 +327,12 @@ export class CoursesService {
     });
 
     if (!course) {
-      throw new NotFoundException('Course not found');
+      throw new NotFoundException("Course not found");
     }
 
     const updatedCourse = await this.prisma.course.update({
       where: { id: courseId },
-      data: { status: 'UNPUBLISHED' },
+      data: { status: "UNPUBLISHED" },
     });
 
     return updatedCourse;
@@ -325,34 +344,39 @@ export class CoursesService {
     });
 
     if (!course) {
-      throw new NotFoundException('Course not found');
+      throw new NotFoundException("Course not found");
     }
 
     const archivedCourse = await this.prisma.course.update({
       where: { id: courseId },
-      data: { status: 'ARCHIVED' },
+      data: { status: "ARCHIVED" },
     });
 
     return archivedCourse;
   }
 
-  async getPublicCourses(tenantId: string, cursor?: string, limit = 20, search?: string) {
+  async getPublicCourses(
+    tenantId: string,
+    cursor?: string,
+    limit = 20,
+    search?: string,
+  ) {
     const where: any = {
       tenantId,
-      status: 'PUBLISHED',
-      visibility: 'PUBLIC',
+      status: "PUBLISHED",
+      visibility: "PUBLIC",
     };
 
     if (search) {
       where.OR = [
-        { title: { contains: search, mode: 'insensitive' } },
-        { shortDescription: { contains: search, mode: 'insensitive' } },
+        { title: { contains: search, mode: "insensitive" } },
+        { shortDescription: { contains: search, mode: "insensitive" } },
       ];
     }
 
     const courses = await this.prisma.course.findMany({
       where,
-      orderBy: { createdAt: 'desc' },
+      orderBy: { createdAt: "desc" },
       take: limit + 1,
       cursor: cursor ? { id: cursor } : undefined,
       select: {
@@ -384,18 +408,18 @@ export class CoursesService {
 
   async getCoursePreview(tenantId: string, slug: string) {
     const course = await this.prisma.course.findFirst({
-      where: { tenantId, slug, status: 'PUBLISHED', visibility: 'PUBLIC' },
+      where: { tenantId, slug, status: "PUBLISHED", visibility: "PUBLIC" },
       include: {
         sections: {
           where: {
             lessons: {
-              some: { status: 'PUBLISHED' },
+              some: { status: "PUBLISHED" },
             },
           },
           include: {
             lessons: {
-              where: { status: 'PUBLISHED' },
-              orderBy: { orderIndex: 'asc' },
+              where: { status: "PUBLISHED" },
+              orderBy: { orderIndex: "asc" },
               select: {
                 id: true,
                 title: true,
@@ -405,13 +429,13 @@ export class CoursesService {
               },
             },
           },
-          orderBy: { orderIndex: 'asc' },
+          orderBy: { orderIndex: "asc" },
         },
       },
     });
 
     if (!course) {
-      throw new NotFoundException('Course not found');
+      throw new NotFoundException("Course not found");
     }
 
     return {
@@ -427,13 +451,13 @@ export class CoursesService {
         language: course.language,
         price: course.price,
         currency: course.currency,
-        teacher: { name: '' }, // Would need to fetch teacher name
+        teacher: { name: "" }, // Would need to fetch teacher name
       },
       previewLessons: course.sections.flatMap((section) =>
         section.lessons.map((lesson) => ({
           id: lesson.id,
           title: lesson.title,
-          type: 'VIDEO', // Would need actual type
+          type: "VIDEO", // Would need actual type
           position: lesson.orderIndex,
           durationSeconds: lesson.duration,
         })),

@@ -1,6 +1,6 @@
-import { Injectable } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import * as crypto from 'crypto';
+import { Injectable } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
+import * as crypto from "crypto";
 
 export interface WatermarkPayload {
   studentName: string;
@@ -32,9 +32,13 @@ export class WatermarkEngine {
   private readonly positionChangeIntervalSec: number;
 
   constructor(private configService: ConfigService) {
-    this.hmacSecret = configService.get<string>('VIDEO_WATERMARK_HMAC_SECRET') || 'default-watermark-secret-change-in-production';
-    this.tokenTtlMs = configService.get<number>('VIDEO_TOKEN_TTL_MS') || 5 * 60 * 1000; // 5 minutes default
-    this.positionChangeIntervalSec = configService.get<number>('WATERMARK_POSITION_CHANGE_INTERVAL_SEC') || 7;
+    this.hmacSecret =
+      configService.get<string>("VIDEO_WATERMARK_HMAC_SECRET") ||
+      "default-watermark-secret-change-in-production";
+    this.tokenTtlMs =
+      configService.get<number>("VIDEO_TOKEN_TTL_MS") || 5 * 60 * 1000; // 5 minutes default
+    this.positionChangeIntervalSec =
+      configService.get<number>("WATERMARK_POSITION_CHANGE_INTERVAL_SEC") || 7;
   }
 
   /**
@@ -59,8 +63,8 @@ export class WatermarkEngine {
     const seedNumber = Number(seed & 0xffffffffn);
     const rand = this.mulberry32(seedNumber + step * 7919);
     return {
-      x: 4 + rand() * 56,      // 4% to 60%
-      y: 6 + rand() * 76,      // 6% to 82%
+      x: 4 + rand() * 56, // 4% to 60%
+      y: 6 + rand() * 76, // 6% to 82%
       rotate: -6 + rand() * 12, // -6 to +6 degrees
       opacity: Math.max(0.35, baseOpacity - 0.15 + rand() * 0.3), // 0.35 to 0.8
     };
@@ -70,14 +74,20 @@ export class WatermarkEngine {
    * Generate all positions for a playback session
    * Returns array of positions for the entire video duration
    */
-  generatePositionSequence(seed: bigint, videoDurationSec: number, baseOpacity = 0.65): Position[] {
+  generatePositionSequence(
+    seed: bigint,
+    videoDurationSec: number,
+    baseOpacity = 0.65,
+  ): Position[] {
     const positions: Position[] = [];
-    const totalSteps = Math.ceil(videoDurationSec / this.positionChangeIntervalSec);
-    
+    const totalSteps = Math.ceil(
+      videoDurationSec / this.positionChangeIntervalSec,
+    );
+
     for (let step = 0; step < totalSteps; step++) {
       positions.push(this.positionAt(seed, step, baseOpacity));
     }
-    
+
     return positions;
   }
 
@@ -85,7 +95,11 @@ export class WatermarkEngine {
    * Create HMAC-SHA256 signature for watermark payload
    * Payload: studentName|studentPhone|studentId|tenantName|enrollmentId|issuedAt|expiresAt|seed
    */
-  signPayload(payload: WatermarkPayload, seed: bigint, expiresAt: number): string {
+  signPayload(
+    payload: WatermarkPayload,
+    seed: bigint,
+    expiresAt: number,
+  ): string {
     const data = [
       payload.studentName,
       payload.studentPhone,
@@ -95,22 +109,27 @@ export class WatermarkEngine {
       payload.issuedAt.toString(),
       expiresAt.toString(),
       seed.toString(),
-    ].join('|');
+    ].join("|");
 
     return crypto
-      .createHmac('sha256', this.hmacSecret)
+      .createHmac("sha256", this.hmacSecret)
       .update(data)
-      .digest('hex');
+      .digest("hex");
   }
 
   /**
    * Verify HMAC signature
    */
-  verifySignature(payload: WatermarkPayload, seed: bigint, expiresAt: number, signature: string): boolean {
+  verifySignature(
+    payload: WatermarkPayload,
+    seed: bigint,
+    expiresAt: number,
+    signature: string,
+  ): boolean {
     const expectedSignature = this.signPayload(payload, seed, expiresAt);
     return crypto.timingSafeEqual(
-      Buffer.from(signature, 'hex'),
-      Buffer.from(expectedSignature, 'hex'),
+      Buffer.from(signature, "hex"),
+      Buffer.from(expectedSignature, "hex"),
     );
   }
 
@@ -132,7 +151,7 @@ export class WatermarkEngine {
     const seed = this.generateSeed();
     const issuedAt = Date.now();
     const expiresAt = issuedAt + this.tokenTtlMs;
-    
+
     const signature = this.signPayload(payload, seed, expiresAt);
     const positions = this.generatePositionSequence(seed, videoDurationSec);
 
@@ -147,7 +166,11 @@ export class WatermarkEngine {
   /**
    * Get position at specific timestamp (for client-side rendering)
    */
-  getPositionAtTime(seed: bigint, timestampSec: number, baseOpacity = 0.65): Position {
+  getPositionAtTime(
+    seed: bigint,
+    timestampSec: number,
+    baseOpacity = 0.65,
+  ): Position {
     const step = Math.floor(timestampSec / this.positionChangeIntervalSec);
     return this.positionAt(seed, step, baseOpacity);
   }
@@ -159,7 +182,12 @@ export class WatermarkEngine {
     if (Date.now() > data.expiresAt) {
       return false; // Expired
     }
-    return this.verifySignature(data.payload, data.seed, data.expiresAt, data.signature);
+    return this.verifySignature(
+      data.payload,
+      data.seed,
+      data.expiresAt,
+      data.signature,
+    );
   }
 
   getTokenTtlMs(): number {

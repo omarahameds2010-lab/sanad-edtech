@@ -1,10 +1,23 @@
-import { Controller, Post, Get, Put, Delete, Param, Body, Query, UseGuards, Request, HttpCode, HttpStatus } from '@nestjs/common';
-import { VideoProtectionService } from './video-protection.service';
-import { PrismaService } from '../tenants/prisma.service';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { RequirePermission } from '../authorization/authorization.decorators';
+import {
+  Controller,
+  Post,
+  Get,
+  Put,
+  Delete,
+  Param,
+  Body,
+  Query,
+  UseGuards,
+  Request,
+  HttpCode,
+  HttpStatus,
+} from "@nestjs/common";
+import { VideoProtectionService } from "./video-protection.service";
+import { PrismaService } from "../tenants/prisma.service";
+import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
+import { RequirePermission } from "../authorization/authorization.decorators";
 
-@Controller('api/video-protection')
+@Controller("api/video-protection")
 @UseGuards(JwtAuthGuard)
 export class VideoProtectionController {
   constructor(
@@ -15,12 +28,13 @@ export class VideoProtectionController {
   /**
    * Authorize video playback - called by student before starting video
    */
-  @Post('playback/authorize')
+  @Post("playback/authorize")
   @HttpCode(HttpStatus.OK)
-  @RequirePermission({ action: 'watch', resourceType: 'lesson' })
+  @RequirePermission({ action: "watch", resourceType: "lesson" })
   async authorizePlayback(
     @Request() req,
-    @Body() body: { lessonId: string; deviceId: string; deviceFingerprint: string },
+    @Body()
+    body: { lessonId: string; deviceId: string; deviceFingerprint: string },
   ) {
     const token = await this.videoProtectionService.authorizePlayback(
       req.user.sub,
@@ -29,8 +43,8 @@ export class VideoProtectionController {
         lessonId: body.lessonId,
         deviceId: body.deviceId,
         deviceFingerprint: body.deviceFingerprint,
-        userAgent: req.headers['user-agent'] || '',
-        ip: req.ip || '',
+        userAgent: req.headers["user-agent"] || "",
+        ip: req.ip || "",
       },
     );
 
@@ -40,13 +54,19 @@ export class VideoProtectionController {
   /**
    * Heartbeat from video player
    */
-  @Post('playback/:sessionId/heartbeat')
+  @Post("playback/:sessionId/heartbeat")
   @HttpCode(HttpStatus.OK)
-  @RequirePermission({ action: 'watch', resourceType: 'lesson' })
+  @RequirePermission({ action: "watch", resourceType: "lesson" })
   async heartbeat(
     @Request() req,
-    @Param('sessionId') sessionId: string,
-    @Body() body: { position: number; seekCount: number; visible: boolean; focused: boolean },
+    @Param("sessionId") sessionId: string,
+    @Body()
+    body: {
+      position: number;
+      seekCount: number;
+      visible: boolean;
+      focused: boolean;
+    },
   ) {
     const result = await this.videoProtectionService.handleHeartbeat(
       req.tenantId,
@@ -60,12 +80,12 @@ export class VideoProtectionController {
   /**
    * Capture event from player (screenshot, recording, tamper)
    */
-  @Post('playback/:sessionId/capture-event')
+  @Post("playback/:sessionId/capture-event")
   @HttpCode(HttpStatus.ACCEPTED)
-  @RequirePermission({ action: 'watch', resourceType: 'lesson' })
+  @RequirePermission({ action: "watch", resourceType: "lesson" })
   async captureEvent(
     @Request() req,
-    @Param('sessionId') sessionId: string,
+    @Param("sessionId") sessionId: string,
     @Body() body: { eventType: string; metadata?: Record<string, any> },
   ) {
     await this.videoProtectionService.handleCaptureEvent(
@@ -80,42 +100,48 @@ export class VideoProtectionController {
   /**
    * End playback session
    */
-  @Post('playback/:sessionId/end')
+  @Post("playback/:sessionId/end")
   @HttpCode(HttpStatus.OK)
-  @RequirePermission({ action: 'watch', resourceType: 'lesson' })
-  async endSession(
-    @Request() req,
-    @Param('sessionId') sessionId: string,
-  ) {
-    await this.videoProtectionService.endSession(req.tenantId, req.user.sub, sessionId);
+  @RequirePermission({ action: "watch", resourceType: "lesson" })
+  async endSession(@Request() req, @Param("sessionId") sessionId: string) {
+    await this.videoProtectionService.endSession(
+      req.tenantId,
+      req.user.sub,
+      sessionId,
+    );
     return { ended: true };
   }
 
   /**
    * Get active sessions for current student
    */
-  @Get('playback/sessions/active')
-  @RequirePermission({ action: 'read', resourceType: 'analytics' })
+  @Get("playback/sessions/active")
+  @RequirePermission({ action: "read", resourceType: "analytics" })
   async getActiveSessions(@Request() req) {
-    const sessions = await this.videoProtectionService.getActiveSessions(req.tenantId, req.user.sub);
+    const sessions = await this.videoProtectionService.getActiveSessions(
+      req.tenantId,
+      req.user.sub,
+    );
     return { sessions };
   }
 
   /**
    * Get tenant video security configuration
    */
-  @Get('config')
-  @RequirePermission({ action: 'read', resourceType: 'settings' })
+  @Get("config")
+  @RequirePermission({ action: "read", resourceType: "settings" })
   async getConfig(@Request() req) {
-    const config = await this.videoProtectionService.getTenantVideoConfig(req.tenantId);
+    const config = await this.videoProtectionService.getTenantVideoConfig(
+      req.tenantId,
+    );
     return { config };
   }
 
   /**
    * Update tenant video security configuration (admin)
    */
-  @Put('config')
-  @RequirePermission({ action: 'manage', resourceType: 'settings' })
+  @Put("config")
+  @RequirePermission({ action: "manage", resourceType: "settings" })
   async updateConfig(@Request() req, @Body() body: { videoSecurity: any }) {
     const tenantConfig = await this.prisma.tenantConfig.findUnique({
       where: { tenantId: req.tenantId },
@@ -139,54 +165,67 @@ export class VideoProtectionController {
       },
     });
 
-    const config = await this.videoProtectionService.getTenantVideoConfig(req.tenantId);
+    const config = await this.videoProtectionService.getTenantVideoConfig(
+      req.tenantId,
+    );
     return { config };
   }
 
   /**
    * Get video security stats (admin/teacher dashboard)
    */
-  @Get('stats')
-  @RequirePermission({ action: 'read', resourceType: 'analytics' })
+  @Get("stats")
+  @RequirePermission({ action: "read", resourceType: "analytics" })
   async getStats(@Request() req) {
-    const stats = await this.videoProtectionService.getVideoSecurityStats(req.tenantId);
+    const stats = await this.videoProtectionService.getVideoSecurityStats(
+      req.tenantId,
+    );
     return { stats };
   }
 
   /**
    * Admin: Revoke a student's playback session
    */
-  @Post('admin/sessions/:sessionId/revoke')
-  @RequirePermission({ action: 'manage', resourceType: 'settings' })
+  @Post("admin/sessions/:sessionId/revoke")
+  @RequirePermission({ action: "manage", resourceType: "settings" })
   async revokeSession(
     @Request() req,
-    @Param('sessionId') sessionId: string,
+    @Param("sessionId") sessionId: string,
     @Body() body: { reason: string },
   ) {
-    await this.videoProtectionService.revokeSession(req.tenantId, sessionId, body.reason);
+    await this.videoProtectionService.revokeSession(
+      req.tenantId,
+      sessionId,
+      body.reason,
+    );
     return { revoked: true };
   }
 
   /**
    * Admin: Get all active sessions for a student
    */
-  @Get('admin/students/:studentId/sessions')
-  @RequirePermission({ action: 'read', resourceType: 'analytics' })
+  @Get("admin/students/:studentId/sessions")
+  @RequirePermission({ action: "read", resourceType: "analytics" })
   async getStudentSessions(
     @Request() req,
-    @Param('studentId') studentId: string,
+    @Param("studentId") studentId: string,
   ) {
-    const sessions = await this.videoProtectionService.getActiveSessions(req.tenantId, studentId);
+    const sessions = await this.videoProtectionService.getActiveSessions(
+      req.tenantId,
+      studentId,
+    );
     return { sessions };
   }
 
   /**
    * Verify playback token (for CDN/edge validation)
    */
-  @Post('verify-token')
+  @Post("verify-token")
   @HttpCode(HttpStatus.OK)
   async verifyToken(@Body() body: { token: string }) {
-    const result = await this.videoProtectionService.verifyPlaybackToken(body.token);
+    const result = await this.videoProtectionService.verifyPlaybackToken(
+      body.token,
+    );
     return result;
   }
 }

@@ -1,7 +1,7 @@
-import { Injectable } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import * as crypto from 'crypto';
-import { WatermarkEngine, WatermarkPayload } from './watermark-engine';
+import { Injectable } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
+import * as crypto from "crypto";
+import { WatermarkEngine, WatermarkPayload } from "./watermark-engine";
 
 export interface VideoPlaybackToken {
   token: string;
@@ -46,9 +46,13 @@ export class SignedTokenService {
     private configService: ConfigService,
     private watermarkEngine: WatermarkEngine,
   ) {
-    this.tokenSecret = configService.get<string>('VIDEO_TOKEN_SECRET') || 'default-video-token-secret-change-in-production';
-    this.tokenTtlMs = configService.get<number>('VIDEO_TOKEN_TTL_MS') || 5 * 60 * 1000; // 5 minutes
-    this.issuer = configService.get<string>('VIDEO_TOKEN_ISSUER') || 'learning-platform';
+    this.tokenSecret =
+      configService.get<string>("VIDEO_TOKEN_SECRET") ||
+      "default-video-token-secret-change-in-production";
+    this.tokenTtlMs =
+      configService.get<number>("VIDEO_TOKEN_TTL_MS") || 5 * 60 * 1000; // 5 minutes
+    this.issuer =
+      configService.get<string>("VIDEO_TOKEN_ISSUER") || "learning-platform";
   }
 
   /**
@@ -68,13 +72,24 @@ export class SignedTokenService {
       captureProtection: boolean;
     };
   }): Promise<VideoPlaybackToken> {
-    const { lessonId, videoId, studentId, playbackSessionId, watermarkPayload, videoDurationSec, tenantConfig } = params;
+    const {
+      lessonId,
+      videoId,
+      studentId,
+      playbackSessionId,
+      watermarkPayload,
+      videoDurationSec,
+      tenantConfig,
+    } = params;
 
     const issuedAt = Date.now();
     const expiresAt = issuedAt + this.tokenTtlMs;
 
     // Generate watermark data
-    const watermarkData = this.watermarkEngine.createWatermarkData(watermarkPayload, videoDurationSec);
+    const watermarkData = this.watermarkEngine.createWatermarkData(
+      watermarkPayload,
+      videoDurationSec,
+    );
 
     // Generate positions for the token (client will use these)
     const positions = this.watermarkEngine.generatePositionSequence(
@@ -85,9 +100,9 @@ export class SignedTokenService {
     // Create policy hash for integrity
     const policyString = JSON.stringify(tenantConfig);
     const policyHash = crypto
-      .createHmac('sha256', this.tokenSecret)
+      .createHmac("sha256", this.tokenSecret)
       .update(policyString)
-      .digest('hex')
+      .digest("hex")
       .substring(0, 16);
 
     // Create token payload
@@ -127,13 +142,17 @@ export class SignedTokenService {
    * Sign token payload using HMAC-SHA256
    */
   private signToken(payload: TokenPayload): string {
-    const header = Buffer.from(JSON.stringify({ alg: 'HS256', typ: 'JWT' })).toString('base64url');
-    const payloadB64 = Buffer.from(JSON.stringify(payload)).toString('base64url');
-    
+    const header = Buffer.from(
+      JSON.stringify({ alg: "HS256", typ: "JWT" }),
+    ).toString("base64url");
+    const payloadB64 = Buffer.from(JSON.stringify(payload)).toString(
+      "base64url",
+    );
+
     const signature = crypto
-      .createHmac('sha256', this.tokenSecret)
+      .createHmac("sha256", this.tokenSecret)
       .update(`${header}.${payloadB64}`)
-      .digest('base64url');
+      .digest("base64url");
 
     return `${header}.${payloadB64}.${signature}`;
   }
@@ -143,7 +162,7 @@ export class SignedTokenService {
    */
   verifyToken(token: string): TokenPayload | null {
     try {
-      const parts = token.split('.');
+      const parts = token.split(".");
       if (parts.length !== 3) {
         return null;
       }
@@ -152,16 +171,23 @@ export class SignedTokenService {
 
       // Verify signature
       const expectedSignature = crypto
-        .createHmac('sha256', this.tokenSecret)
+        .createHmac("sha256", this.tokenSecret)
         .update(`${headerB64}.${payloadB64}`)
-        .digest('base64url');
+        .digest("base64url");
 
-      if (!crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expectedSignature))) {
+      if (
+        !crypto.timingSafeEqual(
+          Buffer.from(signature),
+          Buffer.from(expectedSignature),
+        )
+      ) {
         return null;
       }
 
       // Decode payload
-      const payload = JSON.parse(Buffer.from(payloadB64, 'base64url').toString()) as TokenPayload;
+      const payload = JSON.parse(
+        Buffer.from(payloadB64, "base64url").toString(),
+      ) as TokenPayload;
 
       // Check expiration
       if (Date.now() > payload.expiresAt) {
@@ -191,11 +217,11 @@ export class SignedTokenService {
     const seed = BigInt(payload.watermarkSeed);
     const isValid = this.watermarkEngine.verifySignature(
       {
-        studentName: '', // Will be filled from context
-        studentPhone: '',
-        studentId: '',
-        tenantName: '',
-        enrollmentId: '',
+        studentName: "", // Will be filled from context
+        studentPhone: "",
+        studentId: "",
+        tenantName: "",
+        enrollmentId: "",
         issuedAt: payload.issuedAt,
       },
       seed,
@@ -216,11 +242,13 @@ export class SignedTokenService {
    */
   extractPlaybackSessionId(token: string): string | null {
     try {
-      const parts = token.split('.');
+      const parts = token.split(".");
       if (parts.length !== 3) return null;
-      
+
       const payloadB64 = parts[1];
-      const payload = JSON.parse(Buffer.from(payloadB64, 'base64url').toString()) as TokenPayload;
+      const payload = JSON.parse(
+        Buffer.from(payloadB64, "base64url").toString(),
+      ) as TokenPayload;
       return payload.playbackSessionId;
     } catch {
       return null;

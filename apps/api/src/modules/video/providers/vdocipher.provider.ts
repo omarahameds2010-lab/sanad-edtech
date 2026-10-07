@@ -1,6 +1,10 @@
-import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import * as crypto from 'crypto';
+import {
+  Injectable,
+  BadRequestException,
+  NotFoundException,
+} from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
+import * as crypto from "crypto";
 import {
   VideoProvider,
   CreateUploadInput,
@@ -10,17 +14,17 @@ import {
   DeleteVideoResult,
   WebhookPayload,
   VideoStatus,
-} from './video-provider.interface';
+} from "./video-provider.interface";
 
 @Injectable()
 export class VdoCipherProvider implements VideoProvider {
-  readonly name = 'vdocipher';
+  readonly name = "vdocipher";
   readonly supportedMimeTypes = [
-    'video/mp4',
-    'video/webm',
-    'video/quicktime',
-    'video/x-msvideo',
-    'video/x-matroska',
+    "video/mp4",
+    "video/webm",
+    "video/quicktime",
+    "video/x-msvideo",
+    "video/x-matroska",
   ];
   readonly maxFileSize = 100 * 1024 * 1024 * 1024; // 100GB
 
@@ -29,12 +33,17 @@ export class VdoCipherProvider implements VideoProvider {
   private readonly baseUrl: string;
 
   constructor(private configService: ConfigService) {
-    this.clientId = configService.get<string>('VDOCIPHER_CLIENT_ID') || '';
-    this.clientSecret = configService.get<string>('VDOCIPHER_CLIENT_SECRET') || '';
-    this.baseUrl = configService.get<string>('VDOCIPHER_BASE_URL') || 'https://dev.vdocipher.com/api';
+    this.clientId = configService.get<string>("VDOCIPHER_CLIENT_ID") || "";
+    this.clientSecret =
+      configService.get<string>("VDOCIPHER_CLIENT_SECRET") || "";
+    this.baseUrl =
+      configService.get<string>("VDOCIPHER_BASE_URL") ||
+      "https://dev.vdocipher.com/api";
 
     if (!this.clientId || !this.clientSecret) {
-      console.warn('[VdoCipherProvider] Missing required configuration (VDOCIPHER_CLIENT_ID, VDOCIPHER_CLIENT_SECRET)');
+      console.warn(
+        "[VdoCipherProvider] Missing required configuration (VDOCIPHER_CLIENT_ID, VDOCIPHER_CLIENT_SECRET)",
+      );
     }
   }
 
@@ -53,29 +62,44 @@ export class VdoCipherProvider implements VideoProvider {
     providerData?: Record<string, any>;
   }> {
     if (!this.clientId || !this.clientSecret) {
-      throw new BadRequestException('VdoCipher not configured');
+      throw new BadRequestException("VdoCipher not configured");
     }
 
     // VdoCipher uses OTP-based upload
     // This is a stub implementation - actual implementation would call VdoCipher API
-    throw new Error('VdoCipherProvider is a stub - not fully implemented. Use BunnyStreamProvider instead.');
+    throw new Error(
+      "VdoCipherProvider is a stub - not fully implemented. Use BunnyStreamProvider instead.",
+    );
   }
 
   async getStatus(videoId: string): Promise<VideoStatusResult> {
-    throw new Error('VdoCipherProvider is a stub - not fully implemented. Use BunnyStreamProvider instead.');
+    throw new Error(
+      "VdoCipherProvider is a stub - not fully implemented. Use BunnyStreamProvider instead.",
+    );
   }
 
   async getPlaybackToken(
     videoId: string,
     sessionId: string,
     tenantId: string,
-    studentId: string
-  ): Promise<{ playbackUrl: string; token: string; expiresAt: Date; drm?: { licenseUrl: string; certificateUrl?: string } }> {
-    throw new Error('VdoCipherProvider is a stub - not fully implemented. Use BunnyStreamProvider instead.');
+    studentId: string,
+  ): Promise<{
+    playbackUrl: string;
+    token: string;
+    expiresAt: Date;
+    drm?: { licenseUrl: string; certificateUrl?: string };
+  }> {
+    throw new Error(
+      "VdoCipherProvider is a stub - not fully implemented. Use BunnyStreamProvider instead.",
+    );
   }
 
-  async deleteVideo(videoId: string): Promise<{ success: boolean; errorMessage?: string }> {
-    throw new Error('VdoCipherProvider is a stub - not fully implemented. Use BunnyStreamProvider instead.');
+  async deleteVideo(
+    videoId: string,
+  ): Promise<{ success: boolean; errorMessage?: string }> {
+    throw new Error(
+      "VdoCipherProvider is a stub - not fully implemented. Use BunnyStreamProvider instead.",
+    );
   }
 
   async handleWebhook(payload: {
@@ -92,13 +116,16 @@ export class VdoCipherProvider implements VideoProvider {
     rawPayload: Record<string, any>;
   }): Promise<void> {
     // VdoCipher webhook handling would go here
-    console.log('[VdoCipherProvider] Webhook received (stub):', payload);
+    console.log("[VdoCipherProvider] Webhook received (stub):", payload);
   }
 
-  verifyWebhook(payload: string | Buffer, headers: Record<string, string>): Promise<boolean> {
+  verifyWebhook(
+    payload: string | Buffer,
+    headers: Record<string, string>,
+  ): Promise<boolean> {
     // VdoCipher uses HMAC-SHA256 with secret key
-    const signature = headers['x-vdocipher-signature'];
-    
+    const signature = headers["x-vdocipher-signature"];
+
     if (!signature) {
       return Promise.resolve(false);
     }

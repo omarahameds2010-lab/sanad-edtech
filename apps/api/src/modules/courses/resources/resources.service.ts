@@ -1,8 +1,13 @@
-import { Injectable, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
-import { PrismaService } from '../../tenants/prisma.service';
-import * as crypto from 'crypto';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+  ForbiddenException,
+} from "@nestjs/common";
+import { PrismaService } from "../../tenants/prisma.service";
+import * as crypto from "crypto";
 
-export type ResourceType = 'PDF' | 'FILE' | 'LINK';
+export type ResourceType = "PDF" | "FILE" | "LINK";
 
 @Injectable()
 export class ResourcesService {
@@ -22,14 +27,18 @@ export class ResourcesService {
       downloadable?: boolean;
     },
   ) {
-    const lesson = await this.prisma.lesson.findFirst({ where: { id: lessonId, tenantId } });
-    if (!lesson) throw new NotFoundException('Lesson not found');
+    const lesson = await this.prisma.lesson.findFirst({
+      where: { id: lessonId, tenantId },
+    });
+    if (!lesson) throw new NotFoundException("Lesson not found");
 
-    if ((dto.type === 'PDF' || dto.type === 'FILE') && !dto.assetId) {
-      throw new BadRequestException(`assetId is required for ${dto.type} resources`);
+    if ((dto.type === "PDF" || dto.type === "FILE") && !dto.assetId) {
+      throw new BadRequestException(
+        `assetId is required for ${dto.type} resources`,
+      );
     }
-    if (dto.type === 'LINK' && !dto.url) {
-      throw new BadRequestException('url is required for LINK resources');
+    if (dto.type === "LINK" && !dto.url) {
+      throw new BadRequestException("url is required for LINK resources");
     }
 
     let position = dto.position;
@@ -58,18 +67,22 @@ export class ResourcesService {
   }
 
   async listResources(tenantId: string, lessonId: string) {
-    const lesson = await this.prisma.lesson.findFirst({ where: { id: lessonId, tenantId } });
-    if (!lesson) throw new NotFoundException('Lesson not found');
+    const lesson = await this.prisma.lesson.findFirst({
+      where: { id: lessonId, tenantId },
+    });
+    if (!lesson) throw new NotFoundException("Lesson not found");
 
     return this.prisma.resource.findMany({
       where: { lessonId, tenantId },
-      orderBy: { position: 'asc' },
+      orderBy: { position: "asc" },
     });
   }
 
   async getResource(tenantId: string, resourceId: string) {
-    const resource = await this.prisma.resource.findFirst({ where: { id: resourceId, tenantId } });
-    if (!resource) throw new NotFoundException('Resource not found');
+    const resource = await this.prisma.resource.findFirst({
+      where: { id: resourceId, tenantId },
+    });
+    if (!resource) throw new NotFoundException("Resource not found");
     return resource;
   }
 
@@ -104,24 +117,33 @@ export class ResourcesService {
       include: { section: { select: { courseId: true } } },
     });
 
-    if (!lesson) throw new NotFoundException('Lesson not found');
+    if (!lesson) throw new NotFoundException("Lesson not found");
 
     if (!lesson.isFree) {
       const enrollment = await this.prisma.enrollment.findFirst({
-        where: { tenantId, userId, courseId: lesson.section.courseId, status: 'ACTIVE' },
+        where: {
+          tenantId,
+          userId,
+          courseId: lesson.section.courseId,
+          status: "ACTIVE",
+        },
       });
-      if (!enrollment) throw new ForbiddenException('Not enrolled in this course');
+      if (!enrollment)
+        throw new ForbiddenException("Not enrolled in this course");
     }
 
-    if (resource.type === 'LINK') {
+    if (resource.type === "LINK") {
       return { url: resource.url, expiresAt: null };
     }
 
     const ttlSeconds = 15 * 60;
     const expiresAt = new Date(Date.now() + ttlSeconds * 1000);
-    const secret = process.env.STORAGE_SIGNING_SECRET ?? 'dev-storage-secret';
+    const secret = process.env.STORAGE_SIGNING_SECRET ?? "dev-storage-secret";
     const payload = `${tenantId}/${resource.assetId}/${expiresAt.getTime()}`;
-    const signature = crypto.createHmac('sha256', secret).update(payload).digest('hex');
+    const signature = crypto
+      .createHmac("sha256", secret)
+      .update(payload)
+      .digest("hex");
 
     return {
       url: `https://storage.example.com/${tenantId}/${resource.assetId}?exp=${expiresAt.getTime()}&sig=${signature}`,

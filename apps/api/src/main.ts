@@ -1,15 +1,15 @@
-import { NestFactory } from '@nestjs/core';
-import { ValidationPipe } from '@nestjs/common';
-import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
-import { AppModule } from './app.module';
-import { Logger } from 'nestjs-pino';
+import { NestFactory } from "@nestjs/core";
+import { ValidationPipe } from "@nestjs/common";
+import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
+import { AppModule } from "./app.module";
+import { Logger } from "nestjs-pino";
 
 function validateSecrets(): void {
-  const isProduction = process.env.NODE_ENV === 'production';
+  const isProduction = process.env.NODE_ENV === "production";
   const defaults = {
-    JWT_SECRET: 'your-super-secret-jwt-key-change-in-production',
-    VIDEO_TOKEN_SECRET: 'change-in-production',
-    VIDEO_WATERMARK_HMAC_SECRET: 'change-in-production',
+    JWT_SECRET: "your-super-secret-jwt-key-change-in-production",
+    VIDEO_TOKEN_SECRET: "change-in-production",
+    VIDEO_WATERMARK_HMAC_SECRET: "change-in-production",
   };
 
   for (const [key, defaultValue] of Object.entries(defaults)) {
@@ -36,7 +36,7 @@ async function bootstrap() {
   app.useLogger(app.get(Logger));
 
   app.enableCors({
-    origin: process.env.ALLOWED_ORIGINS?.split(',') || '*',
+    origin: process.env.ALLOWED_ORIGINS?.split(",") || "*",
     credentials: true,
   });
 
@@ -49,18 +49,18 @@ async function bootstrap() {
   );
 
   // Health endpoints
-  app.setGlobalPrefix('api');
+  app.setGlobalPrefix("api");
 
   // OpenAPI / Swagger
   const config = new DocumentBuilder()
-    .setTitle('Learning Platform API')
-    .setDescription('Multi-tenant white-label LMS for Egyptian teachers')
-    .setVersion('1.0')
+    .setTitle("Learning Platform API")
+    .setDescription("Multi-tenant white-label LMS for Egyptian teachers")
+    .setVersion("1.0")
     .addBearerAuth()
-    .addCookieAuth('access_token')
+    .addCookieAuth("access_token")
     .build();
   const document = SwaggerModule.createDocument(app, config);
-  SwaggerModule.setup('api/docs', app, document);
+  SwaggerModule.setup("api/docs", app, document);
 
   const port = process.env.PORT || 3000;
   await app.listen(port);

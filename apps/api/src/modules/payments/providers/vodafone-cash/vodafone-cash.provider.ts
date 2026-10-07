@@ -1,5 +1,5 @@
-import { Injectable } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
+import { Injectable } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
 import {
   PaymentProvider,
   ProviderCapabilities,
@@ -10,11 +10,11 @@ import {
   VerifyProviderPaymentInput,
   VerifyWebhookInput,
   VerifiedWebhookResult,
-} from '../payment-provider.interface';
+} from "../payment-provider.interface";
 
 @Injectable()
 export class VodafoneCashProvider implements PaymentProvider {
-  readonly name = 'vodafone_cash';
+  readonly name = "vodafone_cash";
   readonly capabilities: ProviderCapabilities = {
     cards: false,
     wallets: true,
@@ -33,19 +33,22 @@ export class VodafoneCashProvider implements PaymentProvider {
   private enabled: boolean;
 
   constructor(private configService: ConfigService) {
-    this.baseUrl = configService.get<string>('VODAFONE_CASH_BASE_URL') || '';
-    this.merchantId = configService.get<string>('VODAFONE_CASH_MERCHANT_ID') || '';
-    this.apiKey = configService.get<string>('VODAFONE_CASH_API_KEY') || '';
-    this.secret = configService.get<string>('VODAFONE_CASH_SECRET') || '';
-    this.enabled = configService.get<boolean>('VODAFONE_CASH_ENABLED') || false;
+    this.baseUrl = configService.get<string>("VODAFONE_CASH_BASE_URL") || "";
+    this.merchantId =
+      configService.get<string>("VODAFONE_CASH_MERCHANT_ID") || "";
+    this.apiKey = configService.get<string>("VODAFONE_CASH_API_KEY") || "";
+    this.secret = configService.get<string>("VODAFONE_CASH_SECRET") || "";
+    this.enabled = configService.get<boolean>("VODAFONE_CASH_ENABLED") || false;
   }
 
-  async createPayment(input: CreateProviderPaymentInput): Promise<CreateProviderPaymentResult> {
+  async createPayment(
+    input: CreateProviderPaymentInput,
+  ): Promise<CreateProviderPaymentResult> {
     if (!this.enabled) {
       return {
         success: false,
-        errorCode: 'PROVIDER_DISABLED',
-        errorMessage: 'Vodafone Cash provider is not enabled',
+        errorCode: "PROVIDER_DISABLED",
+        errorMessage: "Vodafone Cash provider is not enabled",
       };
     }
 
@@ -53,20 +56,30 @@ export class VodafoneCashProvider implements PaymentProvider {
     // This is a stub - actual implementation depends on official integration
     return {
       success: false,
-      errorCode: 'NOT_IMPLEMENTED',
-      errorMessage: 'Vodafone Cash integration requires official merchant/PSP integration. Use Paymob/Fawry for wallet payments or contact payment team.',
+      errorCode: "NOT_IMPLEMENTED",
+      errorMessage:
+        "Vodafone Cash integration requires official merchant/PSP integration. Use Paymob/Fawry for wallet payments or contact payment team.",
     };
   }
 
-  async getPaymentStatus(input: GetProviderPaymentStatusInput): Promise<ProviderPaymentStatus> {
-    return { status: 'CREATED', errorCode: 'NOT_IMPLEMENTED' };
+  async getPaymentStatus(
+    input: GetProviderPaymentStatusInput,
+  ): Promise<ProviderPaymentStatus> {
+    return { status: "CREATED", errorCode: "NOT_IMPLEMENTED" };
   }
 
-  async verifyPayment(input: VerifyProviderPaymentInput): Promise<ProviderPaymentStatus> {
-    return this.getPaymentStatus({ providerTransactionId: input.providerTransactionId, orderId: input.orderId });
+  async verifyPayment(
+    input: VerifyProviderPaymentInput,
+  ): Promise<ProviderPaymentStatus> {
+    return this.getPaymentStatus({
+      providerTransactionId: input.providerTransactionId,
+      orderId: input.orderId,
+    });
   }
 
-  async verifyWebhook(input: VerifyWebhookInput): Promise<VerifiedWebhookResult> {
-    return { valid: false, errorCode: 'NOT_IMPLEMENTED' };
+  async verifyWebhook(
+    input: VerifyWebhookInput,
+  ): Promise<VerifiedWebhookResult> {
+    return { valid: false, errorCode: "NOT_IMPLEMENTED" };
   }
 }

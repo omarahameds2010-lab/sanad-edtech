@@ -1,6 +1,6 @@
-import { Injectable } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import * as crypto from 'crypto';
+import { Injectable } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
+import * as crypto from "crypto";
 import {
   PaymentProvider,
   ProviderCapabilities,
@@ -13,7 +13,7 @@ import {
   ProviderRefundResult,
   VerifyWebhookInput,
   VerifiedWebhookResult,
-} from '../payment-provider.interface';
+} from "../payment-provider.interface";
 
 interface PaymobAuthResponse {
   token: string;
@@ -51,7 +51,7 @@ interface PaymobTransaction {
 
 @Injectable()
 export class PaymobProvider implements PaymentProvider {
-  readonly name = 'paymob';
+  readonly name = "paymob";
   readonly capabilities: ProviderCapabilities = {
     cards: true,
     wallets: true,
@@ -70,21 +70,30 @@ export class PaymobProvider implements PaymentProvider {
   private hmacSecret: string;
 
   constructor(private configService: ConfigService) {
-    this.baseUrl = configService.get<string>('PAYMOB_BASE_URL') || 'https://accept.paymob.com/api';
-    this.apiKey = configService.get<string>('PAYMOB_API_KEY') || '';
-    this.integrationId = configService.get<string>('PAYMOB_INTEGRATION_ID') || '';
-    this.iframeId = configService.get<string>('PAYMOB_IFRAME_ID') || '';
-    this.hmacSecret = configService.get<string>('PAYMOB_HMAC_SECRET') || '';
+    this.baseUrl =
+      configService.get<string>("PAYMOB_BASE_URL") ||
+      "https://accept.paymob.com/api";
+    this.apiKey = configService.get<string>("PAYMOB_API_KEY") || "";
+    this.integrationId =
+      configService.get<string>("PAYMOB_INTEGRATION_ID") || "";
+    this.iframeId = configService.get<string>("PAYMOB_IFRAME_ID") || "";
+    this.hmacSecret = configService.get<string>("PAYMOB_HMAC_SECRET") || "";
   }
 
-  async createPayment(input: CreateProviderPaymentInput): Promise<CreateProviderPaymentResult> {
+  async createPayment(
+    input: CreateProviderPaymentInput,
+  ): Promise<CreateProviderPaymentResult> {
     try {
       const authToken = await this.authenticate();
       const orderId = await this.createOrder(authToken, input);
-      const paymentToken = await this.createPaymentKey(authToken, orderId, input);
+      const paymentToken = await this.createPaymentKey(
+        authToken,
+        orderId,
+        input,
+      );
 
       let redirectUrl: string;
-      if (input.paymentMethod === 'CARD') {
+      if (input.paymentMethod === "CARD") {
         redirectUrl = `https://accept.paymobsolutions.com/api/acceptance/iframes/${this.iframeId}?payment_token=${paymentToken}`;
       } else {
         redirectUrl = `https://accept.paymobsolutions.com/api/acceptance/payments/pay?payment_token=${paymentToken}`;
@@ -102,29 +111,36 @@ export class PaymobProvider implements PaymentProvider {
     } catch (error) {
       return {
         success: false,
-        errorCode: 'PROVIDER_ERROR',
+        errorCode: "PROVIDER_ERROR",
         errorMessage: error.message,
         rawResponse: error.response?.data,
       };
     }
   }
 
-  async getPaymentStatus(input: GetProviderPaymentStatusInput): Promise<ProviderPaymentStatus> {
+  async getPaymentStatus(
+    input: GetProviderPaymentStatusInput,
+  ): Promise<ProviderPaymentStatus> {
     try {
       const authToken = await this.authenticate();
-      const transaction = await this.getTransaction(authToken, input.providerTransactionId || input.providerPaymentId || '');
+      const transaction = await this.getTransaction(
+        authToken,
+        input.providerTransactionId || input.providerPaymentId || "",
+      );
 
       return this.mapTransactionToStatus(transaction);
     } catch (error) {
       return {
-        status: 'FAILED',
-        errorCode: 'PROVIDER_ERROR',
+        status: "FAILED",
+        errorCode: "PROVIDER_ERROR",
         failureReason: error.message,
       };
     }
   }
 
-  async verifyPayment(input: VerifyProviderPaymentInput): Promise<ProviderPaymentStatus> {
+  async verifyPayment(
+    input: VerifyProviderPaymentInput,
+  ): Promise<ProviderPaymentStatus> {
     return this.getPaymentStatus({
       providerTransactionId: input.providerTransactionId,
       providerPaymentId: input.providerPaymentId,
@@ -132,14 +148,22 @@ export class PaymobProvider implements PaymentProvider {
     });
   }
 
-  async verifyWebhook(input: VerifyWebhookInput): Promise<VerifiedWebhookResult> {
-    const isValid = this.verifyHmac(input.rawBody, input.headers['hmac'] || input.headers['x-paymob-hmac'] || '');
+  async verifyWebhook(
+    input: VerifyWebhookInput,
+  ): Promise<VerifiedWebhookResult> {
+    const isValid = this.verifyHmac(
+      input.rawBody,
+      input.headers["hmac"] || input.headers["x-paymob-hmac"] || "",
+    );
 
     if (!isValid) {
-      return { valid: false, errorCode: 'INVALID_SIGNATURE' };
+      return { valid: false, errorCode: "INVALID_SIGNATURE" };
     }
 
-    const payload = typeof input.rawBody === 'string' ? JSON.parse(input.rawBody) : input.rawBody;
+    const payload =
+      typeof input.rawBody === "string"
+        ? JSON.parse(input.rawBody)
+        : input.rawBody;
     const obj = payload.obj || payload;
 
     return {
@@ -150,7 +174,7 @@ export class PaymobProvider implements PaymentProvider {
       transactionId: obj.id?.toString(),
       status: this.mapPaymobStatus(obj.success, obj.pending),
       amountMinor: BigInt(obj.amount_cents || 0),
-      currency: obj.currency || 'EGP',
+      currency: obj.currency || "EGP",
       paidAt: obj.created_at ? new Date(obj.created_at) : new Date(),
       rawPayload: payload,
     };
@@ -158,8 +182,8 @@ export class PaymobProvider implements PaymentProvider {
 
   private async authenticate(): Promise<string> {
     const response = await fetch(`${this.baseUrl}/auth/tokens`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ api_key: this.apiKey }),
     });
 
@@ -167,11 +191,14 @@ export class PaymobProvider implements PaymentProvider {
     return data.token;
   }
 
-  private async createOrder(token: string, input: CreateProviderPaymentInput): Promise<number> {
+  private async createOrder(
+    token: string,
+    input: CreateProviderPaymentInput,
+  ): Promise<number> {
     const response = await fetch(`${this.baseUrl}/ecommerce/orders`, {
-      method: 'POST',
+      method: "POST",
       headers: {
-        'Content-Type': 'application/json',
+        "Content-Type": "application/json",
         Authorization: `Bearer ${token}`,
       },
       body: JSON.stringify({
@@ -188,11 +215,15 @@ export class PaymobProvider implements PaymentProvider {
     return data.id;
   }
 
-  private async createPaymentKey(token: string, orderId: number, input: CreateProviderPaymentInput): Promise<string> {
+  private async createPaymentKey(
+    token: string,
+    orderId: number,
+    input: CreateProviderPaymentInput,
+  ): Promise<string> {
     const response = await fetch(`${this.baseUrl}/acceptance/payment_keys`, {
-      method: 'POST',
+      method: "POST",
       headers: {
-        'Content-Type': 'application/json',
+        "Content-Type": "application/json",
         Authorization: `Bearer ${token}`,
       },
       body: JSON.stringify({
@@ -201,19 +232,20 @@ export class PaymobProvider implements PaymentProvider {
         expiration: 3600,
         order_id: orderId,
         billing_data: {
-          apartment: 'NA',
-          email: input.customerEmail || 'customer@example.com',
-          floor: 'NA',
-          first_name: input.customerName?.split(' ')[0] || 'Customer',
-          street: 'NA',
-          building: 'NA',
-          phone_number: input.customerPhone || '+201000000000',
-          shipping_method: 'NA',
-          postal_code: 'NA',
-          city: 'NA',
-          country: 'EG',
-          last_name: input.customerName?.split(' ').slice(1).join(' ') || 'User',
-          state: 'NA',
+          apartment: "NA",
+          email: input.customerEmail || "customer@example.com",
+          floor: "NA",
+          first_name: input.customerName?.split(" ")[0] || "Customer",
+          street: "NA",
+          building: "NA",
+          phone_number: input.customerPhone || "+201000000000",
+          shipping_method: "NA",
+          postal_code: "NA",
+          city: "NA",
+          country: "EG",
+          last_name:
+            input.customerName?.split(" ").slice(1).join(" ") || "User",
+          state: "NA",
         },
         currency: input.currency,
         integration_id: parseInt(this.integrationId),
@@ -224,28 +256,43 @@ export class PaymobProvider implements PaymentProvider {
     return data.token;
   }
 
-  private async getTransaction(token: string, paymentToken: string): Promise<PaymobTransaction> {
-    const response = await fetch(`${this.baseUrl}/acceptance/payments/search?payment_token=${paymentToken}`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
+  private async getTransaction(
+    token: string,
+    paymentToken: string,
+  ): Promise<PaymobTransaction> {
+    const response = await fetch(
+      `${this.baseUrl}/acceptance/payments/search?payment_token=${paymentToken}`,
+      {
+        headers: { Authorization: `Bearer ${token}` },
+      },
+    );
 
     const data = await response.json();
     return data.transactions?.[0] || data;
   }
 
-  private mapTransactionToStatus(transaction: PaymobTransaction): ProviderPaymentStatus {
-    let status: 'PAID' | 'FAILED' | 'PENDING' | 'EXPIRED' | 'CANCELLED' | 'REFUND_PENDING' | 'REFUNDED';
+  private mapTransactionToStatus(
+    transaction: PaymobTransaction,
+  ): ProviderPaymentStatus {
+    let status:
+      | "PAID"
+      | "FAILED"
+      | "PENDING"
+      | "EXPIRED"
+      | "CANCELLED"
+      | "REFUND_PENDING"
+      | "REFUNDED";
 
     if (transaction.is_refunded) {
-      status = 'REFUNDED';
+      status = "REFUNDED";
     } else if (transaction.is_void || transaction.is_voided) {
-      status = 'CANCELLED';
+      status = "CANCELLED";
     } else if (transaction.captured_amount > 0) {
-      status = 'PAID';
+      status = "PAID";
     } else if (transaction.is_refund_pending) {
-      status = 'REFUND_PENDING';
+      status = "REFUND_PENDING";
     } else {
-      status = 'PENDING';
+      status = "PENDING";
     }
 
     return {
@@ -253,38 +300,44 @@ export class PaymobProvider implements PaymentProvider {
       providerPaymentId: transaction.id?.toString(),
       providerTransactionId: transaction.id?.toString(),
       amountMinor: BigInt(transaction.amount_cents || 0),
-      currency: transaction.currency || 'EGP',
-      paidAt: transaction.created_at ? new Date(transaction.created_at) : undefined,
+      currency: transaction.currency || "EGP",
+      paidAt: transaction.created_at
+        ? new Date(transaction.created_at)
+        : undefined,
       rawResponse: transaction,
     };
   }
 
-  private mapPaymobStatus(success: boolean, pending: boolean): 'PAID' | 'FAILED' | 'PENDING' {
-    if (success && !pending) return 'PAID';
-    if (!success) return 'FAILED';
-    return 'PENDING';
+  private mapPaymobStatus(
+    success: boolean,
+    pending: boolean,
+  ): "PAID" | "FAILED" | "PENDING" {
+    if (success && !pending) return "PAID";
+    if (!success) return "FAILED";
+    return "PENDING";
   }
 
   private mapEventType(obj: any): string {
-    if (obj.success === true && obj.pending !== true) return 'payment.paid';
-    if (obj.success === false) return 'payment.failed';
-    if (obj.pending === true) return 'payment.pending';
-    if (obj.is_refunded === true) return 'payment.refunded';
-    if (obj.is_void === true || obj.is_voided === true) return 'payment.cancelled';
-    return 'payment.unknown';
+    if (obj.success === true && obj.pending !== true) return "payment.paid";
+    if (obj.success === false) return "payment.failed";
+    if (obj.pending === true) return "payment.pending";
+    if (obj.is_refunded === true) return "payment.refunded";
+    if (obj.is_void === true || obj.is_voided === true)
+      return "payment.cancelled";
+    return "payment.unknown";
   }
 
   private verifyHmac(body: string | Buffer, receivedHmac: string): boolean {
     if (!receivedHmac || !this.hmacSecret) return false;
 
     const expectedHmac = crypto
-      .createHmac('sha512', this.hmacSecret)
-      .update(typeof body === 'string' ? body : body.toString())
-      .digest('hex');
+      .createHmac("sha512", this.hmacSecret)
+      .update(typeof body === "string" ? body : body.toString())
+      .digest("hex");
 
     return crypto.timingSafeEqual(
-      Buffer.from(receivedHmac, 'hex'),
-      Buffer.from(expectedHmac, 'hex'),
+      Buffer.from(receivedHmac, "hex"),
+      Buffer.from(expectedHmac, "hex"),
     );
   }
 
@@ -292,31 +345,34 @@ export class PaymobProvider implements PaymentProvider {
     try {
       const authToken = await this.authenticate();
 
-      const response = await fetch(`${this.baseUrl}/acceptance/void_refund/refund`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${authToken}`,
+      const response = await fetch(
+        `${this.baseUrl}/acceptance/void_refund/refund`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${authToken}`,
+          },
+          body: JSON.stringify({
+            auth_token: authToken,
+            transaction_id: input.providerTransactionId,
+            amount_cents: Number(input.amountMinor),
+          }),
         },
-        body: JSON.stringify({
-          auth_token: authToken,
-          transaction_id: input.providerTransactionId,
-          amount_cents: Number(input.amountMinor),
-        }),
-      });
+      );
 
       const data = await response.json();
 
       return {
         success: true,
         providerRefundId: data.id?.toString(),
-        status: 'SUCCEEDED',
+        status: "SUCCEEDED",
         rawResponse: data,
       };
     } catch (error) {
       return {
         success: false,
-        errorCode: 'REFUND_FAILED',
+        errorCode: "REFUND_FAILED",
         errorMessage: error.message,
       };
     }

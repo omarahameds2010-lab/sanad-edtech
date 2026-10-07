@@ -1,6 +1,6 @@
-import { Module } from '@nestjs/common';
-import { EnrollmentsService } from './enrollments.service';
-import { PrismaService } from '../../tenants/prisma.service';
+import { Module } from "@nestjs/common";
+import { EnrollmentsService } from "./enrollments.service";
+import { PrismaService } from "../../tenants/prisma.service";
 
 @Module({
   providers: [EnrollmentsService, PrismaService],
