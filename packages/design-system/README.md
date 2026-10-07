@@ -7,7 +7,7 @@
 **One learning universe. Many learning identities.**
 
 [![Repository](https://img.shields.io/badge/Repository-sanad--edtech-111827?style=for-the-badge&logo=github)](https://github.com/omarahameds2010-lab/sanad-edtech)
-[![Architecture](https://img.shields.io/badge/Architecture-Multi--Tenant-7c3aed?style=for-the-badge)](../../)
+[![Architecture]([https://img.shields.io/badge/Architecture-Multi--Tenant](https://github.com/omarahameds2010-lab/sanad-edtech/blob/master/docs/ARCHITECTURE.md)-7c3aed?style=for-the-badge)](../../)
 [![RTL](https://img.shields.io/badge/RTL-First-0f766e?style=for-the-badge)](../../)
 [![Motion](https://img.shields.io/badge/Motion-System-111827?style=for-the-badge)](../../)
 [![Design Tokens](https://img.shields.io/badge/Design-Tokens-d4a373?style=for-the-badge)](./tokens.css)
