@@ -8,6 +8,7 @@ import { EnrollmentsService } from '../src/modules/courses/enrollments/enrollmen
 import { AssignmentsService } from '../src/modules/courses/assignments/assignments.service';
 import { ExamsService } from '../src/modules/courses/exams/exams.service';
 import { ProgressService } from '../src/modules/courses/progress/progress.service';
+import { ResourcesService } from '../src/modules/courses/resources/resources.service';
 
 /* ------------------------------------------------------------------ */
 /* In-memory fake of the Prisma client surface used by the real services */
@@ -29,6 +30,7 @@ function createFakePrisma() {
     lessonProgress: [],
     idempotencyKey: [],
     auditLog: [],
+    resource: [],
   };
   let idCounter = 0;
   const nextId = (prefix: string) => `${prefix}_${++idCounter}`;
@@ -243,6 +245,7 @@ function createFakePrisma() {
     lessonProgress: buildModel('lessonProgress'),
     idempotencyKey: buildModel('idempotencyKey'),
     auditLog: buildModel('auditLog'),
+    resource: buildModel('resource'),
     $transaction: async (ops: any[]) => Promise.all(ops),
   };
 }
@@ -265,6 +268,7 @@ describe('Golden LMS Flow (E2E, in-memory Prisma)', () => {
     const assignmentsService = new AssignmentsService(prisma, idempotencyService, progressionService);
     const examsService = new ExamsService(prisma, idempotencyService, progressionService);
     const progressService = new ProgressService(prisma);
+    const resourcesService = new ResourcesService(prisma);
 
     const TENANT = 'tenant_a';
     const TEACHER = 'teacher_1';
@@ -390,5 +394,20 @@ describe('Golden LMS Flow (E2E, in-memory Prisma)', () => {
     await progressService.updateProgress(TENANT, STUDENT, nextLesson.id, { positionSeconds: 99999, watchedSeconds: 180 });
     const prog3 = await progressService.getLessonProgress(TENANT, STUDENT, nextLesson.id);
     expect(prog3.lastPosition).toBeDefined();
+
+    // 18. Resource: create a PDF resource and get a signed URL
+    const resource = await resourcesService.createResource(TENANT, nextLesson.id, {
+      title: 'Chapter 3 Worksheet',
+      type: 'PDF',
+      assetId: 'asset_123',
+      mimeType: 'application/pdf',
+      size: 1024000,
+    });
+    expect(resource.type).toBe('PDF');
+
+    const accessUrl = await resourcesService.getAccessUrl(TENANT, STUDENT, resource.id);
+    expect(accessUrl.url).toContain(`storage.example.com/${TENANT}/asset_123`);
+    expect(accessUrl.url).toContain('exp=');
+    expect(accessUrl.url).toContain('sig=');
   });
 });
