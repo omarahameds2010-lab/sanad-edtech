@@ -1,5 +1,6 @@
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
+import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { AppModule } from './app.module';
 import { Logger } from 'nestjs-pino';
 
@@ -50,12 +51,24 @@ async function bootstrap() {
   // Health endpoints
   app.setGlobalPrefix('api');
 
+  // OpenAPI / Swagger
+  const config = new DocumentBuilder()
+    .setTitle('Learning Platform API')
+    .setDescription('Multi-tenant white-label LMS for Egyptian teachers')
+    .setVersion('1.0')
+    .addBearerAuth()
+    .addCookieAuth('access_token')
+    .build();
+  const document = SwaggerModule.createDocument(app, config);
+  SwaggerModule.setup('api/docs', app, document);
+
   const port = process.env.PORT || 3000;
   await app.listen(port);
 
   console.log(`🚀 API is running on http://localhost:${port}`);
   console.log(`📊 Health: http://localhost:${port}/api/health`);
   console.log(`🔌 Ready: http://localhost:${port}/api/ready`);
+  console.log(`📚 Swagger: http://localhost:${port}/api/docs`);
 }
 
 bootstrap();
