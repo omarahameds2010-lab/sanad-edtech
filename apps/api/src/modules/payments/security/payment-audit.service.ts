@@ -1,6 +1,7 @@
-import { Injectable } from '@nestjs/common';
-import { PrismaService } from '../../tenants/prisma.service';
-import { Prisma } from '@prisma/client';
+import { Injectable } from "@nestjs/common";
+import { PrismaService } from "../../tenants/prisma.service";
+import { Prisma } from "@prisma/client";
+import * as crypto from "crypto";
 
 @Injectable()
 export class PaymentAuditService {
@@ -35,16 +36,25 @@ export class PaymentAuditService {
     });
   }
 
-  async getPaymentAuditTrail(tenantId: string, paymentId: string): Promise<any[]> {
+  async getPaymentAuditTrail(
+    tenantId: string,
+    paymentId: string,
+  ): Promise<any[]> {
     return this.prisma.paymentAuditLog.findMany({
       where: { tenantId, paymentId },
-      orderBy: { createdAt: 'asc' },
+      orderBy: { createdAt: "asc" },
     });
   }
 
   async getTenantAuditLogs(
     tenantId: string,
-    filters?: { action?: string; resourceType?: string; actorId?: string; from?: Date; to?: Date },
+    filters?: {
+      action?: string;
+      resourceType?: string;
+      actorId?: string;
+      from?: Date;
+      to?: Date;
+    },
     limit = 100,
     offset = 0,
   ): Promise<any[]> {
@@ -54,11 +64,12 @@ export class PaymentAuditService {
         ...(filters?.action && { action: filters.action }),
         ...(filters?.resourceType && { resourceType: filters.resourceType }),
         ...(filters?.actorId && { actorId: filters.actorId }),
-        ...(filters?.from && filters?.to && {
-          createdAt: { gte: filters.from, lte: filters.to },
-        }),
+        ...(filters?.from &&
+          filters?.to && {
+            createdAt: { gte: filters.from, lte: filters.to },
+          }),
       },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { createdAt: "desc" },
       take: limit,
       skip: offset,
     });
@@ -67,13 +78,17 @@ export class PaymentAuditService {
   async getActorAuditTrail(tenantId: string, actorId: string): Promise<any[]> {
     return this.prisma.paymentAuditLog.findMany({
       where: { tenantId, actorId },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { createdAt: "desc" },
       take: 50,
     });
   }
 
   private hashIp(ip: string): string {
     // Simple hash for privacy
-    return require('crypto').createHash('sha256').update(ip).digest('hex').substring(0, 32);
+    return crypto
+      .createHash("sha256")
+      .update(ip)
+      .digest("hex")
+      .substring(0, 32);
   }
 }

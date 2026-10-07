@@ -1,13 +1,16 @@
-import { Injectable, NestMiddleware, BadRequestException, NotFoundException } from '@nestjs/common';
-import { Request, Response, NextFunction } from 'express';
-import { PrismaService } from './prisma.service';
+import {
+  Injectable,
+  NestMiddleware,
+  BadRequestException,
+  NotFoundException,
+} from "@nestjs/common";
+import { Request, Response, NextFunction } from "express";
+import { PrismaService } from "./prisma.service";
 
-declare global {
-  namespace Express {
-    interface Request {
-      tenantId?: string;
-      tenant?: any;
-    }
+declare module "express" {
+  interface Request {
+    tenantId?: string;
+    tenant?: any;
   }
 }
 
@@ -21,14 +24,17 @@ export class TenantResolverMiddleware implements NestMiddleware {
     const host = req.headers.host;
 
     if (!host) {
-      throw new BadRequestException('Host header is required');
+      throw new BadRequestException("Host header is required");
     }
 
     // Extract domain (remove port if present)
-    const domain = host.split(':')[0];
+    const domain = host.split(":")[0];
 
     // Skip tenant resolution for health checks and platform admin routes
-    if (req.path.startsWith('/api/health') || req.path.startsWith('/api/ready')) {
+    if (
+      req.path.startsWith("/api/health") ||
+      req.path.startsWith("/api/ready")
+    ) {
       return next();
     }
 
@@ -46,8 +52,8 @@ export class TenantResolverMiddleware implements NestMiddleware {
         throw new NotFoundException(`Tenant not found for domain: ${domain}`);
       }
 
-      if (tenantDomain.tenant.status !== 'ACTIVE') {
-        throw new BadRequestException('Tenant is not active');
+      if (tenantDomain.tenant.status !== "ACTIVE") {
+        throw new BadRequestException("Tenant is not active");
       }
 
       tenant = tenantDomain.tenant;
@@ -60,7 +66,7 @@ export class TenantResolverMiddleware implements NestMiddleware {
 
     // Set PostgreSQL RLS context (this will be done in a transaction context)
     // For now, we store it in the request for the interceptor to use
-    req.headers['x-tenant-id'] = tenant.id;
+    req.headers["x-tenant-id"] = tenant.id;
 
     next();
   }

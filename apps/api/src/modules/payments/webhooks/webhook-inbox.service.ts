@@ -1,11 +1,12 @@
-import { Injectable } from '@nestjs/common';
-import { PrismaService } from '../../tenants/prisma.service';
-import { ProviderRegistryService } from '../providers/provider-registry.service';
-import { PaymentOrchestratorService } from '../payment-orchestrator.service';
-import { IdempotencyService } from '../security/idempotency.service';
-import { PaymentAuditService } from '../security/payment-audit.service';
-import { OutboxService } from '../../outbox/outbox.service';
-import { Prisma, WebhookProcessingStatus } from '@prisma/client';
+import { Injectable } from "@nestjs/common";
+import { PrismaService } from "../../tenants/prisma.service";
+import { ProviderRegistryService } from "../providers/provider-registry.service";
+import { PaymentOrchestratorService } from "../payment-orchestrator.service";
+import { IdempotencyService } from "../security/idempotency.service";
+import { PaymentAuditService } from "../security/payment-audit.service";
+import { OutboxService } from "../../outbox/outbox.service";
+import { Prisma, WebhookProcessingStatus } from "@prisma/client";
+import * as crypto from "crypto";
 
 @Injectable()
 export class WebhookInboxService {
@@ -34,7 +35,12 @@ export class WebhookInboxService {
 
     // Check if already processed
     const existing = await this.prisma.webhookEvent.findUnique({
-      where: { provider_externalEventId: { provider, externalEventId: headers['x-event-id'] || '' } },
+      where: {
+        provider_externalEventId: {
+          provider,
+          externalEventId: headers["x-event-id"] || "",
+        },
+      },
     });
 
     if (existing) {
@@ -50,21 +56,31 @@ export class WebhookInboxService {
     });
 
     if (!verification.valid) {
-      await this.recordWebhookEvent(provider, headers['x-event-id'] || '', 'SIGNATURE_INVALID', {
-        signatureVerified: false,
-        payloadHash,
-        processingStatus: 'FAILED',
-        errorCode: verification.errorCode,
-      });
+      await this.recordWebhookEvent(
+        provider,
+        headers["x-event-id"] || "",
+        "SIGNATURE_INVALID",
+        {
+          signatureVerified: false,
+          payloadHash,
+          processingStatus: "FAILED",
+          errorCode: verification.errorCode,
+        },
+      );
       throw new Error(`Invalid webhook signature: ${verification.errorCode}`);
     }
 
     // Persist webhook event
-    const event = await this.recordWebhookEvent(provider, verification.externalEventId || headers['x-event-id'] || '', verification.eventType || 'UNKNOWN', {
-      signatureVerified: true,
-      payloadHash,
-      processingStatus: 'PENDING',
-    });
+    const event = await this.recordWebhookEvent(
+      provider,
+      verification.externalEventId || headers["x-event-id"] || "",
+      verification.eventType || "UNKNOWN",
+      {
+        signatureVerified: true,
+        payloadHash,
+        processingStatus: "PENDING",
+      },
+    );
 
     // Queue for processing
     await this.queueForProcessing(event.id);
@@ -95,13 +111,15 @@ export class WebhookInboxService {
   }
 
   async processEvent(eventId: string): Promise<void> {
-    const event = await this.prisma.webhookEvent.findUnique({ where: { id: eventId } });
+    const event = await this.prisma.webhookEvent.findUnique({
+      where: { id: eventId },
+    });
     if (!event) return;
 
     // Update status to processing
     await this.prisma.webhookEvent.update({
       where: { id: eventId },
-      data: { processingStatus: 'PROCESSING', processedAt: new Date() },
+      data: { processingStatus: "PROCESSING", processedAt: new Date() },
     });
 
     try {
@@ -111,52 +129,66 @@ export class WebhookInboxService {
       // Mark as processed
       await this.prisma.webhookEvent.update({
         where: { id: eventId },
-        data: { processingStatus: 'PROCESSED' },
+        data: { processingStatus: "PROCESSED" },
       });
     } catch (error) {
       // Mark as failed
       await this.prisma.webhookEvent.update({
         where: { id: eventId },
-        data: { processingStatus: 'FAILED', errorCode: error.message },
+        data: { processingStatus: "FAILED", errorCode: error.message },
       });
       throw error;
     }
   }
 
   private async handleEvent(event: any): Promise<void> {
-    const { provider, eventType, externalEventId, rawPayload, id: webhookEventId } = event;
+    const {
+      provider,
+      eventType,
+      externalEventId,
+      rawPayload,
+      id: webhookEventId,
+    } = event;
 
     switch (eventType) {
-      case 'payment.paid':
-      case 'payment.completed':
-      case 'payment.succeeded':
+      case "payment.paid":
+      case "payment.completed":
+      case "payment.succeeded":
         await this.handlePaymentPaid(provider, rawPayload, webhookEventId);
         break;
-      case 'payment.failed':
-      case 'payment.cancelled':
-      case 'payment.expired':
+      case "payment.failed":
+      case "payment.cancelled":
+      case "payment.expired":
         await this.handlePaymentFailed(provider, rawPayload, eventType);
         break;
-      case 'payment.refunded':
+      case "payment.refunded":
         await this.handleRefundCompleted(provider, rawPayload);
         break;
-      case 'payment.pending':
+      case "payment.pending":
         // Just log, no action needed
         break;
       default:
         // Log unknown event types
-        console.warn(`Unhandled webhook event type: ${eventType} from ${provider}`);
+        console.warn(
+          `Unhandled webhook event type: ${eventType} from ${provider}`,
+        );
     }
   }
 
-  private async handlePaymentPaid(provider: string, payload: any, webhookEventId: string): Promise<void> {
-    const transactionId = payload.id || payload.transaction_id || payload.referenceNumber;
-    const orderId = payload.merchant_order_id || payload.merchantRefNum || payload.order?.id;
+  private async handlePaymentPaid(
+    provider: string,
+    payload: any,
+    webhookEventId: string,
+  ): Promise<void> {
+    const transactionId =
+      payload.id || payload.transaction_id || payload.referenceNumber;
+    const orderId =
+      payload.merchant_order_id || payload.merchantRefNum || payload.order?.id;
 
     if (!orderId) return;
 
     const intent = await this.prisma.paymentIntent.findFirst({
-      where: { orderId, provider, status: 'PROCESSING' },
+      where: { orderId, provider, status: "PROCESSING" },
     });
 
     if (!intent) return;
@@ -173,14 +205,14 @@ export class WebhookInboxService {
       currency: intent.currency,
     });
 
-    if (verification.status !== 'PAID') return;
+    if (verification.status !== "PAID") return;
 
     // Check idempotency
     const idempotent = await this.idempotency.checkAndStore(
       intent.tenantId,
       intent.userId,
       `webhook_payment_${provider}_${transactionId}`,
-      'webhook_payment_process',
+      "webhook_payment_process",
       { transactionId, orderId },
     );
 
@@ -195,7 +227,7 @@ export class WebhookInboxService {
         paymentIntentId: intent.id,
         provider,
         paymentMethod: intent.requestedMethod,
-        status: 'PAID',
+        status: "PAID",
         amountMinor: intent.amountMinor,
         currency: intent.currency,
         providerTransactionId: transactionId,
@@ -205,7 +237,7 @@ export class WebhookInboxService {
     });
 
     // Complete payment
-    await this.orchestrator['completePayment'](
+    await this.orchestrator["completePayment"](
       intent.tenantId,
       payment.id,
       intent.orderId,
@@ -214,13 +246,24 @@ export class WebhookInboxService {
     );
 
     // Mark idempotency as completed
-    await this.idempotency.markCompleted(intent.tenantId, `webhook_payment_${provider}_${transactionId}`, { paymentId: payment.id });
+    await this.idempotency.markCompleted(
+      intent.tenantId,
+      `webhook_payment_${provider}_${transactionId}`,
+      { paymentId: payment.id },
+    );
   }
 
-  private async handlePaymentFailed(provider: string, payload: any, eventType: string): Promise<void> {
-    const orderId = payload.merchant_order_id || payload.merchantRefNum || payload.order?.id;
-    const failureCode = payload.failure_code || payload.error_code || 'PROVIDER_FAILED';
-    const failureReason = payload.failure_reason || payload.error_message || eventType;
+  private async handlePaymentFailed(
+    provider: string,
+    payload: any,
+    eventType: string,
+  ): Promise<void> {
+    const orderId =
+      payload.merchant_order_id || payload.merchantRefNum || payload.order?.id;
+    const failureCode =
+      payload.failure_code || payload.error_code || "PROVIDER_FAILED";
+    const failureReason =
+      payload.failure_reason || payload.error_message || eventType;
 
     const intent = await this.prisma.paymentIntent.findFirst({
       where: { orderId, provider },
@@ -231,8 +274,13 @@ export class WebhookInboxService {
     await this.prisma.paymentIntent.update({
       where: { id: intent.id },
       data: {
-        status: 'FAILED',
-        metadata: { ...(intent.metadata as Record<string, any>), failureCode, failureReason, webhookEvent: payload },
+        status: "FAILED",
+        metadata: {
+          ...(intent.metadata as Record<string, any>),
+          failureCode,
+          failureReason,
+          webhookEvent: payload,
+        },
       },
     });
 
@@ -245,7 +293,7 @@ export class WebhookInboxService {
         paymentIntentId: intent.id,
         provider,
         paymentMethod: intent.requestedMethod,
-        status: 'FAILED',
+        status: "FAILED",
         amountMinor: intent.amountMinor,
         currency: intent.currency,
         failureCode,
@@ -255,7 +303,10 @@ export class WebhookInboxService {
     });
   }
 
-  private async handleRefundCompleted(provider: string, payload: any): Promise<void> {
+  private async handleRefundCompleted(
+    provider: string,
+    payload: any,
+  ): Promise<void> {
     const refundId = payload.refund_id || payload.id;
     const paymentId = payload.payment_id || payload.referenceNumber;
 
@@ -269,18 +320,20 @@ export class WebhookInboxService {
     // Update refund record
     await this.prisma.refund.updateMany({
       where: { paymentId: payment.id, providerRefundId: refundId },
-      data: { status: 'SUCCEEDED', processedAt: new Date() },
+      data: { status: "SUCCEEDED", processedAt: new Date() },
     });
   }
 
   private hashPayload(body: string | Buffer): string {
-    const crypto = require('crypto');
-    return crypto.createHash('sha256').update(typeof body === 'string' ? body : body.toString()).digest('hex');
+    return crypto
+      .createHash("sha256")
+      .update(typeof body === "string" ? body : body.toString())
+      .digest("hex");
   }
 
   async retryFailedWebhooks(): Promise<number> {
     const failedEvents = await this.prisma.webhookEvent.findMany({
-      where: { processingStatus: 'FAILED' },
+      where: { processingStatus: "FAILED" },
       take: 50,
     });
 
