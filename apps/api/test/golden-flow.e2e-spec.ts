@@ -409,5 +409,16 @@ describe('Golden LMS Flow (E2E, in-memory Prisma)', () => {
     expect(accessUrl.url).toContain(`storage.example.com/${TENANT}/asset_123`);
     expect(accessUrl.url).toContain('exp=');
     expect(accessUrl.url).toContain('sig=');
+
+    // 19. Idempotency: repeating start with the same key returns the same cached response, no duplicate created
+    const repeatedExam = await examsService.startExamAttempt(TENANT, STUDENT, exam.id, 'key-start-2');
+    expect(repeatedExam.attemptId).toBe(examAttempt.attemptId);
+
+    // 20. Idempotency: repeating submit with the same key returns the same response
+    const repeatedSubmit = await examsService.submitExamAttempt(TENANT, STUDENT, exam.id, {
+      answers: [{ questionId: 'q1', selectedOptionIds: ['opt1'] }],
+      idempotencyKey: 'key-exam-submit-1',
+    });
+    expect(repeatedSubmit.status).toBe('SUBMITTED');
   });
 });
