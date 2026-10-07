@@ -344,5 +344,24 @@ describe('Golden LMS Flow (E2E, in-memory Prisma)', () => {
     // 11. No duplicate active attempt for the assignment
     const activeSubs = await prisma.assignmentSubmission.findMany({ where: { studentId: STUDENT } });
     expect(activeSubs.length).toBe(1);
+
+    // 12. Student submits the assignment
+    const submission = await assignmentsService.submitAssignment(TENANT, STUDENT, assignment.id, {
+      content: 'Student answer to the homework',
+      idempotencyKey: 'key-submit-1',
+    });
+    expect(submission.status).toBe('SUBMITTED');
+
+    // 13. Teacher grades the submission
+    const graded = await assignmentsService.gradeSubmission(TENANT, submission.attemptId, TEACHER, {
+      score: 85,
+      feedback: 'Good work! Well explained.',
+    });
+    expect(graded.status).toBe('GRADED');
+    expect(graded.score).toBe(85);
+
+    // 14. Verify progression rule: ENTER_ASSIGNMENT still holds (assignment entered even if not graded)
+    const examAccessAfterGrade = await lessonsService.getStudentLesson(TENANT, STUDENT, examLesson.id);
+    expect(examAccessAfterGrade.access.isLocked).toBe(false);
   });
 });
