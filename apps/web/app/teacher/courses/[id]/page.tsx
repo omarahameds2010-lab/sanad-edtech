@@ -58,6 +58,11 @@ export default function CourseOverviewPage() {
           <Link href="/teacher/courses/c2/builder">
             <button>متابعة التحرير</button>
           </Link>
+          <Link href="/teacher/courses/c2/publish">
+            <button style={{ background: 'var(--color-action)', color: 'var(--bg-base)' }}>
+              نشر الكورس
+            </button>
+          </Link>
         </div>
       </div>
 
