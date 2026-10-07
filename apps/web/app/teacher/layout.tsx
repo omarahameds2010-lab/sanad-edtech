@@ -1,5 +1,7 @@
 import Link from 'next/link';
 
+import TeacherCommandRegistrar from './TeacherCommandRegistrar';
+
 const navItems = [
   { href: '/teacher', label: 'نظرة عامة' },
   { href: '/teacher/courses', label: 'الكورسات' },
@@ -14,6 +16,7 @@ const navItems = [
 export default function TeacherLayout({ children }: { children: React.ReactNode }) {
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '240px 1fr', minHeight: '100vh' }}>
+      <TeacherCommandRegistrar />
       <aside style={{ borderInlineEnd: '1px solid var(--border-subtle)', padding: 'var(--space-lg)' }}>
         <Link href="/teacher" style={{ fontWeight: 700, fontSize: 18 }}>لوحة المعلم</Link>
         <nav style={{ marginTop: 'var(--space-lg)', display: 'flex', flexDirection: 'column', gap: 4 }}>
