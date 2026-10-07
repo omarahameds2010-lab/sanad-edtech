@@ -1,93 +1,164 @@
+<div align="center">
+
 # @lp/design-system
 
-> The visual foundation for the Multi-Tenant Learning Platform.
+### The visual foundation for the Multi-Tenant Learning Platform.
 
-`@lp/design-system` is the shared design-system foundation for the SANAD Multi-Tenant LMS.
+**One learning universe. Many learning identities.**
 
-It provides the platform's visual language through shared tokens, semantic theming, motion rules, RTL foundations, accessibility behavior, and tenant-adaptive styling.
+[![Repository](https://img.shields.io/badge/Repository-sanad--edtech-111827?style=for-the-badge&logo=github)](https://github.com/omarahameds2010-lab/sanad-edtech)
+[![Architecture](https://img.shields.io/badge/Architecture-Multi--Tenant-7c3aed?style=for-the-badge)](../../)
+[![RTL](https://img.shields.io/badge/RTL-First-0f766e?style=for-the-badge)](../../)
+[![Motion](https://img.shields.io/badge/Motion-System-111827?style=for-the-badge)](../../)
+[![Design Tokens](https://img.shields.io/badge/Design-Tokens-d4a373?style=for-the-badge)](./tokens.css)
+[![Accessibility](https://img.shields.io/badge/Accessibility-First-2563eb?style=for-the-badge)](../../)
 
-The goal is simple:
-
-> **One learning universe. Many learning identities.**
-
-The design system keeps the platform visually coherent across teachers, subjects, and tenants while allowing each learning space to develop its own identity without changing the underlying component system.
-
----
-
-## Philosophy
-
-The design system separates the platform into two visual layers:
-
-### Master Platform DNA
-
-The shared visual language that keeps the entire platform recognizable:
-
-- Typography
-- Layout and grid
-- Spacing
-- Component geometry
-- Interaction patterns
-- Motion language
-- Iconography
-- Accessibility behavior
-
-### Tenant Adaptive Layer
-
-The controlled layer that allows teachers, institutions, and subjects to express their own identity:
-
-- Accent color
-- Subject motif
-- Motif intensity
-- Theme-level visual adjustments
-
-The rule is intentionally strict:
-
-> **Tenants adapt the system. They do not redefine the system.**
-
-Shared components consume semantic tokens and remain unaware of which tenant or subject is active.
+</div>
 
 ---
 
-## Design Architecture
+## ✦ What is `@lp/design-system`?
+
+`@lp/design-system` is the shared visual foundation of the SANAD Multi-Tenant LMS.
+
+It defines the visual language shared across the platform:
+
+- design tokens
+- semantic theming
+- typography
+- spacing
+- motion
+- RTL foundations
+- accessibility behavior
+- tenant-adaptive styling
+
+The package exists to solve a specific architectural problem:
+
+> **How can one platform support many teachers, subjects, and learning identities without becoming a collection of disconnected products?**
+
+The answer is a controlled visual system.
+
+The platform stays recognizable.
+
+The learning identity changes.
+
+---
+
+# ◈ Design Philosophy
 
 ```text
-                    MASTER PLATFORM
-                           │
-              ┌────────────┴────────────┐
-              │                         │
-        Design System              Interaction DNA
-              │                         │
-              └────────────┬────────────┘
-                           │
-                  Semantic Tokens
-                           │
-            ┌──────────────┼──────────────┐
-            │              │              │
-        Teacher A      Teacher B      Teacher C
-            │              │              │
-        Subject X      Subject Y      Subject Z
-            │              │              │
-            └──────────────┴──────────────┘
-                           │
-                    Shared Components
+                         MASTER PLATFORM
+                                │
+                                ▼
+                     ┌─────────────────────┐
+                     │   Semantic Tokens   │
+                     └──────────┬──────────┘
+                                │
+                 ┌──────────────┼──────────────┐
+                 │              │              │
+                 ▼              ▼              ▼
+             Teacher A      Teacher B      Teacher C
+             Subject X      Subject Y      Subject Z
+                 │              │              │
+                 └──────────────┼──────────────┘
+                                ▼
+                        Shared Components
 
-The intended hierarchy is:
+The design system is built around one central principle:
 
-Master Platform
-    ↓
-Semantic Design Tokens
-    ↓
-Shared Components
-    ↓
-Tenant Adaptive Tokens
+Tenants adapt the system. They do not redefine the system.
 
-A shared component should never contain tenant-specific business or visual logic such as:
+◇ The 80 / 20 Identity Model
 
-if (tenant === "physics") {
-  ...
-}
+The platform intentionally separates platform identity from learning identity.
 
-Instead, components consume semantic tokens:
+┌─────────────────────────────────────────────────────┐
+│                                                     │
+│        80% — MASTER PLATFORM DNA                    │
+│                                                     │
+│ Typography · Grid · Spacing · Components             │
+│ Motion · Interaction · Geometry · Accessibility      │
+│                                                     │
+├─────────────────────────────────────────────────────┤
+│                                                     │
+│        20% — TENANT / SUBJECT IDENTITY              │
+│                                                     │
+│ Accent · Motif · Subject language · Teacher brand   │
+│                                                     │
+└─────────────────────────────────────────────────────┘
+
+This creates a system where:
+
+a mathematics tenant can feel mathematical
+an Arabic tenant can feel editorial
+a physics tenant can feel scientific
+a teacher can have a recognizable learning space
+
+while the entire product still feels like one platform.
+
+⟡ Identity Architecture
+
+The platform follows a three-layer identity model:
+
+MASTER PLATFORM
+       ↓
+SUBJECT IDENTITY
+       ↓
+TEACHER IDENTITY
+
+Conceptually:
+
+Master Platform DNA
+
+The shared language across the ecosystem:
+
+typography
+layout and grid
+spacing
+component geometry
+iconography
+interaction patterns
+motion language
+accessibility behavior
+Subject Identity
+
+The educational character of the space:
+
+accent
+motif
+visual rhythm
+subject-specific patterns
+Teacher Identity
+
+The final layer:
+
+teacher branding
+logo
+imagery
+personalized learning space
+◎ Token Architecture
+
+The token system is the foundation of the package.
+
+Raw / Adaptive Layer
+
+Values that may change by tenant:
+
+--tenant-accent
+--tenant-motif-opacity
+Semantic Layer
+
+Values that components actually consume:
+
+--color-action
+--bg-base
+--bg-surface
+--text-primary
+--text-muted
+--border-subtle
+Component Layer
+
+Components depend on semantic meaning:
 
 .teacher-card {
   border: 1px solid var(--border-subtle);
@@ -95,67 +166,27 @@ Instead, components consume semantic tokens:
 
 .teacher-card .cta {
   color: var(--color-action);
-  transition:
-    background-color var(--motion-fast)
-    var(--ease-standard);
-}
-What's Included
-
-The package provides the shared foundation for:
-
-Design tokens
-Color tokens
-Motion tokens
-Spacing tokens
-Typography tokens
-Semantic tokens
-Tenant adaptive tokens
-RTL baseline
-Reduced-motion support
-
-The primary token source is:
-
-tokens.css
-
-This file is the single source of truth for shared visual values.
-
-Token Architecture
-
-Tokens are exposed through CSS custom properties.
-
-The design system separates adaptive values from semantic usage.
-
-For example:
-
-:root {
-  --tenant-accent: #d4a373;
-
-  --color-action: var(--tenant-accent);
-  --text-primary: #f4f4f6;
-  --text-muted: #8c909e;
-
-  --motion-fast: 140ms;
-  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
 }
 
-Components consume semantic tokens rather than tenant-specific values:
+This means components do not need to know:
 
-.button {
-  color: var(--color-action);
+"Am I inside Physics?"
 
-  transition:
-    background-color var(--motion-fast)
-    var(--ease-standard);
-}
+"Am I inside Arabic?"
 
-This keeps component implementation stable even when tenant identity changes.
+"Am I inside Teacher A?"
 
-Tenant Theming
+They simply consume the design language.
 
-Tenant customization is intentionally limited to an adaptive layer.
+---
+
+# ◇ Tenant Theming
+
+Tenant customization is intentionally restricted to the adaptive layer.
 
 Example:
 
+```css
 :root[data-subject="physics"] {
   --tenant-accent: #6ea8ff;
   --tenant-motif-opacity: 0.2;
@@ -166,7 +197,7 @@ Example:
   --tenant-motif-opacity: 0.15;
 }
 
-Shared components remain unaware of the tenant:
+The component remains unchanged:
 
 .teacher-card {
   border: 1px solid var(--border-subtle);
@@ -174,167 +205,165 @@ Shared components remain unaware of the tenant:
 
 .teacher-card .cta {
   color: var(--color-action);
-
   transition:
     background-color var(--motion-fast)
     var(--ease-standard);
 }
+Result
+Same Component
+      +
+Different Tenant Tokens
+      ↓
+Different Learning Identity
 
-The same component can therefore exist across many teacher and subject spaces without separate implementations.
+No duplicated component implementations.
 
-Visual Identity Model
+No tenant-specific component forks.
 
-The platform follows a three-layer identity model:
+No visual fragmentation.
 
-MASTER PLATFORM
-       ↓
-SUBJECT IDENTITY
-       ↓
-TEACHER IDENTITY
+✦ Motion Is Part of the Product
 
-The visual system follows an intentional 80/20 balance:
+Motion is treated as a system, not as decoration.
 
-80% = Master Platform DNA
-20% = Tenant / Subject Identity
-
-The master platform remains recognizable even when the tenant accent, subject motif, or teacher branding changes.
-
-This keeps a multi-tenant platform coherent instead of turning it into a collection of unrelated products.
-
-Motion System
-
-Motion is part of the product identity, not decoration.
-
-The guiding principle is:
+The core rule is:
 
 Motion = Feedback + Hierarchy + Continuity
 
-The motion language is intended to feel:
+The intended motion character is:
 
-Precise
-Fluid
-Intelligent
-Calm
-Responsive
-Premium
-Motion Levels
-Level	Typical Range	Purpose
+Precise · Fluid · Calm · Responsive · Intelligent · Premium
+
+Motion Scale
+Level	Duration	Role
 Instant	80ms	Immediate state response
 Fast	140ms	Micro-interactions
-Standard	220ms	Common UI transitions
+Standard	220ms	Common transitions
 Medium	320ms	Component/state transitions
 Slow	450ms	Larger transitions
-
-Shared easing:
-
+Shared Easing
 --ease-standard: cubic-bezier(0.2, 0, 0, 1);
 --ease-enter: cubic-bezier(0, 0, 0.2, 1);
 --ease-exit: cubic-bezier(0.4, 0, 1, 1);
-Motion Budgets
+◌ Motion Budgets
 
-Different areas of the product use different motion budgets.
+Motion intensity is intentionally different across product contexts.
 
-Area	Budget
-Marketing / Landing	High
-Teacher Dashboard	Medium
-Course Builder	Medium
-Student Dashboard	Low–Medium
-Learning	Low
-Exam	Very Low
-Payment	Low
-Auth / Security	Low–Very Low
+Product Area	Motion Budget
+Marketing / Landing	█████ High
+Teacher Dashboard	████ Medium
+Course Builder	████ Medium
+Student Dashboard	███ Low–Medium
+Learning	██ Low
+Exam	█ Very Low
+Payment	██ Low
+Auth / Security	█ Very Low
 
-Motion should reinforce hierarchy and feedback rather than compete with learning content or increase unnecessary visual noise.
+The purpose is not to maximize animation.
 
-Reduced Motion
+The purpose is to spend motion where it improves understanding.
 
-Accessibility is part of the design-system contract.
+♢ Accessibility
 
-The system respects:
+Accessibility is part of the component contract.
+
+The system supports reduced motion:
 
 @media (prefers-reduced-motion: reduce) {
-  /* Reduce or replace unnecessary movement */
+  /* Replace unnecessary movement with reduced or static feedback */
 }
 
 Reduced motion should preserve:
 
-Feedback
-State visibility
-Focus
-Navigation clarity
-Interaction meaning
+feedback
+state visibility
+focus
+navigation clarity
+interaction meaning
 
-while reducing unnecessary movement.
+while removing unnecessary movement.
 
-RTL First
+⇄ RTL First
 
-RTL is a baseline capability of the platform.
+RTL is a first-class direction, not a translation layer added later.
 
-The design system supports:
+The system supports:
 
 <html dir="rtl">
 
-and scoped RTL contexts where needed.
+and scoped RTL contexts.
 
-Components should prefer logical CSS properties:
+Prefer logical CSS properties:
 
 margin-inline-start
 padding-inline
 inset-inline-start
 border-inline-end
 
-rather than hard-coded left/right assumptions.
+instead of hard-coded:
+
+margin-left
+padding-right
+left
+right
 
 Motion should also respect logical direction.
 
-Semantic Tokens
+◈ Semantic Design Tokens
 
-Shared components should consume semantic tokens instead of raw visual values.
+Shared components should consume semantic tokens instead of raw values.
 
-Prefer:
-
+Prefer
 color: var(--text-primary);
 background: var(--bg-surface);
 border-color: var(--border-subtle);
 color: var(--color-action);
-
-Avoid unnecessary component-level hardcoding:
-
+Avoid
 color: #d4a373;
 background: #1a1c23;
 
+unless the value is genuinely local and intentional.
+
 Semantic tokens make the system:
 
-Themeable
-Tenant-aware
-Consistent
-Easier to evolve
-Safer to refactor
-Component Contract
+themeable
+tenant-aware
+consistent
+easier to evolve
+safer to refactor
+⌘ Component Contract
 
-Shared components built on top of this package should follow a consistent contract.
+Shared components built with this system follow a small set of rules.
 
-Components consume tokens
+01 — Components consume tokens
 
-Components should consume the system's semantic design language rather than redefine it.
+Components use semantic design tokens.
 
-Components do not know tenants
+They do not redefine the platform's visual language.
 
-Tenant-specific identity belongs in the adaptive token layer.
+02 — Components do not know tenants
 
-Components remain accessible
+Avoid:
 
-Keyboard interaction, focus behavior, semantics, and reduced motion are part of component quality.
+if (tenant === "physics") {
+  ...
+}
 
-Components support RTL
+Tenant identity belongs to the adaptive layer.
 
-Avoid directional assumptions in layout and interaction.
+03 — Components remain accessible
 
-Components respect motion budgets
+Keyboard interaction, focus behavior, semantic markup, and reduced motion are part of the contract.
 
-Not every interaction requires animation.
+04 — Components support RTL
 
-Example
+Directional assumptions should not leak into shared component implementations.
+
+05 — Components respect motion budgets
+
+Animation is used when it communicates something meaningful.
+
+⚡ Example
 .teacher-card {
   background: var(--bg-surface);
   color: var(--text-primary);
@@ -351,16 +380,17 @@ Example
   color: var(--color-action);
 }
 
-The component remains unchanged while tenant-level identity is provided through semantic token overrides.
+The component remains unchanged.
 
-Design-System Boundaries
+Only the semantic token values adapt.
 
-This package owns the visual foundation of the platform.
+◈ Design-System Boundaries
 
-It is intentionally not a business-logic package.
+This package owns the visual foundation.
 
-Do not place here:
+It does not own business logic.
 
+Never place here
 API clients
 Database logic
 Prisma models
@@ -369,82 +399,56 @@ Authorization
 BullMQ workers
 Payment integrations
 AI orchestration
-SANAD service integration
+SANAD integration
 Tenant business rules
 
-Those concerns belong to their respective application and infrastructure boundaries.
+Those concerns belong to the appropriate application or infrastructure boundaries.
 
-Package Relationship
+Boundary Model
 
-Conceptually:
+The design system is a foundation, not an application layer.
 
+◇ Package Relationship
                     @lp/design-system
                            │
           ┌────────────────┼────────────────┐
           │                │                │
+          ▼                ▼                ▼
       Public UI       Student UI       Teacher UI
           │                │                │
           └────────────────┼────────────────┘
-                           │
-                  Multi-Tenant LMS
+                           ▼
+                    Multi-Tenant LMS
 
-The design system is a shared visual foundation, not an application layer.
+One design system.
 
-Global Design Principles
-One Learning Universe
+Multiple product surfaces.
 
-Every tenant should feel like part of the same platform.
+One visual language.
 
-Many Learning Identities
+⌁ Source of Truth
 
-Teachers and subjects can express distinct identities without breaking the platform's visual language.
-
-Consistency Over Customization
-
-Customization exists within clear system boundaries.
-
-Meaning Over Decoration
-
-Visual differences should communicate hierarchy, state, subject, or identity.
-
-Motion With Purpose
-
-Animation should communicate feedback, continuity, or hierarchy.
-
-Accessibility By Default
-
-Accessibility is part of the component contract, not a final cleanup step.
-
-RTL As a First-Class Direction
-
-Arabic is not treated as a secondary rendering mode of an LTR-first system.
-
-Source of Truth
-
-The design-system source of truth is:
+The primary token source is:
 
 packages/design-system/tokens.css
 
 Broader visual and motion rules are documented in:
 
 docs/VISUAL_IDENTITY.md
-
-When introducing or changing a token:
-
+When changing the system
 Update the source of truth.
 Keep semantic naming consistent.
-Check tenant override behavior.
-Verify RTL behavior where applicable.
-Verify reduced-motion behavior where applicable.
-Avoid introducing one-off component constants without a clear system reason.
-Design Governance
+Verify tenant overrides.
+Verify RTL behavior.
+Verify reduced-motion behavior.
+Avoid introducing one-off visual constants without a real system reason.
+◉ Design Governance
 
 Before adding a new token, ask:
 
-Does this represent a real reusable system concept, or is it solving a one-off component problem?
+Is this a reusable system concept or a one-off component solution?
 
-Prefer:
-
+Prefer
 --color-action
 
 over:
@@ -459,65 +463,134 @@ over:
 
 --special-button-animation
 
-The design system should represent reusable concepts rather than individual screens.
+The design system should model concepts, not individual screens.
 
-Accessibility Checklist
+♿ Accessibility Checklist
 
-Any new shared component should consider:
+Every new shared component should consider:
 
-Semantic HTML
-Keyboard operation
-Visible focus
-Focus order
-Accessible labels
-Screen-reader behavior
-Sufficient contrast
-RTL direction
-Reduced motion
-Disabled/loading states
-Error states
+ Semantic HTML
+ Keyboard operation
+ Visible focus
+ Logical focus order
+ Accessible labels
+ Screen-reader behavior
+ Sufficient contrast
+ RTL direction
+ Reduced motion
+ Disabled states
+ Loading states
+ Error states
 
-Accessibility failures should be treated as component-quality issues.
+Accessibility is a component-quality requirement.
 
-Performance Principles
+⚡ Performance Principles
 
 The design system should remain lightweight and predictable.
 
-Prefer:
-
+Prefer
 CSS transitions
 transform
 opacity
 CSS variables
-Compositor-friendly animation
+compositor-friendly animation
+Avoid unnecessary
+layout-triggering animation
+heavy JavaScript animation
+global event listeners
+unbounded visual effects
+layout-changing animation
 
-Avoid unnecessary:
+The design system should support application performance rather than fight it.
 
-Layout-triggering animations
-Heavy JavaScript animation
-Global event listeners
-Unbounded visual effects
-Animation that changes layout unnecessarily
+✦ Design Language at a Glance
+                    VISUAL DNA
+                        │
+         ┌──────────────┼──────────────┐
+         │              │              │
+      TYPOGRAPHY       SPACE          COLOR
+         │              │              │
+         └──────────────┼──────────────┘
+                        │
+                      MOTION
+                        │
+                 INTERACTION DNA
+                        │
+                ┌───────┴───────┐
+                │               │
+               LTR             RTL
+                │               │
+                └───────┬───────┘
+                        │
+                 ACCESSIBILITY
+                        │
+                        ▼
+               TENANT ADAPTATION
+◇ Why This Exists
 
-The design system should support the application's performance budget rather than fight it.
+A multi-tenant platform can easily become visually fragmented:
 
-Documentation
+Tenant A → completely different UI
+Tenant B → completely different UI
+Tenant C → completely different UI
 
-The broader visual identity and motion standards are documented in:
+That is not the goal.
+
+The goal is:
+
+                    ONE PLATFORM
+                         │
+          ┌──────────────┼──────────────┐
+          │              │              │
+      Teacher A      Teacher B      Teacher C
+          │              │              │
+      Subject X      Subject Y      Subject Z
+          │              │              │
+          └──────────────┼──────────────┘
+                         │
+                 SHARED DESIGN DNA
+
+Different learning identities.
+
+Shared platform intelligence.
+
+◐ Documentation
+
+For the broader visual language, see:
 
 docs/VISUAL_IDENTITY.md
 
-This package provides the reusable implementation foundation for those standards.
+For the implementation source of truth:
+
+tokens.css
 
 Status
 
-@lp/design-system is the shared visual foundation for the Multi-Tenant LMS.
+@lp/design-system is the shared visual foundation of the SANAD Multi-Tenant LMS.
 
-It establishes the platform's visual and motion language while preserving tenant-level identity through controlled semantic token overrides.
+It provides a controlled system for:
 
-Core Principle
+consistent UI
+tenant adaptation
+subject identity
+motion
+RTL
+accessibility
+semantic theming
 
-The system stays the same. The learning identity changes.
+without allowing application surfaces to drift apart.
+
+<div align="center">
+The system stays the same.
+The learning identity changes.
+<br/>
+
+One platform.
+Many teachers.
+Many subjects.
+One design language.
+
+</div> ```
 
 One platform.
 Many teachers.
