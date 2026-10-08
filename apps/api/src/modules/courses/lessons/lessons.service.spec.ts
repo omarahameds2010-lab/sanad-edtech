@@ -137,6 +137,7 @@ describe("LessonsService", () => {
         section: { courseId: "c1" },
         assignment: null,
         exam: null,
+        videos: [],
         lockStatus: "UNLOCKED",
         unlockType: "NONE",
         description: null,
@@ -148,6 +149,39 @@ describe("LessonsService", () => {
 
       const result = await service.getStudentLesson(tenantId, userId, "l1");
       expect(result.lesson.title).toBe("Preview");
+    });
+
+    it("returns watchable videos for the lesson", async () => {
+      const videos = [
+        {
+          id: "v1",
+          title: "Intro",
+          provider: "youtube",
+          providerVideoId: "dQw4w9WgXcQ",
+          status: "READY",
+          duration: 180,
+        },
+      ];
+      prisma.lesson.findFirst.mockResolvedValue({
+        id: "l1",
+        title: "L1",
+        type: "VIDEO",
+        isFree: false,
+        section: { courseId: "c1" },
+        assignment: null,
+        exam: null,
+        videos,
+        lockStatus: "UNLOCKED",
+        unlockType: "NONE",
+        description: null,
+        duration: 600,
+        orderIndex: 1,
+        status: "PUBLISHED",
+      });
+      prisma.enrollment.findFirst.mockResolvedValue({ id: "e1" });
+
+      const result = await service.getStudentLesson(tenantId, userId, "l1");
+      expect(result.videos).toEqual(videos);
     });
   });
 

@@ -5,7 +5,7 @@ import {
   ForbiddenException,
 } from "@nestjs/common";
 import { PrismaService } from "../../tenants/prisma.service";
-import { LessonType } from "@prisma/client";
+import { LessonType, VideoStatus } from "@prisma/client";
 
 @Injectable()
 export class LessonsService {
@@ -178,6 +178,19 @@ export class LessonsService {
         exam: {
           select: { id: true, title: true, timerMinutes: true, status: true },
         },
+        // Only watchable videos reach the student (no uploads/failures).
+        videos: {
+          where: { status: { in: [VideoStatus.READY, VideoStatus.PUBLISHED] } },
+          select: {
+            id: true,
+            title: true,
+            provider: true,
+            providerVideoId: true,
+            status: true,
+            duration: true,
+          },
+          orderBy: { createdAt: "asc" },
+        },
       },
     });
 
@@ -215,6 +228,7 @@ export class LessonsService {
       },
       assignment: lesson.assignment ?? null,
       exam: lesson.exam ?? null,
+      videos: lesson.videos ?? [],
     };
   }
 }

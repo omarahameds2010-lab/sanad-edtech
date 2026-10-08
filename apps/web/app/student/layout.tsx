@@ -4,7 +4,6 @@ import StudentCommandRegistrar from './StudentCommandRegistrar';
 const navItems = [
   { href: '/student', label: 'لوحتي' },
   { href: '/student/courses', label: 'كورساتي' },
-  { href: '/student/lessons/l1', label: 'آخر درس' },
   { href: '/student/assignments', label: 'واجباتي' },
   { href: '/student/exams', label: 'اختباراتي' },
   { href: '/student/profile', label: 'الملف الشخصي' },

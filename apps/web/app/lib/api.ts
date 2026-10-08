@@ -199,6 +199,35 @@ export interface NextLessonRef {
   type: string;
 }
 
+export interface LessonVideo {
+  id: string;
+  title: string;
+  provider: string;
+  providerVideoId: string | null;
+  status: string;
+  duration: number | null;
+}
+
+export interface StudentLesson {
+  lesson: {
+    id: string;
+    title: string;
+    type: string;
+    description: string | null;
+    duration: number | null;
+    orderIndex: number;
+    status: string;
+  };
+  access: {
+    isLocked: boolean;
+    unlockType: string;
+    lockStatus: string;
+  };
+  assignment: { id: string; title: string } | null;
+  exam: { id: string; title: string; timerMinutes: number; status: string } | null;
+  videos: LessonVideo[];
+}
+
 // ---------------------------------------------------------------------------
 // Endpoint functions
 // ---------------------------------------------------------------------------
@@ -256,4 +285,7 @@ export const api = {
       `/api/v1/progression/lessons/${lessonId}/next`,
       { token },
     ),
+
+  getStudentLesson: (token: string, lessonId: string) =>
+    apiFetch<StudentLesson>(`/api/v1/student/lessons/${lessonId}`, { token }),
 };
