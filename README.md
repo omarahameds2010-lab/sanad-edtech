@@ -2867,6 +2867,12 @@ Test: lms-progression.e2e-spec.ts (3 cases)
 
 MIT License — see [`LICENSE`](LICENSE). You may fork, self-host, and sell teacher spaces built on this. Attribution appreciated but not required. No warranty (see license). Money-handling code comes with zero guarantees — audit before accepting live EGP.
 
+### Author
+
+Built with ❤️ by **OMAR AHMED** — 16-year-old high-school student & founder, building serious learning infrastructure for Egyptian teachers and students.
+
+[![LinkedIn](https://img.shields.io/badge/LinkedIn-OMAR_AHMED-0A66C2?style=for-the-badge&logo=linkedin&logoColor=white)](https://www.linkedin.com/in/omar-ahmed-7b97613b1/)
+
 ### Acknowledgments (Tech Heroes)
 
 - [Next.js](https://nextjs.org/) · [NestJS](https://nestjs.com/) · [Prisma](https://www.prisma.io/) · [PostgreSQL](https://www.postgresql.org/) · [Redis](https://redis.io/) · [BullMQ](https://bullmq.io/) · [Turborepo](https://turbo.build/) · [pnpm](https://pnpm.io/) · [Cloudflare](https://www.cloudflare.com/) · [Bunny Stream](https://bunny.net/stream/) · [Paymob](https://paymob.com/) · [Fawry](https://www.fawry.com/) · [Argon2](https://github.com/P-H-C/phc-winner-argon2) · [TUS](https://tus.io/) · [hls.js](https://github.com/video-dev/hls.js/) · [Mermaid](https://mermaid.js.org/) · [Shields.io](https://shields.io/) (badges on this page)
@@ -2882,15 +2888,14 @@ MIT License — see [`LICENSE`](LICENSE). You may fork, self-host, and sell teac
 | Threats + layers + compliance | [`docs/SECURITY.md`](docs/SECURITY.md) |
 | Verified vs TODO vs known issues | [`docs/STATUS.md`](docs/STATUS.md) |
 
-### Contact & Community (Placeholders — Replace With Real Links)
+### Contact & Community
 
 | Channel | Link |
 |---------|------|
-| 🐛 Issues | `https://github.com/<owner>/<repo>/issues` |
-| 💬 Discussions | `https://github.com/<owner>/<repo>/discussions` |
+| 🐛 Issues | `https://github.com/omarahameds2010-lab/sanad-edtech/issues` |
+| 💬 Discussions | `https://github.com/omarahameds2010-lab/sanad-edtech/discussions` |
 | 🔒 Security (private) | `security@yourdomain.com` (PGP on request — never post PoC publicly) |
-| ✉️ Maintainer | `hello@yourdomain.com` |
-| 𝕏 Updates | `https://x.com/<handle>` |
+| 👤 Author | **OMAR AHMED** (16) — [LinkedIn](https://www.linkedin.com/in/omar-ahmed-7b97613b1/) |
 
 ---
 
@@ -2901,9 +2906,9 @@ MIT License — see [`LICENSE`](LICENSE). You may fork, self-host, and sell teac
 **A screenshot without the logo should still feel like the platform.**
 **A different tenant should still feel like the same ecosystem.**
 
-[![Star on GitHub](https://img.shields.io/github/stars/<owner>/<repo>?style=social)](https://github.com/<owner>/<repo>)
-[![Fork](https://img.shields.io/github/forks/<owner>/<repo>?style=social)](https://github.com/<owner>/<repo>/fork)
-[![Follow](https://img.shields.io/twitter/follow/<handle>?style=social)](https://twitter.com/<handle>)
+[![Star on GitHub](https://img.shields.io/github/stars/omarahameds2010-lab/sanad-edtech?style=social)](https://github.com/omarahameds2010-lab/sanad-edtech)
+[![Fork](https://img.shields.io/github/forks/omarahameds2010-lab/sanad-edtech?style=social)](https://github.com/omarahameds2010-lab/sanad-edtech/fork)
+[![LinkedIn](https://img.shields.io/badge/LinkedIn-OMAR_AHMED-0A66C2?style=social&logo=linkedin)](https://www.linkedin.com/in/omar-ahmed-7b97613b1/)
 
 <sub>Last updated: 2026-10-07 · Source of truth: <code>AGENTS.md</code> + <code>docs/STATUS.md</code> + <code>docs/ARCHITECTURE.md</code> + <code>docs/SECURITY.md</code> + <code>docs/VIDEO_PROTECTION.md</code> · README line target: 2000+ (this file) · Next: record demo GIFs into <code>docs/assets/</code> and replace placeholders</sub>
 
