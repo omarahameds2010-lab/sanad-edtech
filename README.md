@@ -2718,7 +2718,7 @@ Phase 5 🔮 Scale (extract ONLY when justified)
 ### 36.2 Setup for Contributors (First Time)
 
 ```powershell
-git clone <repo>; cd learning-platform
+git clone https://github.com/omarahameds2010-lab/sanad-edtech.git; cd learning-platform
 docker compose up -d
 pnpm install
 cd apps/api; npx prisma generate; npx prisma migrate deploy; cd ..; cd ..
