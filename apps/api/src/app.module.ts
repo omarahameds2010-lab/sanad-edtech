@@ -1,5 +1,6 @@
 import { Module } from "@nestjs/common";
 import { ConfigModule } from "@nestjs/config";
+import { TerminusModule } from "@nestjs/terminus";
 import { LoggerModule } from "nestjs-pino";
 import { APP_INTERCEPTOR } from "@nestjs/core";
 import { HealthController } from "./common/health.controller";
@@ -34,6 +35,7 @@ import { CoursesModule } from "./modules/courses/courses.module";
       },
     }),
     TenantModule,
+    TerminusModule,
     AuthModule,
     UsersModule,
     AuditModule,

@@ -5,12 +5,12 @@
 ### *Single source of truth for "where are we?" — updated from live code inventory, not memory.*
 
 [![Build](https://img.shields.io/badge/Build-pnpm-green?style=for-the-badge&logo=turborepo&logoColor=white)](#-verified-i-ran-it-and-showed-the-output)
-[![Overall](https://img.shields.io/badge/Overall-58 Percent-yellow?style=for-the-badge)](#-track-dashboard-verified-2026-10-08)
+[![Overall](https://img.shields.io/badge/Overall-62 Percent-yellow?style=for-the-badge)](#-track-dashboard-verified-2026-10-08)
 [![Docs](https://img.shields.io/badge/Docs-World_class-blue?style=for-the-badge&logo=markdown&logoColor=white)](../README.md)
 
-**Overall: ~58% to a live v1.0** (code written ≈ 70% · verified live ≈ 30% — the gap IS the roadmap)
+**Overall: ~62% to a live v1.0** (code written ≈ 75% · verified ≈ 40% — loop HTTP complete + 85 tests green + boot DI fixed; live DB still pending)
 
-*Last inventoried: 2026-10-08 · Method: file-by-file repo walk (modules, models, pages, packages, CI) · Corrections to previous version marked with 🆕*
+*Last inventoried: 2026-10-08 · Method: file walk + independent test re-runs (84/84 unit, golden-flow 1/1, exit 0) + boot verification · 🆕 = this session*
 
 </div>
 
@@ -20,14 +20,14 @@
 
 | # | Track | % | Signal (evidence, not adjectives) |
 |---|-------|---|-----------------------------------|
-| 1 | Backend foundation (auth, RBAC, tenants, plans, outbox, audit) | 90% | 13 modules; PolicyEngine 22 actions (`authorization/policy-engine.ts:27`); `redeem` EXISTS 🆕 (old doc said missing — wrong) |
-| 2 | Database + RLS | 85% | **41 models** (`schema.prisma`); 178+26 RLS policies; `app_user` cage verified; NOT yet run live |
-| 3 | LMS Core (assignments/exams/progression/timers) | 65% | 🆕 Services REAL under `courses/`: assignments/exams/lessons/sections/progress/**progression**/resources + **8 unit specs**; `expiresAt` logic present (`assignments.service.ts:299+`); timers/progression NOT yet proven live |
+| 1 | Backend foundation (auth, RBAC, tenants, plans, outbox, audit) | 93% | 13 modules; 22 actions; `redeem` EXISTS; 🆕 **4 loop controllers added** (assignments/exams/progression/enrollments, ~30 endpoints, guards on every route); 🆕 **3 boot DI bugs fixed** (AuthModule PrismaService, `@Global()` AuthorizationModule, TerminusModule) — boot reaches DB-connect stage |
+| 2 | Database + RLS | 85% | **41 models** (`schema.prisma`); 178+26 RLS policies; `app_user` cage verified; NOT yet run live (no Docker on this machine) |
+| 3 | LMS Core (assignments/exams/progression/timers) | 80% | Services REAL under `courses/` + 8 unit specs (84/84 green, independently re-run); 🆕 **HTTP layer complete**: enter/submit/timer/grade/progression endpoints wired with `JwtAuthGuard` + `RequirePermission`; ENTER calls chain attempt-start + progression unlock in one request; compiles exit 0 + DI-verified at boot; live-DB proof pending |
 | 4 | Payments | 75% | 18 files; Paymob SHA512 + Fawry HMAC verified in code; 3 stubs fail-closed; ledger + inbox + idempotency present; no live run |
 | 5 | Video + protection | 70% | 13 files (video + video-protection); watermark/token HMAC verified; needs provider keys + live proof |
 | 6 | Frontend Web | 50% | 🆕 **17 pages** (builder, preview, publish, exams, grading inbox, analytics, upload/editor components) + vitest config; mostly shells, API wiring partial |
 | 7 | Design system | 60% | 🆕 **6 packages** (`config, design-system, motion, types, ui, validation`); **20 components** + full token set (colors, motion, spacing, typography, zindex, breakpoints, border) + theme; stories growing |
-| 8 | Testing | 30% | 🆕 8 unit specs (courses domain) + 2 e2e specs (golden-flow, rls-isolation); **nothing run against live DB yet** |
+| 8 | Testing | 55% | 🆕 **84 unit tests PASS (independently re-run, exit 0)** + golden-flow e2e **1/1 PASS (independently re-run, exit 0)**; RLS e2e skipped — needs live DB (`RLS_ADMIN_URL` + `RLS_APP_URL`); new controllers have zero tests yet (next) |
 | 9 | DevOps / CI | 55% | 🆕 CI jobs: typecheck, lint, **test-unit**, build, e2e refs, **deploy-preview**, release; ⚠️ release fires on `main` but default branch is `master` (never runs — bug) |
 | 10 | Docs & repo hygiene | 95% | README (2900+), ARCHITECTURE, SECURITY (4000+), VISUAL_IDENTITY (5000+), VIDEO_PROTECTION; LICENSE (MIT/OMAR AHMED); root SECURITY.md; CODEOWNERS; PR/issue templates; dependabot; junk lockfiles removed |
 | 11 | Security hardening | 50% | Real: Argon2id, rotation, HMAC ×5 surfaces, RLS, boot validator; Planned: 2FA, rate limits, WAF, KMS, SIEM |
@@ -93,9 +93,10 @@
 - [x] `packages/design-system`: tokens (colors, typography, spacing, motion, border, breakpoints, zindex, index) + `tokens.css` + theme/ + **20 components** (Avatar, Badge, Button, Card, DataDisplay, DataTable, Dialog, Drawer, EmptyState, FormField, Input, Loading, Modal, Select, Skeleton, Stepper, Tabs, Toast, Tooltip, Wizard) + stories (growing)
 - [x] `packages/{config, motion, types, ui, validation}`: workspace scaffolding present (audit each for stub-vs-real before depending on it)
 
-### Testing — Specs Exist (Not Yet Run Live)
-- [x] 8 unit specs: assignments, enrollments, exams, lessons, progress, progression, resources, sections (courses domain)
-- [x] 2 e2e specs: `golden-flow.e2e-spec.ts` (order→pay→enroll), `rls-isolation.e2e-spec.ts` (A⊘B matrix)
+### Testing — Specs Exist & Run ✅ (Unit + 1/2 e2e Live)
+- [x] **84 unit tests PASS**: assignments, enrollments, exams, lessons, progress, progression, resources, sections (courses domain)
+- [x] 1/2 e2e specs LIVE: `golden-flow.e2e-spec.ts` ✅ PASS (order→pay→enroll with in-memory Prisma)
+- [ ] 1/2 e2e specs SKIPPED: `rls-isolation.e2e-spec.ts` (needs live DB with `RLS_ADMIN_URL` + `RLS_APP_URL` env vars)
 
 ### Docs & Repo (World-Class Tier)
 - [x] `README.md` (2900+ lines): badges, mermaid, full reference + author OMAR AHMED (16) + LinkedIn + real repo links
@@ -137,8 +138,27 @@
 
 ---
 
+## 🔁 THE LOOP — Endpoint Inventory (Enroll → Learn → Exam → Grade) 🆕
+
+> The loop's brains (services) existed; its mouths (HTTP) didn't. Now both exist. Every route guarded (`JwtAuthGuard` + `RequirePermission`); every response `{ data }`; idempotency keys on ENTER/submit; ENTER chains attempt-start + progression unlock in one request.
+
+| Step | Endpoints | Guards |
+|------|-----------|--------|
+| 1. Enroll | `POST /api/v1/enrollments/courses/:courseId/enroll` · `GET /api/v1/enrollments/me` · `GET /:enrollmentId` · `POST /:enrollmentId/cancel|suspend|reactivate` | `enroll` / `read` / `manage` on `enrollment` |
+| 2. Learn (progress) | `GET /api/v1/student/courses/:courseId/progress` · `GET/PATCH /lessons/:lessonId/progress` · `POST /lessons/:lessonId/complete` (pre-existing ✅) | `read` / `update` on `lesson` |
+| 3a. Assignment | CRUD + `GET /:id/view` + `POST /:id/enter` (starts 300m clock **+ unlocks exam**) + `GET /:id/timer` + `GET /:id/submissions/me` + `POST /:id/submit` + `GET /:id/submissions` (grading queue) + `POST /submissions/:sid/grade` | `create/read/attempt/submit/grade` on `assignment` |
+| 3b. Exam | CRUD + `GET /:id/view` (solutions stripped server-side) + `POST /:id/enter` (starts 70m clock **+ unlocks next lesson**) + `GET /:id/timer` + `GET /:id/attempts/me` + `POST /:id/submit` + `GET /:id/attempts/grading` + `POST /attempts/:aid/grade` | `create/read/attempt/submit/grade` on `exam`/`attempt` |
+| 4. Progress | `GET /api/v1/progression/courses/:courseId` · `GET /lessons/:lessonId/next` · `POST /lessons/:lessonId/unlock|reset` (teacher) | `read` course/lesson · `manage` lesson |
+
+**Proof:** `nest build` exit 0 (api-only) · boot resolves full DI graph (verified to DB-connect stage; no DB on this machine) · 3 pre-existing boot DI bugs found by booting and fixed (see decisions).
+
+---
+
 ## 🚧 IN PROGRESS (No Ownerless Rows — Claim One)
 
+- [x] **Loop HTTP layer** (4 controllers, ~30 endpoints, guards) — DONE this session, compiles + DI-verified ✅
+- [x] **Boot DI trio** (AuthModule PrismaService, `@Global()` AuthorizationModule, TerminusModule) — DONE, boot reaches DB-connect ✅
+- [x] **Independent test re-runs** (84/84 unit + golden-flow 1/1, exit 0) — DONE ✅
 - [ ] Restore **root `.env.example`** (copy of `apps/api/.env.example`, which exists and is tracked ✅) + **seed script** (`prisma/seed.ts`: demo tenant → teacher → course → voucher) — live `.env` confirmed untracked ✅
 - [ ] Fix **release-on-`main` bug** (default branch is `master`; release job + `needs: [build, e2e]` never fire) — retarget or rename branch
 - [ ] Pin Prisma CLI `5.22.0` (client already pinned; kill the `^5.7.1` drift)
@@ -151,6 +171,11 @@
 ---
 
 ## ⚠️ KNOWN ISSUES (With Severity — No Mystery Bugs)
+
+### ✅ FIXED This Session (Verified by Boot)
+- **AuthService DI**: `AuthModule` lacked `PrismaService` → app could NEVER boot (proven: identical crash with and without new code). Fixed by adding provider (repo convention).
+- **AuthorizationGuard DI**: guard's `AuthorizationService` unresolvable outside `AuthorizationModule` → fixed with `@Global()` (no duplicate providers exist — checked).
+- **HealthController DI**: `TerminusModule` installed but never imported → wired into `AppModule`. Boot now reaches DB-connect (fails only: no database on this machine — correct behavior).
 
 | # | Issue | Impact | Status |
 |---|-------|--------|--------|
@@ -197,6 +222,9 @@
 | 2026-10-07 | World-class docs tier (README + SECURITY + VISUAL_IDENTITY) | 🆕 Docs are a product surface; cited-to-code specs prevent drift |
 | 2026-10-07 | Repo hygiene as release gate (CODEOWNERS, templates, no junk lockfiles) | 🆕 Protect `master` + review routing before team grows |
 | 2026-10-08 | STATUS.md rewritten from live inventory (this file) | 🆕 Old file misled (redeem-gone, LMS-unstarted); status must cite code |
+| 2026-10-08 | Loop HTTP layer: 4 controllers under `courses/` (enrollments/assignments/exams/progression) | 🆕 Services existed without routes; ENTER endpoints chain attempt-start + progression unlock; guards on every route |
+| 2026-10-08 | Boot trio fixed (AuthModule provider, `@Global()` AuthorizationModule, TerminusModule import) | 🆕 App had never booted (proven via stash A/B); boot now reaches DB-connect stage |
+| 2026-10-08 | Independent re-verification before trusting concurrent edits (84/84 + golden-flow 1/1) | 🆕 Two people editing live files; verify-then-keep protocol (see note below) |
 
 ---
 
@@ -225,14 +253,50 @@ cd apps/api; pnpm run dev      # :3000 — expect "Nest application successfully
 cd ..\web; pnpm run dev        # :3001 — open /teachers
 ```
 
-Expected: build exits 0, e2e green, `/health` ok, teacher discovery renders.
+**Expected**: build exits 0, e2e green, `/health` ok, teacher discovery renders.
+
+### 🏁 Verified Output (2026-10-08)
+
+```powershell
+# Unit tests (84 passing)
+PASS src/modules/courses/sections/sections.service.spec.ts
+PASS src/modules/courses/resources/resources.service.spec.ts
+PASS src/modules/courses/progress/progress.service.spec.ts
+PASS src/modules/courses/enrollments/enrollments.service.spec.ts
+PASS src/modules/courses/lessons/lessons.service.spec.ts
+PASS src/modules/courses/progression/progression.service.spec.ts
+PASS src/modules/courses/assignments/assignments.service.spec.ts
+PASS src/modules/courses/exams/exams.service.spec.ts
+
+Test Suites: 8 passed, 8 total
+Tests:       84 passed, 84 total
+Time:        12.827 s
+
+# e2e tests (1/2 passing — RLS skipped, needs live DB)
+PASS test/golden-flow.e2e-spec.ts
+
+Test Suites: 1 skipped, 1 passed, 1 of 2 total
+Tests:       5 skipped, 1 passed, 6 total
+Time:        5.252 s
+
+# Build verification
+apps/api      ✅ nest build — exits 0
+apps/web      ✅ next build — 16 pages compiled, exits 0
+packages/design-system ❌ tsup fails (pre-existing: duplicate symbols, framer-motion deps, circular types)
+```
+
+> **Note**: `design-system` build issues are pre-existing and block turborepo root build. API + Web are independently deployable.
 
 ---
 
 <div align="center">
 
-**Overall ~58% — the foundation is real, the proof is next.**
+**Overall ~62% — the loop has a voice now; live proof is next.** (84 unit + golden-flow e2e re-verified green ✅)
 
-<sub>Inventoried 2026-10-08 · 13 modules · 41 models · 17 pages · 20 components · 6 packages · 10 specs · method: read everything, cite file:line, mark corrections 🆕 · next file to fix: <code>.env.example</code> + seed</sub>
+🤝 **Concurrent-editing note (2026-10-08):** two people editing live files simultaneously — test results added mid-session were independently re-verified TRUE and kept. Rule: pull before editing shared docs; verify-then-keep for others' claims.
+
+<sub>Inventoried 2026-10-08 · 13 modules · 41 models · 17 pages · 20 components · 6 packages · 10 specs · 4 loop controllers (~30 endpoints) · method: read everything, cite file:line, run tests, boot the app · next: live DB boot + RLS e2e + frontend wiring</sub>
+
+<sub>Inventoried 2026-10-08 · 13 modules · 41 models · 17 pages · 20 components · 6 packages · 84 unit tests + 1 e2e · method: read everything, cite file:line, mark corrections 🆕 · next file to fix: <code>.env.example</code> + seed</sub>
 
 </div>
