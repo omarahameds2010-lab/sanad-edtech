@@ -1,0 +1,284 @@
+import { forwardRef } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { ChevronLeftIcon, ChevronRightIcon, CheckIcon } from '../../icon/icons';
+
+export interface WizardStep {
+  id: string;
+  title: string;
+  description?: string;
+  icon?: React.ReactNode;
+  content: React.ReactNode;
+  isOptional?: boolean;
+  validation?: (data: any) => boolean | Promise<boolean>;
+}
+
+export interface WizardProps {
+  steps: WizardStep[];
+  initialStep?: number;
+  onComplete: (data: any) => void;
+  onCancel?: () => void;
+  onStepChange?: (stepIndex: number, step: any) => void;
+  initialData?: any;
+  validateOnStepChange?: boolean;
+}
+
+interface WizardState {
+  currentStep: number;
+  data: any;
+  errors: Record<string, string>;
+  isSubmitting: boolean;
+  completedSteps: Set<number>;
+}
+
+const Wizard = forwardRef<HTMLDivElement, WizardProps>(
+  ({ steps, initialStep = 0, onComplete, onCancel, onStepChange, initialData = {}, validateOnStepChange = true, ...props }, ref) => {
+    const [currentStep, setCurrentStep] = useState(initialStep);
+    const [formData, setFormData] = useState(initialData || {});
+    const [errors, setErrors] = useState<Record<string, string>>({});
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [completedSteps, setCompletedSteps] = useState<Set<number>>(new Set());
+
+    const currentStepData = steps[currentStep];
+    const isFirstStep = currentStep === 0;
+    const isLastStep = currentStep === steps.length - 1;
+
+    const validateStep = async (stepIndex: number, data: any): Promise<boolean> => {
+      const step = steps[stepIndex];
+      if (!step.validation) return true;
+      
+      try {
+        const isValid = await step.validation(formData);
+        if (!isValid) {
+          setErrors(prev => ({ ...prev, [steps[stepIndex].id]: 'Validation failed' }));
+          return false;
+        }
+        return true;
+      } catch (error) {
+        setErrors(prev => ({ ...prev, [steps[stepIndex].id]: 'Validation error' }));
+        return false;
+      }
+    };
+
+    const handleNext = async () => {
+      if (validateOnStepChange) {
+        const isValid = await validateStep(currentStep, formData);
+        if (!isValid) return;
+      }
+
+      const newCompletedSteps = new Set(completedSteps);
+      newCompletedSteps.add(currentStep);
+      setCompletedSteps(newCompletedSteps);
+
+      if (isLastStep) {
+        setIsSubmitting(true);
+        try {
+          await onComplete(formData);
+        } finally {
+          setIsSubmitting(false);
+        }
+      } else {
+        setCurrentStep(prev => prev + 1);
+      }
+    };
+
+    const handleBack = () => {
+      if (!isFirstStep) {
+        setCurrentStep(prev => prev - 1);
+      }
+    };
+
+    const handleStepClick = (index: number) => {
+      if (index <= Math.max(...completedSteps)) {
+        setCurrentStep(index);
+      }
+    };
+
+    const handleInputChange = (key: string, value: any) => {
+      setFormData(prev => ({ ...prev, [key]: value }));
+      if (errors[key]) {
+        setErrors(prev => {
+          const next = { ...errors };
+          delete next[key];
+          return next;
+        });
+      }
+    };
+
+    const isFirstStep = currentStep === 0;
+    const isLastStep = currentStep === steps.length - 1;
+
+    const nextStep = async () => {
+      if (validateOnStepChange) {
+        const isValid = await validateStep(currentStep, formData);
+        if (!isValid) return;
+      }
+
+      if (isLastStep) {
+        setIsSubmitting(true);
+        try {
+          await onComplete(formData);
+        } finally {
+          setIsSubmitting(false);
+        }
+      } else {
+        setCompletedSteps(prev => new Set([...prev, currentStep]));
+        setCurrentStep(prev => prev + 1);
+        onStepChange?.(currentStep + 1, steps[currentStep + 1]);
+      }
+    };
+
+    const handleBack = () => {
+      if (!isFirstStep) {
+        setCurrentStep(prev => prev - 1);
+        onStepChange?.(currentStep - 1, steps[currentStep - 1]);
+      }
+    };
+
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: '500px' }}>
+        {/* Progress Bar */}
+        <div style={{ marginBottom: '24px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            {steps.map((step, index) => (
+              <div key={step.id} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
+                <motion.div
+                  initial={{ scale: 0 }}
+                  animate={{ scale: 1 }}
+                  transition={{ type: 'spring', stiffness: 300, damping: 20, delay: index * 0.1 }}
+                  style={{
+                    width: '40px',
+                    height: '40px',
+                    borderRadius: '50%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    background: index < currentStep ? 'var(--color-success)' : index === currentStep ? 'var(--color-primary)' : 'var(--color-neutral-200)',
+                    color: index <= currentStep ? 'white' : 'var(--color-neutral-400)',
+                    fontWeight: 600,
+                    fontSize: '14px',
+                    position: 'relative',
+                    zIndex: 1,
+                    border: '3px solid var(--color-bg-primary)',
+                  }}
+                >
+                  {index < currentStep ? (
+                    <CheckIcon size={18} />
+                  ) : (
+                    <span style={{ fontWeight: 600 }}>{index + 1}</span>
+                  )}
+                </motion.div>
+                <p style={{ fontSize: '12px', textAlign: 'center', color: index <= currentStep ? 'var(--color-text-primary)' : 'var(--color-text-muted)', fontWeight: index <= currentStep ? 600 : 400 }}>
+                  {step.title}
+                </p>
+              </motion.div>
+              {index < steps.length - 1 && (
+                <motion.div
+                  initial={{ width: 0 }}
+                  animate={{ width: '100%' }}
+                  transition={{ duration: 0.5, delay: index * 0.1, ease: 'easeOut' }}
+                  style={{
+                    flex: 1,
+                    height: '2px',
+                    background: index < currentStep ? 'var(--color-success)' : 'var(--color-neutral-200)',
+                    borderRadius: '2px',
+                    marginTop: '16px',
+                  }}
+                />
+              )}
+            ))}
+          </div>
+
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.4, delay: 0.2 }}
+            style={{ flex: 1, padding: '24px 0', overflow: 'auto' }}
+          >
+            <div style={{ marginBottom: '16px' }}>
+              <h2 style={{ margin: '0 0 4px', fontSize: '24px', fontWeight: 700' }}>
+                {steps[currentStep].title}
+              </h2>
+              {steps[currentStep].description && (
+                <p style={{ margin: '8px 0 0', color: 'var(--color-text-secondary)', lineHeight: 1.5 }}>
+                  {steps[currentStep].description}
+                </p>
+              )}
+            </div>
+
+            <div style={{ flex: 1, minHeight: '300px' }}>
+              {steps[currentStep].content}
+            </div>
+
+            {/* Navigation */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '24px', paddingTop: '24px', borderTop: '1px solid var(--color-border-main)' }}>
+              <motion.button
+                onClick={handleBack}
+                disabled={isFirstStep}
+                style={{
+                  padding: '10px 20px',
+                  background: 'var(--color-bg-surface)',
+                  color: 'var(--color-text-primary)',
+                  border: '1px solid var(--color-border-main)',
+                  borderRadius: '8px',
+                  fontWeight: 500,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  opacity: isFirstStep ? 0.4 : 1,
+                  pointerEvents: isFirstStep ? 'none' : 'auto',
+                }}
+                whileHover={{ background: 'var(--color-neutral-100)' }}
+                whileTap={{ scale: 0.98 }}
+              >
+                <ChevronLeftIcon size={18} /> Back
+              </motion.button>
+
+              <motion.button
+                onClick={nextStep}
+                disabled={isSubmitting}
+                style={{
+                  padding: '10px 24px',
+                  background: 'var(--color-primary)',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  fontWeight: 600,
+                  cursor: isSubmitting ? 'not-allowed' : 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  opacity: isSubmitting ? 0.7 : 1,
+                }}
+                whileHover={{ background: 'var(--color-primary-hover)' }}
+                whileTap={{ scale: 0.98 }}
+              >
+                {isSubmitting ? (
+                  <>
+                    <span style={{ width: '16px', height: '16px', border: '2px solid white', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
+                    Processing...
+                  </>
+                ) : isLastStep ? (
+                  <>
+                    Complete
+                    <ChevronRightIcon size={18} />
+                  </>
+                ) : (
+                  <>
+                    Next
+                    <ChevronRightIcon size={18} />
+                  </>
+                )}
+              </motion.button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+);
+
+Wizard.displayName = 'Wizard';
+
+export { Wizard };
+export type { WizardProps, WizardStep };
