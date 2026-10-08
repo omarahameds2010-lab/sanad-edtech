@@ -1,0 +1,40 @@
+name: 🐛 Bug report
+description: Something broken? Tell us exactly how to reproduce it.
+title: "[bug]: "
+labels: ["bug"]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: Plain words + what you expected instead.
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      description: Numbered, starting from a clean state. Include tenant/role used.
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Evidence
+      description: Screenshots, requestId from the error response, relevant log lines (REDACT secrets/PII before pasting).
+    validations:
+      required: true
+  - type: input
+    id: commit
+    attributes:
+      label: Commit / branch tested
+      description: e.g. master @ abc1234 — "latest" is not an answer, check `git log`.
+    validations:
+      required: true
+  - type: checkboxes
+    id: security
+    attributes:
+      label: Security check
+      options:
+        - label: "This is NOT a vulnerability (if it is, use Security → Report a vulnerability privately instead)"
+          required: true

@@ -39,3 +39,10 @@ prisma/migrations/.migration_lock.toml
 
 # Turbo
 .turbo/
+*storybook.log
+storybook-static
+
+# Repo hygiene (never commit these)
+package-lock.json
+build-out.txt
+*-out.txt

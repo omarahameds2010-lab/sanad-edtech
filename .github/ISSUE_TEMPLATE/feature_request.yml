@@ -1,0 +1,36 @@
+name: ✨ Feature request
+description: Idea for the platform? Describe the problem first, then the proposal.
+title: "[feat]: "
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem (who hurts, how often?)
+      description: "Example: teachers can't see at-risk students before exams. NOT a solution yet."
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposal
+      description: Your idea + which surface it lives on (student/teacher/admin) + P0 or later.
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Learning experience (student)
+        - Teacher dashboard / builder
+        - Payments / money
+        - Video protection
+        - Auth / security
+        - Design system / motion
+        - Docs / repo
+    validations:
+      required: true
+  - type: textarea
+    id: abuse
+    attributes:
+      label: Abuse cases (how could this be misused?)
+      description: "Think like T1–T10 in docs/SECURITY.md §2.2. At least one required for money/auth/exam features."

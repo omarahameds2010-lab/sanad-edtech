@@ -1,0 +1,20 @@
+# Dependabot — grouped, scheduled, non-noisy (merges still need human + CI green)
+version: 2
+updates:
+  # GitHub Actions (weekly, grouped)
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule: { interval: "weekly", day: "monday", time: "04:00", timezone: "Africa/Cairo" }
+    groups:
+      actions: { patterns: ["*"] }
+    commit-message: { prefix: "chore(deps)" }
+
+  # Docker base images (monthly — image bumps need care)
+  - package-ecosystem: "docker"
+    directory: "/"
+    schedule: { interval: "monthly" }
+    commit-message: { prefix: "chore(deps)" }
+
+  # NOTE: pnpm workspaces — Dependabot's npm ecosystem reads package.json but does NOT
+  # fully manage pnpm-lock.yaml. JS deps are updated via `pnpm update -r` PRs (manual,
+  # weekly ritual) until Dependabot pnpm support matures. See docs/SECURITY.md §10.5.

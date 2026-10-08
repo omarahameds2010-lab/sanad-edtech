@@ -1,0 +1,14 @@
+# Line-ending + diff behavior (Windows + macOS + Linux contributors)
+* text=auto eol=lf
+
+# Lockfiles: keep exact bytes, never merge-conflict markers inside
+pnpm-lock.yaml text eol=lf merge=binary
+package-lock.json text eol=lf merge=binary
+
+# Images/fonts: binary, no diff
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.webp binary
+*.woff2 binary
+*.ttf binary

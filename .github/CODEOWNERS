@@ -1,0 +1,16 @@
+# CODEOWNERS — review routing (requires branch protection to enforce)
+# Default: everything needs the maintainer. Specific paths listed for clarity.
+
+* @omarahameds2010-lab
+
+# Security-sensitive: extra-careful review, security checklist mandatory
+/apps/api/src/modules/auth/ @omarahameds2010-lab
+/apps/api/src/modules/authorization/ @omarahameds2010-lab
+/apps/api/src/modules/payments/ @omarahameds2010-lab
+/apps/api/src/modules/video-protection/ @omarahameds2010-lab
+/apps/api/prisma/ @omarahameds2010-lab
+/docker/postgres/ @omarahameds2010-lab
+
+# Docs: spec + code move together (doc-only PRs still need review)
+/docs/ @omarahameds2010-lab
+*.md @omarahameds2010-lab
