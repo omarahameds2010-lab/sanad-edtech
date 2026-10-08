@@ -19,7 +19,7 @@ import {
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { RequirePermission } from "../authorization/authorization.decorators";
 
-@Controller("api/entitlements")
+@Controller("entitlements")
 @UseGuards(JwtAuthGuard)
 export class EntitlementsController {
   constructor(private entitlementsService: EntitlementsService) {}

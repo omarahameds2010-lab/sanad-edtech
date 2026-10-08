@@ -13,7 +13,7 @@ import { FeatureFlagsService } from "./feature-flags.service";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { RequirePermission } from "../authorization/authorization.decorators";
 
-@Controller("api/feature-flags")
+@Controller("feature-flags")
 @UseGuards(JwtAuthGuard)
 export class FeatureFlagsController {
   constructor(private featureFlagsService: FeatureFlagsService) {}

@@ -13,7 +13,7 @@ import { JwtAuthGuard } from "./guards/jwt-auth.guard";
 import { LoginDto } from "./dto/login.dto";
 import { RefreshTokenDto } from "./dto/refresh-token.dto";
 
-@Controller("api/auth")
+@Controller("auth")
 export class AuthController {
   constructor(private authService: AuthService) {}
 

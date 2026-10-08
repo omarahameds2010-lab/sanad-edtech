@@ -12,7 +12,7 @@ import { ProgressService } from "./progress.service";
 import { JwtAuthGuard } from "../../auth/guards/jwt-auth.guard";
 import { RequirePermission } from "../../authorization/authorization.decorators";
 
-@Controller("api/v1/student")
+@Controller("v1/student")
 @UseGuards(JwtAuthGuard)
 export class ProgressController {
   constructor(private progressService: ProgressService) {}

@@ -25,7 +25,7 @@ import {
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { RequirePermission } from "../authorization/authorization.decorators";
 
-@Controller("api/v1/teacher/courses")
+@Controller("v1/teacher/courses")
 @UseGuards(JwtAuthGuard)
 export class TeacherCoursesController {
   constructor(private coursesService: CoursesService) {}
@@ -140,7 +140,7 @@ export class TeacherCoursesController {
   }
 }
 
-@Controller("api/v1/public/courses")
+@Controller("v1/public/courses")
 export class PublicCoursesController {
   constructor(private coursesService: CoursesService) {}
 
@@ -190,7 +190,7 @@ export class PublicCoursesController {
   }
 }
 
-@Controller("api/v1/teacher")
+@Controller("v1/teacher")
 @UseGuards(JwtAuthGuard)
 export class SectionsController {
   constructor(private sectionsService: SectionsService) {}
@@ -278,7 +278,7 @@ export class SectionsController {
   }
 }
 
-@Controller("api/v1/teacher")
+@Controller("v1/teacher")
 @UseGuards(JwtAuthGuard)
 export class TeacherLessonsController {
   constructor(private lessonsService: LessonsService) {}
@@ -388,7 +388,7 @@ export class TeacherLessonsController {
   }
 }
 
-@Controller("api/v1/student/lessons")
+@Controller("v1/student/lessons")
 @UseGuards(JwtAuthGuard)
 export class StudentLessonsController {
   constructor(private lessonsService: LessonsService) {}
@@ -409,7 +409,7 @@ export class StudentLessonsController {
   }
 }
 
-@Controller("api/v1/teacher")
+@Controller("v1/teacher")
 @UseGuards(JwtAuthGuard)
 export class TeacherResourcesController {
   constructor(private resourcesService: ResourcesService) {}
@@ -467,7 +467,7 @@ export class TeacherResourcesController {
   }
 }
 
-@Controller("api/v1/student/resources")
+@Controller("v1/student/resources")
 @UseGuards(JwtAuthGuard)
 export class StudentResourcesController {
   constructor(private resourcesService: ResourcesService) {}
@@ -483,7 +483,7 @@ export class StudentResourcesController {
   }
 }
 
-@Controller("api/v1/student/enrollments")
+@Controller("v1/student/enrollments")
 @UseGuards(JwtAuthGuard)
 export class StudentEnrollmentsController {
   constructor(private enrollmentsService: EnrollmentsService) {}

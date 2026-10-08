@@ -6,7 +6,7 @@ import {
 } from "@nestjs/terminus";
 import { PrismaService } from "../modules/tenants/prisma.service";
 
-@Controller("api")
+@Controller("")
 export class HealthController {
   constructor(
     private health: HealthCheckService,

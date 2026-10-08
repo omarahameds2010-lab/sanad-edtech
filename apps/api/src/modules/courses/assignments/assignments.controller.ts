@@ -14,7 +14,7 @@ import { ProgressionService } from "../progression/progression.service";
 import { JwtAuthGuard } from "../../auth/guards/jwt-auth.guard";
 import { RequirePermission } from "../../authorization/authorization.decorators";
 
-@Controller("api/v1/assignments")
+@Controller("v1/assignments")
 @UseGuards(JwtAuthGuard)
 export class AssignmentsController {
   constructor(

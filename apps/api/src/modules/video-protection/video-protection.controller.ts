@@ -17,7 +17,7 @@ import { PrismaService } from "../tenants/prisma.service";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { RequirePermission } from "../authorization/authorization.decorators";
 
-@Controller("api/video-protection")
+@Controller("video-protection")
 @UseGuards(JwtAuthGuard)
 export class VideoProtectionController {
   constructor(

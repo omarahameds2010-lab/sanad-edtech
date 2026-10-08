@@ -17,7 +17,7 @@ import { VideoProviderRegistry } from "./providers/video-provider.registry";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { RequirePermission } from "../authorization/authorization.decorators";
 
-@Controller("api/video")
+@Controller("video")
 @UseGuards(JwtAuthGuard)
 export class VideoController {
   constructor(

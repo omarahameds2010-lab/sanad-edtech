@@ -11,7 +11,7 @@ import {
 import { Request } from "express";
 import { WebhookInboxService } from "./webhook-inbox.service";
 
-@Controller("api/payments/webhooks")
+@Controller("payments/webhooks")
 export class WebhookController {
   constructor(private webhookInbox: WebhookInboxService) {}
 

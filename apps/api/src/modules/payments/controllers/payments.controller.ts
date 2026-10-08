@@ -21,7 +21,7 @@ import { ProviderRouterService } from "../routing/provider-router.service";
 import { JwtAuthGuard } from "../../auth/guards/jwt-auth.guard";
 import { RequirePermission } from "../../authorization/authorization.decorators";
 
-@Controller("api/payments")
+@Controller("payments")
 @UseGuards(JwtAuthGuard)
 export class PaymentsController {
   constructor(

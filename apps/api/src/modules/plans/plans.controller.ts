@@ -13,7 +13,7 @@ import { PlansService, PlanLimits } from "./plans.service";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { RequirePermission } from "../authorization/authorization.decorators";
 
-@Controller("api/plans")
+@Controller("plans")
 @UseGuards(JwtAuthGuard)
 export class PlansController {
   constructor(private plansService: PlansService) {}

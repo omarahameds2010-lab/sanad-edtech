@@ -16,7 +16,7 @@ import {
   RequirePermission,
 } from "../../authorization/authorization.decorators";
 
-@Controller("api/v1/enrollments")
+@Controller("v1/enrollments")
 @UseGuards(JwtAuthGuard)
 export class EnrollmentsController {
   constructor(private enrollmentsService: EnrollmentsService) {}
