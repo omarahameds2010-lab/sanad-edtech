@@ -1,0 +1,66 @@
+{
+  "name": "@lp/motion",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Motion System for Learning Platform",
+  "main": "dist/index.js",
+  "module": "dist/index.mjs",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js"
+    },
+    "./tokens": {
+      "types": "./dist/tokens/index.d.ts",
+      "import": "./dist/tokens/index.mjs",
+      "require": "./dist/tokens/index.js"
+    },
+    "./primitives": {
+      "types": "./dist/primitives/index.d.ts",
+      "import": "./dist/primitives/index.mjs",
+      "require": "./dist/primitives/index.js"
+    },
+    "./transitions": {
+      "types": "./dist/transitions/index.d.ts",
+      "import": "./dist/transitions/index.mjs",
+      "require": "./dist/transitions/index.js"
+    },
+    "./patterns": {
+      "types": "./dist/patterns/index.d.ts",
+      "import": "./dist/patterns/index.mjs",
+      "require": "./dist/patterns/index.js"
+    },
+    "./reduced-motion": {
+      "types": "./dist/reduced-motion/index.d.ts",
+      "import": "./dist/reduced-motion/index.mjs",
+      "require": "./dist/reduced-motion/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint . --ext .ts,.tsx",
+    "test": "vitest run"
+  },
+  "peerDependencies": {
+    "react": ">=18",
+    "react-dom": ">=18",
+    "framer-motion": ">=10"
+  },
+  "devDependencies": {
+    "@types/react": "^18.2.0",
+    "@types/react-dom": "^18.2.0",
+    "typescript": "^5.3.0",
+    "tsup": "^8.0.0",
+    "vitest": "^1.0.0",
+    "framer-motion": "^10"
+  },
+  "peerDependenciesMeta": {
+    "framer-motion": {
+      "optional": true
+    }
+  }
+}

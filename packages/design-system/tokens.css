@@ -1,95 +1,558 @@
-/* ============================================================
-   @lp/design-system — Master Identity Tokens
-   ONE LEARNING UNIVERSE. MANY LEARNING IDENTITIES.
-   ============================================================ */
+/**
+ * Design System CSS Custom Properties
+ * 
+ * Global CSS custom properties for the design system.
+ * Import this file in your global CSS to enable all design tokens.
+ * 
+ * @package @lp/design-system
+ */
 
-:root {
-  /* ---------- Master surfaces ---------- */
-  --bg-base: #121316;          /* deep graphite / near black */
-  --bg-surface: #1a1c23;       /* warm dark surface */
-  --bg-elevated: #22242d;      /* elevated panel */
-  --text-primary: #f4f4f6;     /* warm off-white */
-  --text-muted: #8c909e;       /* subtle neutral */
-  --border-subtle: rgba(244, 244, 246, 0.08);
-
-  /* ---------- Tenant / Subject adaptive ---------- */
-  --tenant-accent: #d4a373;          /* default amber; tenants override */
-  --tenant-motif-opacity: 0.15;
-
-  /* ---------- Semantic (components never reference --tenant-accent) ---------- */
-  --color-action: var(--tenant-accent);
-  --color-focus: var(--tenant-accent);
-  --color-brand: var(--tenant-accent);
-
-  /* ---------- Typography scale ---------- */
-  --font-display: "IBM Plex Sans Arabic", "Inter", system-ui, sans-serif;
-  --font-body: "IBM Plex Sans Arabic", "Inter", system-ui, sans-serif;
-  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
-
-  /* ---------- Spacing / grid ---------- */
-  --space-unit: 4px;
-  --space-xs: 4px;
-  --space-sm: 8px;
-  --space-md: 16px;
-  --space-lg: 24px;
-  --space-xl: 40px;
-  --space-2xl: 64px;
-  --radius-card: 12px;
-  --radius-control: 8px;
-
-  /* ---------- Motion tokens ---------- */
-  --motion-instant: 80ms;
-  --motion-fast: 140ms;
-  --motion-standard: 220ms;
-  --motion-medium: 320ms;
-  --motion-slow: 450ms;
-  --motion-emphasis: 650ms;
-  --motion-hero: 900ms;
-
-  /* ---------- Easing ---------- */
-  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
-  --ease-enter: cubic-bezier(0, 0, 0.2, 1);
-  --ease-exit: cubic-bezier(0.4, 0, 1, 1);
-
-  /* ---------- Motion distance scale ---------- */
-  --motion-distance-xs: 2px;
-  --motion-distance-sm: 4px;
-  --motion-distance-md: 12px;
-  --motion-distance-lg: 24px;
-}
-
-/* ---------- Reduced motion ---------- */
-@media (prefers-reduced-motion: reduce) {
+@layer base {
+  /* ============================================
+     COLOR SYSTEM
+     ============================================ */
   :root {
-    --motion-instant: 0ms;
-    --motion-fast: 0ms;
-    --motion-standard: 0ms;
-    --motion-medium: 0ms;
-    --motion-slow: 0ms;
-    --motion-emphasis: 0ms;
-    --motion-hero: 0ms;
-  }
+    /* ============================================
+       MASTER COLOR PALETTE
+       ============================================ */
+    
+    /* Base Neutrals - Deep Graphite / Near Black / Warm Off-White */
+    --color-neutral-0: #ffffff;
+    --color-neutral-50: #fafafa;
+    --color-neutral-100: #f5f5f5;
+    --color-neutral-200: #e5e5e5;
+    --color-neutral-300: #d4d4d4;
+    --color-neutral-400: #a3a3a3;
+    --color-neutral-500: #737373;
+    --color-neutral-600: #525252;
+    --color-neutral-700: #404040;
+    --color-neutral-800: #262626;
+    --color-neutral-900: #171717;
+    --color-neutral-950: #0a0a0a;
+    --color-neutral-1000: #030303;
 
-  *,
-  *::before,
-  *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-    scroll-behavior: auto !important;
+    /* Warm Neutrals */
+    --color-warm-50: #fdfcfb;
+    --color-warm-100: #faf8f3;
+    --color-warm-200: #f5eee5;
+    --color-warm-300: #ebddd0;
+    --color-warm-400: #e0c9ad;
+    --color-warm-500: #d4b88c;
+    --color-warm-600: #c4a070;
+    --color-warm-700: #a88052;
+    --color-warm-800: #87633e;
+    --color-warm-900: #6b4e33;
+
+    /* Primary - Electric/Intelligent Amber */
+    --color-primary-50: #fff8ed;
+    --color-primary-100: #fff0d6;
+    --color-primary-200: #ffdeac;
+    --color-primary-300: #ffc975;
+    --color-primary-400: #ffb13d;
+    --color-primary-500: #ff9900;  /* Primary amber */
+    --color-primary-600: #e67e00;
+    --color-primary-700: #cc6600;
+    --color-primary-800: #a35000;
+    --color-primary-900: #804000;
+    --color-primary-950: #4d2000;
+
+    /* Subject Accent Families */
+    /* Math - Blue (Precision) */
+    --color-subject-math-light: #3b82f6;
+    --color-subject-math-main: #2563eb;
+    --color-subject-math-dark: #1d4ed8;
+    --color-subject-math-bg: #eff6ff;
+    --color-subject-math-border: #bfdbfe;
+
+    /* Physics - Orange (Energy) */
+    --color-subject-physics-light: #f97316;
+    --color-subject-physics-main: #ea580c;
+    --color-subject-physics-dark: #c2410c;
+    --color-subject-physics-bg: #fff7ed;
+    --color-subject-physics-border: #fed7aa;
+
+    /* Arabic - Amber/Gold (Culture) */
+    --color-subject-arabic-light: #d4a373;
+    --color-subject-arabic-main: #d4a373;
+    --color-subject-arabic-dark: #b89050;
+    --color-subject-arabic-bg: #fdf8f0;
+    --color-subject-arabic-border: #fde8c8;
+
+    /* English - Violet (Expression) */
+    --color-subject-english-light: #8b5cf6;
+    --color-subject-english-main: #7c3aed;
+    --color-subject-english-dark: #6d28d9;
+    --color-subject-english-bg: #f5f3ff;
+    --color-subject-english-border: #ddd6fe;
+
+    /* Chemistry - Emerald (Science) */
+    --color-subject-chemistry-light: #10b981;
+    --color-subject-chemistry-main: #059669;
+    --color-subject-chemistry-dark: #047857;
+    --color-subject-chemistry-bg: #ecfdf5;
+    --color-subject-chemistry-border: #a7f3d0;
+
+    /* Computer Science - Indigo (Logic) */
+    --color-subject-cs-light: #6366f1;
+    --color-subject-cs-main: #4f46e5;
+    --color-subject-cs-dark: #4338ca;
+    --color-subject-cs-bg: #eef2ff;
+    --color-subject-cs-border: #c7d2fe;
+
+    /* Semantic Status Colors */
+    --color-status-success-light: #86efac;
+    --color-status-success-main: #22c55e;
+    --color-status-success-dark: #16a34a;
+    --color-status-success-bg: #f0fdf4;
+    --color-status-success-border: #bbf7d0;
+
+    --color-status-warning-light: #fde047;
+    --color-status-warning-main: #f59e0b;
+    --color-status-warning-dark: #d97706;
+    --color-status-warning-bg: #fffbeb;
+    --color-status-warning-border: #fde68a;
+
+    --color-status-error-light: #fca5a5;
+    --color-status-error-main: #ef4444;
+    --color-status-error-dark: #dc2626;
+    --color-status-error-bg: #fef2f2;
+    --color-status-error-border: #fecaca;
+
+    --color-status-info-light: #93c5fd;
+    --color-status-info-main: #3b82f6;
+    --color-status-info-dark: #2563eb;
+    --color-status-info-bg: #eff6ff;
+    --color-status-info-border: #bfdbfe;
+
+    /* ============================================
+       BACKGROUND SYSTEM
+       ============================================ */
+    --color-bg-primary: #ffffff;
+    --color-bg-secondary: #fafafa;
+    --color-bg-tertiary: #f5f5f5;
+    --color-bg-inverse: #030303;
+    --color-bg-overlay: rgba(3, 3, 3, 0.5);
+
+    /* Surface System */
+    --color-surface-primary: #ffffff;
+    --color-surface-secondary: #fafafa;
+    --color-surface-tertiary: #f5f5f5;
+    --color-surface-elevated: #ffffff;
+    --color-surface-sunken: #f5f5f5;
+    --color-surface-overlay: rgba(255, 255, 255, 0.95);
+
+    /* Border System */
+    --color-border-light: #e5e5e5;
+    --color-border-main: #d4d4d4;
+    --color-border-dark: #a3a3a3;
+    --color-border-focus: #ff9900;
+    --color-border-error: #ef4444;
+    --color-border-success: #22c55e;
+
+    /* Text System */
+    --color-text-primary: #171717;
+    --color-text-secondary: #525252;
+    --color-text-tertiary: #a3a3a3;
+    --color-text-inverse: #ffffff;
+    --color-text-link: #ff9900;
+    --color-text-disabled: #a3a3a3;
+
+    /* ============================================
+       SEMANTIC COLOR MAP
+       ============================================ */
+    --color-action: #ff9900;
+    --color-focus: #ff9900;
+    --color-brand: #ff9900;
+
+    --color-success: #22c55e;
+    --color-warning: #f59e0b;
+    --color-error: #ef4444;
+    --color-info: #3b82f6;
+
+    --color-bg-primary: #ffffff;
+    --color-bg-secondary: #fafafa;
+    --color-bg-tertiary: #f5f5f5;
+
+    --color-surface-primary: #ffffff;
+    --color-surface-secondary: #fafafa;
+    --color-surface-elevated: #ffffff;
+
+    --color-text-primary: #171717;
+    --color-text-secondary: #525252;
+    --color-text-muted: #a3a3a3;
+    --color-text-inverse: #ffffff;
+    --color-text-link: #ff9900;
+    --color-text-disabled: #a3a3a3;
+
+    --color-border-light: #e5e5e5;
+    --color-border-main: #d4d4d4;
+    --color-border-focus: #ff9900;
+    --color-border-error: #ef4444;
+    --color-border-success: #22c55e;
+
+    /* ============================================
+       SPACING SYSTEM (4px base unit)
+       ============================================ */
+    --space-0: 0;
+    --space-1: 4px;
+    --space-2: 8px;
+    --space-3: 12px;
+    --space-4: 16px;
+    --space-5: 20px;
+    --space-6: 24px;
+    --space-8: 32px;
+    --space-10: 40px;
+    --space-12: 48px;
+    --space-16: 64px;
+    --space-20: 80px;
+    --space-24: 96px;
+
+    /* Semantic spacing */
+    --space-xs: 4px;
+    --space-sm: 8px;
+    --space-md: 16px;
+    --space-lg: 24px;
+    --space-xl: 32px;
+    --space-2xl: 48px;
+    --space-3xl: 64px;
+    --space-4xl: 96px;
+
+    /* Component spacing */
+    --space-component-xs: 4px;
+    --space-component-sm: 8px;
+    --space-component-md: 12px;
+    --space-component-lg: 16px;
+    --space-component-xl: 24px;
+
+    --space-layout-xs: 8px;
+    --space-layout-sm: 16px;
+    --space-layout-md: 24px;
+    --space-layout-lg: 32px;
+    --space-layout-xl: 48px;
+
+    --space-section-sm: 24px;
+    --space-section-md: 48px;
+    --space-section-lg: 72px;
+    --space-section-xl: 96px;
+
+    /* ============================================
+       TYPOGRAPHY
+       ============================================ */
+    /* Font Families */
+    --font-sans-arabic: "IBM Plex Sans Arabic", "Noto Sans Arabic", system-ui, sans-serif;
+    --font-sans-latin: "Inter", "IBM Plex Sans", system-ui, sans-serif;
+    --font-mono-arabic: "IBM Plex Mono Arabic", "JetBrains Mono", monospace;
+    --font-mono-latin: "JetBrains Mono", "IBM Plex Mono", monospace;
+
+    /* Font Weights */
+    --font-weight-thin: 100;
+    --font-weight-extralight: 200;
+    --font-weight-light: 300;
+    --font-weight-normal: 400;
+    --font-weight-medium: 500;
+    --font-weight-semibold: 600;
+    --font-weight-bold: 700;
+    --font-weight-extrabold: 800;
+    --font-weight-black: 900;
+
+    /* Line Heights */
+    --line-height-none: 1;
+    --line-height-tight: 1.1;
+    --line-height-snug: 1.375;
+    --line-height-normal: 1.5;
+    --line-height-relaxed: 1.625;
+    --line-height-loose: 2;
+
+    /* Font Sizes - Display */
+    --text-display-2xl: 72px;
+    --text-display-xl: 60px;
+    --text-display-lg: 48px;
+    --text-display-md: 36px;
+    --text-display-sm: 30px;
+    --text-display-xs: 24px;
+
+    /* Headings */
+    --text-h1: 30px;
+    --text-h2: 24px;
+    --text-h3: 20px;
+    --text-h4: 18px;
+    --text-h5: 16px;
+    --text-h6: 14px;
+
+    /* Body */
+    --text-body-xl: 20px;
+    --text-body-lg: 18px;
+    --text-body-md: 16px;
+    --text-body-sm: 14px;
+    --text-body-xs: 12px;
+
+    /* UI Text */
+    --text-ui-xl: 14px;
+    --text-ui-md: 13px;
+    --text-ui-sm: 12px;
+    --text-ui-xs: 11px;
+
+    /* Line Heights */
+    --leading-none: 1;
+    --leading-tight: 1.1;
+    --leading-snug: 1.375;
+    --leading-normal: 1.5;
+    --leading-relaxed: 1.625;
+    --leading-loose: 2;
+
+    /* ============================================
+       MOTION SYSTEM
+       ============================================ */
+    --motion-instant: 80ms;
+    --motion-fast: 140ms;
+    --motion-standard: 220ms;
+    --motion-medium: 320ms;
+    --motion-slow: 450ms;
+    --motion-emphasis: 650ms;
+    --motion-hero: 900ms;
+
+    /* Easing */
+    --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+    --ease-enter: cubic-bezier(0, 0, 0.2, 1);
+    --ease-exit: cubic-bezier(0.4, 0, 1, 1);
+    --ease-emphasized: cubic-bezier(0.05, 0.7, 0.1, 1);
+    --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+    --ease-enter: cubic-bezier(0, 0, 0.2, 1);
+    --ease-exit: cubic-bezier(0.4, 0, 1, 1);
+    --ease-emphasized: cubic-bezier(0.05, 0.7, 0.1, 1);
+
+    /* Motion Durations */
+    --motion-instant: 80ms;
+    --motion-fast: 140ms;
+    --motion-standard: 220ms;
+    --motion-medium: 320ms;
+    --motion-slow: 450ms;
+    --motion-emphasis: 650ms;
+    --motion-hero: 900ms;
+
+    /* Easing curves */
+    --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+    --ease-enter: cubic-bezier(0, 0, 0.2, 1);
+    --ease-exit: cubic-bezier(0.4, 0, 1, 1);
+    --ease-emphasized: cubic-bezier(0.05, 0.7, 0.1, 1);
+
+    /* Motion durations */
+    --motion-instant: 80ms;
+    --motion-fast: 140ms;
+    --motion-standard: 220ms;
+    --motion-medium: 320ms;
+    --motion-slow: 450ms;
+    --motion-emphasis: 650ms;
+    --motion-hero: 900ms;
+
+    /* ============================================
+       BORDER RADIUS
+       ============================================ */
+    --radius-none: 0;
+    --radius-xs: 2px;
+    --radius-sm: 4px;
+    --radius-md: 8px;
+    --radius-lg: 12px;
+    --radius-xl: 16px;
+    --radius-2xl: 24px;
+    --radius-3xl: 32px;
+    --radius-full: 9999px;
+
+    /* Component radius */
+    --radius-button: 8px;
+    --radius-input: 8px;
+    --radius-card: 12px;
+    --radius-modal: 16px;
+    --radius-drawer: 16px;
+    --radius-tooltip: 8px;
+    --radius-badge: 9999px;
+    --radius-avatar: 9999px;
+
+    /* ============================================
+       SHADOWS
+       ============================================ */
+    --shadow-none: none;
+    --shadow-xs: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+    --shadow-sm: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+    --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+    --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+    --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+    --shadow-2xl: 0 25px 50px -12px rgb(0 0 0 / 0.25);
+    --shadow-inner: inset 0 2px 4px 0 rgb(0 0 0 / 0.05);
+
+    /* ============================================
+       Z-INDEX
+       ============================================ */
+    --z-hide: -1;
+    --z-base: 0;
+    --z-content: 1;
+    --z-dropdown: 100;
+    --z-sticky: 200;
+    --z-fixed: 300;
+    --z-drawer: 400;
+    --z-modal: 500;
+    --z-popover: 600;
+    --z-tooltip: 700;
+    --z-toast: 800;
+    --z-max: 9999;
+
+    /* ============================================
+       BREAKPOINTS
+       ============================================ */
+    --bp-xs: 320px;
+    --bp-sm: 640px;
+    --bp-md: 768px;
+    --bp-lg: 1024px;
+    --bp-xl: 1280px;
+    --bp-2xl: 1536px;
+
+    /* ============================================
+       CONTAINERS
+       ============================================ */
+    --container-xs: 320px;
+    --container-sm: 640px;
+    --container-md: 768px;
+    --container-lg: 1024px;
+    --container-xl: 1280px;
+    --container-2xl: 1400px;
+    --container-2xl: 1400px;
+
+    /* ============================================
+       TRANSITIONS
+       ============================================ */
+    --transition-fast: 150ms;
+    --transition-normal: 200ms;
+    --transition-slow: 300ms;
+
+    /* ============================================
+       REDUCED MOTION
+       ============================================ */
+    @media (prefers-reduced-motion: reduce) {
+      *,
+      *::before,
+      *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+      }
+    }
+
+    /* ============================================
+       RTL SUPPORT
+       ============================================ */
+    [dir="rtl"] {
+      direction: rtl;
+      text-align: right;
+    }
+
+    /* ============================================
+       FOCUS RING
+       ============================================ */
+    :focus-visible {
+      outline: 2px solid var(--color-primary-500);
+      outline-offset: 2px;
+    }
+
+    /* ============================================
+       SCROLLBAR
+       ============================================ */
+    ::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: var(--color-neutral-100);
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: var(--color-neutral-400);
+      border-radius: 9999px;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+      background: var(--color-neutral-500);
+    }
   }
 }
 
-/* ---------- RTL: logical properties baseline ---------- */
-[dir="rtl"] {
-  direction: rtl;
-  text-align: right;
+@layer components {
+  /* ============================================
+     FOCUS RING UTILITY
+     ============================================ */
+  .focus-ring {
+    @media (prefers-reduced-motion: no-preference) {
+      transition: box-shadow var(--motion-fast) var(--ease-standard);
+    }
+  }
+
+  .focus-ring:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 2px var(--color-bg-primary), 0 0 0 4px var(--color-primary-500);
+  }
+
+  /* ============================================
+     FOCUS RING - INSET
+     ============================================ */
+  .focus-ring-inset:focus-visible {
+    outline: none;
+    box-shadow: inset 0 0 0 2px var(--color-primary-500);
+  }
+
+  /* ============================================
+     FOCUS RING - OFFSET
+     ============================================ */
+  .focus-ring-offset {
+    box-shadow: 0 0 0 2px var(--color-bg-primary), 0 0 0 4px var(--color-primary-500);
+  }
 }
 
-/* ---------- Base body ---------- */
-body {
-  background-color: var(--bg-base);
-  color: var(--text-primary);
-  font-family: var(--font-body);
-  margin: 0;
+@layer utilities {
+  /* ============================================
+     FOCUS RING UTILITIES
+     ============================================ */
+  .focus-ring {
+    @media (prefers-reduced-motion: no-preference) {
+      transition: box-shadow var(--motion-fast) var(--ease-standard);
+    }
+  }
+
+  .focus-ring:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 2px var(--color-bg-primary), 0 0 0 4px var(--color-primary-500);
+  }
+
+  .focus-ring-inset:focus-visible {
+    outline: none;
+    box-shadow: inset 0 0 0 2px var(--color-primary-500);
+  }
+
+  .focus-ring-offset {
+    box-shadow: 0 0 0 2px var(--color-bg-primary), 0 0 0 4px var(--color-primary-500);
+  }
+
+  /* ============================================
+     MOTION UTILITIES
+     ============================================ */
+  .motion-reduce {
+    @media (prefers-reduced-motion: reduce) {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+
+  /* ============================================
+     FOCUS UTILITIES
+     ============================================ */
+  .focus-visible-ring:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 2px var(--color-bg-primary), 0 0 0 4px var(--color-primary-500);
+  }
+
+  .focus-visible-ring-inset:focus-visible {
+    outline: none;
+    box-shadow: inset 0 0 0 2px var(--color-primary-500);
+  }
 }
