@@ -27,20 +27,6 @@ export const breakpoints = {
 } as const;
 
 // ============================================
-// BREAKPOINT VALUES (for media queries)
-// ============================================
-
-export const breakpoints = {
-  xs: '320px',
-  sm: '640px',
-  md: '768px',
-  lg: '1024px',
-  xl: '1280px',
-  '2xl': '1536px',
-  '3xl': '1920px',
-} as const;
-
-// ============================================
 // MEDIA QUERIES
 // ============================================
 
@@ -110,31 +96,6 @@ export const containerQuery = {
 
 // ============================================
 // CONTAINER SIZES
-// ============================================
-
-export const container = {
-  // Max-width constraints
-  xs: '320px',
-  sm: '640px',
-  md: '768px',
-  lg: '1024px',
-  xl: '1280px',
-  '2xl': '1400px',
-  '3xl': '1536px',
-  full: '100%',
-
-  // Padding
-  padding: {
-    none: '0',
-    sm: '16px',
-    md: '24px',
-    lg: '32px',
-    xl: '48px',
-  },
-} as const;
-
-// ============================================
-// CONTAINER SIZES (for layout)
 // ============================================
 
 export const containerSize = {
@@ -214,42 +175,6 @@ export const grid = {
 } as const;
 
 // ============================================
-// CONTAINER SIZES
-// ============================================
-
-export const containerSize = {
-  // Max-width constraints
-  xs: '320px',
-  sm: '640px',
-  md: '768px',
-  lg: '1024px',
-  xl: '1280px',
-  '2xl': '1400px',
-  '3xl': '1536px',
-  full: '100%',
-  prose: '65ch',
-} as const;
-
-// ============================================
-// CONTAINER PADDING
-// ============================================
-
-export const containerPadding = {
-  none: '0',
-  sm: '16px',
-  md: '24px',
-  lg: '32px',
-  xl: '48px',
-  responsive: {
-    xs: '16px',
-    sm: '24px',
-    md: '32px',
-    lg: '48px',
-    xl: '64px',
-  },
-} as const;
-
-// ============================================
 // FLEX/GRID UTILITIES
 // ============================================
 
@@ -325,11 +250,6 @@ export const flexBasis = {
   '1/5': '20%',
   '1/6': '16.666667%',
   full: '100%',
-  '1/2': '50%',
-  '1/3': '33.333333%',
-  '1/4': '25%',
-  '1/5': '20%',
-  '1/6': '16.666667%',
 } as const;
 
 // Type exports

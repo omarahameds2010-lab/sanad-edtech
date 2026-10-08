@@ -24,26 +24,7 @@ const sizeStyles = {
   sm: { iconSize: 48, titleSize: 16, padding: 24, maxWidth: 280 },
   md: { iconSize: 80, titleSize: 20, padding: 32, maxWidth: 360 },
   lg: { iconSize: 120, titleSize: 24, padding: 48, maxWidth: 480 },
-};
-
-export interface EmptyStateProps {
-  icon?: React.ReactNode;
-  title: string;
-  description?: string;
-  action?: {
-    label: string;
-    onClick: () => void;
-    variant?: 'primary' | 'secondary' | 'outline';
-  };
-  size?: 'sm' | 'md' | 'lg';
-  illustration?: React.ReactNode;
-}
-
-const sizeStyles = {
-  sm: { iconSize: 48, titleSize: 16, padding: 24, maxWidth: 280 },
-  md: { iconSize: 80, titleSize: 20, padding: 32, maxWidth: 360 },
-  lg: { iconSize: 120, titleSize: 24, padding: 48, maxWidth: 480 },
-};
+} as const;
 
 const EmptyState = forwardRef<HTMLDivElement, EmptyStateProps>(
   ({ icon, title, description, action, size = 'md', illustration, ...props }, ref) => {
@@ -63,7 +44,7 @@ const EmptyState = forwardRef<HTMLDivElement, EmptyStateProps>(
           padding: sizeStyle.padding,
           maxWidth: sizeStyle.maxWidth,
           margin: 'auto',
-        }
+        }}
       >
         {illustration || icon ? (
           <motion.div
@@ -135,7 +116,6 @@ const EmptyState = forwardRef<HTMLDivElement, EmptyStateProps>(
             }}
             whileHover={{ backgroundColor: 'var(--color-primary-hover)' }}
             whileTap={{ scale: 0.98 }}
-            onClick={() => { onClick?.(); }}
           >
             {action.label}
           </motion.button>

@@ -26,12 +26,3 @@ export {
   generateTenantTheme,
   generateCSSVariables,
 } from './theme';
-
-// Re-export types
-export type {
-  ThemeConfig,
-  ThemeContext,
-  ResolvedTheme,
-  TenantThemeConfig,
-  SubjectTheme,
-} from './theme';

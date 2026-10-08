@@ -22,7 +22,7 @@ const sizeStyles = {
   sm: { padding: '2px 6px', fontSize: '10px', borderRadius: 'var(--radius-sm)' },
   md: { padding: '3px 8px', fontSize: '11px', borderRadius: 'var(--radius-md)' },
   lg: { padding: '4px 10px', fontSize: '12px', borderRadius: 'var(--radius-lg)' },
-};
+} as const;
 
 const variantStyles = {
   default: { background: 'var(--color-primary-100)', color: 'var(--color-primary)' },
@@ -31,17 +31,7 @@ const variantStyles = {
   error: { background: 'var(--color-error-bg)', color: 'var(--color-error)' },
   info: { background: 'var(--color-info-bg)', color: 'var(--color-info)' },
   neutral: { background: 'var(--color-neutral-100)', color: 'var(--color-text-primary)' },
-};
-
-export interface BadgeProps {
-  children: React.ReactNode;
-  variant?: 'default' | 'success' | 'warning' | 'error' | 'info' | 'neutral';
-  size?: 'sm' | 'md' | 'lg';
-  dot?: boolean;
-  dotColor?: string;
-  removable?: boolean;
-  onRemove?: () => void;
-}
+} as const;
 
 const Badge = forwardRef<HTMLSpanElement, BadgeProps>(
   ({ children, variant = 'default', size = 'md', dot, dotColor, removable, onRemove, ...props }, ref) => {
@@ -55,17 +45,16 @@ const Badge = forwardRef<HTMLSpanElement, BadgeProps>(
           display: 'inline-flex',
           alignItems: 'center',
           gap: '4px',
-          padding: sizeStyles[size].padding,
-          fontSize: sizeStyles[size].fontSize,
+          padding: sizeStyle.padding,
+          fontSize: sizeStyle.fontSize,
           fontWeight: 600,
           lineHeight: 1,
-          borderRadius: sizeStyles[size].borderRadius,
-          backgroundColor: variantStyles[variant].background,
-          color: variantStyles[variant].color,
-          fontWeight: 600,
+          borderRadius: sizeStyle.borderRadius,
+          backgroundColor: variantStyle.background,
+          color: variantStyle.color,
           whiteSpace: 'nowrap',
           ...props,
-        }
+        }}
         initial={{ scale: 0 }}
         animate={{ scale: 1 }}
         exit={{ scale: 0, opacity: 0 }}

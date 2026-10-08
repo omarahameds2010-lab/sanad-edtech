@@ -118,95 +118,14 @@ export const zIndexMap = {
 
   // Popovers
   popover: 600,
-  popover: 600,
   tooltip: 700,
-  popover: 600,
 
   // Tooltips
-  tooltip: 700,
-  tooltip: 700,
-  tour: 700,
-
-  // Toasts & notifications
-  toast: 800,
-  toast: 800,
-  notification: 800,
-  notification: 800,
-  banner: 800,
-  snackbar: 800,
-
-  // System
-  loader: 900,
-  loader: 900,
-  modal: 500,
-  modalBackdrop: 499,
-  notification: 800,
-  banner: 800,
-
-  // Max
-  max: 9999,
-} as const;
-
-// ============================================
-// SEMANTIC Z-INDEX MAP
-// ============================================
-
-export const zIndexMap = {
-  // Base
-  base: 0,
-  content: 1,
-
-  // Dropdowns
-  dropdown: 100,
-  select: 100,
-  autocomplete: 100,
-  combobox: 100,
-  menu: 100,
-  popover: 100,
-
-  // Sticky elements
-  sticky: 200,
-  header: 200,
-  nav: 200,
-  tabs: 200,
-  toolbar: 200,
-
-  // Fixed elements
-  fixed: 300,
-  header: 200,
-  footer: 200,
-  sidebar: 200,
-  chat: 300,
-  chatButton: 300,
-
-  // Overlays
-  drawer: 400,
-  sidebar: 400,
-  sheet: 400,
-  drawerBackdrop: 399,
-
-  // Modals
-  modal: 500,
-  dialog: 500,
-  modalBackdrop: 499,
-  alert: 500,
-  confirm: 500,
-
-  // Popovers
-  popover: 600,
-  popover: 600,
-  tooltip: 700,
-  popover: 600,
-
-  // Tooltips
-  tooltip: 700,
   tooltip: 700,
   tour: 700,
 
   // Toast/Notification
   toast: 800,
-  toast: 800,
-  notification: 800,
   notification: 800,
   banner: 800,
   snackbar: 800,

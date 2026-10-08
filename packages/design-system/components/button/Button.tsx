@@ -1,6 +1,5 @@
 import { forwardRef } from 'react';
 import { motion, HTMLMotionProps } from 'framer-motion';
-import { motionStyles } from '../styles';
 
 export interface ButtonProps extends HTMLMotionProps<'button'> {
   /** Button variant */
@@ -64,7 +63,7 @@ const variantStyles = {
     hover: { background: 'var(--color-success-dark)' },
     active: { background: 'var(--color-success-dark)' },
   },
-};
+} as const;
 
 const sizeStyles = {
   xs: { padding: '4px 8px', fontSize: '11px', height: '24px', gap: '4px' },
@@ -72,28 +71,9 @@ const sizeStyles = {
   md: { padding: '8px 16px', fontSize: '14px', height: '36px', gap: '8px' },
   lg: { padding: '12px 24px', fontSize: '16px', height: '44px', gap: '10px' },
   xl: { padding: '16px 32px', fontSize: '16px', height: '52px', gap: '12px' },
-};
+} as const;
 
-export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  /** Button variant */
-  variant?: 'primary' | 'secondary' | 'outline' | 'ghost' | 'danger' | 'success';
-  /** Button size */
-  size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl';
-  /** Loading state */
-  loading?: boolean;
-  /** Loading text */
-  loadingText?: string;
-  /** Full width */
-  fullWidth?: boolean;
-  /** Left icon */
-  leftIcon?: React.ReactNode;
-  /** Right icon */
-  rightIcon?: React.ReactNode;
-  /** Disable animation */
-  disableAnimation?: boolean;
-}
-
-export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
+const Button = forwardRef<HTMLButtonElement, ButtonProps>(
   (
     {
       variant = 'primary',
@@ -121,7 +101,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
       display: 'inline-flex',
       alignItems: 'center',
       justifyContent: 'center',
-      gap: '8px',
+      gap: sizeStyle.gap,
       fontWeight: 500,
       borderRadius: 'var(--radius-md)',
       fontFamily: 'var(--font-sans)',
@@ -131,8 +111,8 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
       border: 'none',
       outline: 'none',
       width: fullWidth ? '100%' : 'auto',
-      ...sizeStyles[size],
-      ...variantStyles[variant],
+      ...sizeStyle,
+      ...variantStyle,
     };
 
     const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -159,8 +139,6 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
         onClick={handleClick}
         style={{
           ...baseStyles,
-          ...sizeStyles[size],
-          ...variantStyles[variant],
         } as React.CSSProperties}
         whileHover={!disabled && !loading ? { scale: 1.02 } : undefined}
         whileTap={!loading ? { scale: 0.98 } : undefined}
@@ -168,7 +146,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
         {...props}
       >
         {loading ? (
-          <>
+          <React.Fragment>
             <motion.span
               animate={{ rotate: 360 }}
               transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
@@ -179,13 +157,13 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
               </svg>
             </motion.span>
             <span>{loadingText || 'Loading...'}</span>
-          </>
+          </React.Fragment>
         ) : (
-          <>
+          <React.Fragment>
             {leftIcon && <span style={{ display: 'flex' }}>{leftIcon}</span>}
             <span>{children}</span>
             {rightIcon && <span style={{ display: 'flex' }}>{rightIcon}</span>
-          </>
+          </React.Fragment>
         )}
       </motion.button>
     );

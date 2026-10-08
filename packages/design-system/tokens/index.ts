@@ -12,27 +12,39 @@ export * from './border';
 export * from './zindex';
 export * from './breakpoints';
 
-// Re-export types
+// Re-export types from their source files
 export type {
   ColorScale,
   SubjectColors,
   StatusColors,
   SemanticColorMap,
+} from './colors';
+
+export type {
   SpacingScale,
   SpaceScale,
   LayoutDimensions,
   Dimensions,
+} from './spacing';
+
+export type {
   FontFamily,
   FontWeight,
   LineHeight,
   FontSizeScale,
   TextStyleMap,
+} from './typography';
+
+export type {
   DurationTokens,
   EasingTokens,
   DistanceTokens,
   MotionContext,
   ReducedMotionTokens,
   SemanticMotionMap,
+} from './motion';
+
+export type {
   BorderRadius,
   BorderWidth,
   BorderStyle,
@@ -43,6 +55,9 @@ export type {
   Opacity,
   Transform,
   Filter,
+} from './border';
+
+export type {
   ZIndex,
   ZIndexMap,
   ComponentZIndex,
@@ -51,6 +66,9 @@ export type {
   OverlayOpacity,
   BackdropBlur,
   BackdropFilter,
+} from './zindex';
+
+export type {
   Breakpoint,
   MediaQuery,
   ContainerQuery,
@@ -61,4 +79,4 @@ export type {
   FlexGrow,
   FlexShrink,
   FlexBasis,
-} from './index';
+} from './breakpoints';

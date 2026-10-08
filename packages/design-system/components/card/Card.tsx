@@ -22,6 +22,8 @@ export interface CardProps extends HTMLMotionProps<'div'> {
   };
   /** Padding */
   padding?: 'none' | 'sm' | 'md' | 'lg';
+  /** Disabled state */
+  disabled?: boolean;
 }
 
 const variantStyles = {
@@ -42,35 +44,20 @@ const variantStyles = {
     background: 'var(--color-surface-secondary)',
     border: 'none',
   },
-};
+} as const;
 
 const sizeStyles = {
   sm: { padding: '12px', borderRadius: 'var(--radius-md)' },
   md: { padding: '16px', borderRadius: 'var(--radius-lg)' },
   lg: { padding: '24px', borderRadius: 'var(--radius-xl)' },
-};
+} as const;
 
 const paddingStyles = {
   none: { padding: 0 },
   sm: { padding: '8px' },
   md: { padding: '16px' },
   lg: { padding: '24px' },
-};
-
-export interface CardProps extends React.HTMLAttributes<HTMLDivElement> {
-  variant?: 'default' | 'outlined' | 'elevated' | 'filled';
-  size?: 'sm' | 'md' | 'lg';
-  hoverable?: boolean;
-  clickable?: boolean;
-  header?: React.ReactNode;
-  footer?: React.ReactNode;
-  image?: {
-    src: string;
-    alt: string;
-    position?: 'top' | 'bottom';
-  };
-  padding?: 'none' | 'sm' | 'md' | 'lg';
-}
+} as const;
 
 const Card = forwardRef<HTMLDivElement, CardProps>(
   (
@@ -83,6 +70,7 @@ const Card = forwardRef<HTMLDivElement, CardProps>(
       footer,
       image,
       padding = 'md',
+      disabled = false,
       className = '',
       style,
       children,
@@ -91,27 +79,25 @@ const Card = forwardRef<HTMLDivElement, CardProps>(
     },
     ref
   ) => {
-    const variantStyle = variantStyles[variant];
-    const sizeStyle = sizeStyles[size];
-    const paddingStyle = paddingStyles[padding];
+    const baseStyles = {
+      ...variantStyles[variant],
+      ...sizeStyles[size],
+      ...paddingStyles[padding],
+    } as React.CSSProperties;
 
     return (
       <motion.div
         ref={ref}
+        className={className}
         style={{
-          ...variantStyles[variant],
-          ...sizeStyles[size],
-          ...paddingStyles[padding],
+          ...baseStyles,
+          ...style,
         } as React.CSSProperties}
         whileHover={hoverable && !disabled ? { y: -4, boxShadow: 'var(--shadow-lg)' } : undefined}
         whileTap={clickable ? { scale: 0.98 } : undefined}
         transition={{ duration: 0.2, ease: 'ease-out' }}
         onClick={onClick}
-        style={{
-          ...variantStyles[variant],
-          ...sizeStyles[size],
-          ...paddingStyles[padding],
-        } as React.CSSProperties}
+        {...props}
       >
         {image && image.position !== 'bottom' && (
           <img
@@ -150,7 +136,7 @@ const Card = forwardRef<HTMLDivElement, CardProps>(
               objectFit: 'cover',
             }}
           )}
-        </motion.div>
+      </motion.div>
     );
   }
 );
