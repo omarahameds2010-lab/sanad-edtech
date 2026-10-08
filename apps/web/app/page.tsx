@@ -11,6 +11,8 @@ export default function Home() {
         <Link href="/courses">تصفح الكورسات</Link>
         {' · '}
         <Link href="/student">لوحة الطالب</Link>
+        {' · '}
+        <Link href="/login">دخول</Link>
       </p>
     </main>
   );
