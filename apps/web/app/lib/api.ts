@@ -178,6 +178,27 @@ export interface LoginResult {
   user: { id: string; name: string; role: string };
 }
 
+export interface ExamListItem {
+  id: string;
+  title: string;
+  description?: string | null;
+  timerMinutes: number;
+  status: string;
+  lessonId: string;
+  lesson?: { id: string; title: string } | null;
+}
+
+export interface ExamListResult {
+  exams: ExamListItem[];
+  nextCursor: string | null;
+}
+
+export interface NextLessonRef {
+  id: string;
+  title: string;
+  type: string;
+}
+
 // ---------------------------------------------------------------------------
 // Endpoint functions
 // ---------------------------------------------------------------------------
@@ -224,6 +245,15 @@ export const api = {
   getMyAttempts: (token: string, examId: string) =>
     apiFetch<StudentAttemptSummary[]>(
       `/api/v1/exams/${examId}/attempts/me`,
+      { token },
+    ),
+
+  listExams: (token: string) =>
+    apiFetch<ExamListResult>("/api/v1/exams?status=PUBLISHED", { token }),
+
+  getNextLesson: (token: string, lessonId: string) =>
+    apiFetch<NextLessonRef | null>(
+      `/api/v1/progression/lessons/${lessonId}/next`,
       { token },
     ),
 };

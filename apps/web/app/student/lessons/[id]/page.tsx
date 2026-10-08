@@ -161,7 +161,9 @@ export default async function StudentLessonPage({ params }: { params: Promise<{ 
             <p style={{ color: 'var(--text-muted)', marginBottom: 'var(--space-md)' }}>
               هذا الاختبار مدته 70 دقيقة وماكن تديره إلا مرة واحدة. تم خلط الأسئلة تلقائياً.
             </p>
-            <button style={{ background: '#ef4444', color: 'white' }}>بدء الاختبار</button>
+            <button style={{ background: '#ef4444', color: 'white' }}>
+              <Link href="/student/exams" style={{ color: 'white' }}>بدء الاختبار</Link>
+            </button>
           </div>
         )}
 
