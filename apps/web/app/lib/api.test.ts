@@ -94,3 +94,43 @@ describe("newIdempotencyKey", () => {
     expect(keys.size).toBe(50);
   });
 });
+
+describe("teacher grading endpoints", () => {
+  it("getGradingQueue supports an optional status filter", async () => {
+    const { fetchMock } = mockFetchOnce({ data: { attempts: [], nextCursor: null } });
+    await api.getGradingQueue("t", "exam-1", "SUBMITTED");
+    const [url] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toContain("/api/v1/exams/exam-1/attempts/grading?status=SUBMITTED");
+  });
+
+  it("getGradingQueue omits the filter when absent", async () => {
+    const { fetchMock } = mockFetchOnce({ data: { attempts: [], nextCursor: null } });
+    await api.getGradingQueue("t", "exam-1");
+    const [url] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe("http://localhost:3001/api/v1/exams/exam-1/attempts/grading");
+  });
+
+  it("gradeAttempt posts score and feedback", async () => {
+    const { fetchMock } = mockFetchOnce({
+      data: { id: "a1", status: "GRADED", score: 85 },
+    });
+    const result = await api.gradeAttempt("t", "a1", {
+      score: 85,
+      feedback: "Good",
+    });
+    expect(result.score).toBe(85);
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(init.method).toBe("POST");
+    expect(JSON.parse(init.body as string)).toEqual({
+      score: 85,
+      feedback: "Good",
+    });
+  });
+
+  it("getTeacherExam requests questions", async () => {
+    const { fetchMock } = mockFetchOnce({ data: { id: "e1", questions: [] } });
+    await api.getTeacherExam("t", "e1");
+    const [url] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toContain("/api/v1/exams/e1?questions=true");
+  });
+});

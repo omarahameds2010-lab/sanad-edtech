@@ -228,6 +228,55 @@ export interface StudentLesson {
   videos: LessonVideo[];
 }
 
+export interface TeacherExamQuestion extends ExamQuestionView {
+  correctAnswer?: unknown;
+}
+
+export interface TeacherExamDetail {
+  id: string;
+  title: string;
+  description?: string | null;
+  instructions?: string | null;
+  timerMinutes: number;
+  passingScore: number;
+  maxAttempts: number;
+  status: string;
+  lessonId: string;
+  questions: TeacherExamQuestion[];
+}
+
+export interface GradingAttempt {
+  id: string;
+  examId: string;
+  studentId: string;
+  attemptNumber: number;
+  status: string;
+  startedAt: string;
+  submittedAt: string | null;
+  score: number | null;
+  passed: boolean | null;
+  answers: ExamAnswer[] | null;
+  gradingData?: unknown;
+  gradedAt?: string | null;
+  gradedBy?: string | null;
+  student: { id: string; name: string; phone: string; email: string | null };
+  timeRemainingSeconds?: number;
+  isExpired?: boolean;
+}
+
+export interface GradingQueueResult {
+  attempts: GradingAttempt[];
+  nextCursor: string | null;
+}
+
+export interface GradeAttemptResult {
+  id: string;
+  status: string;
+  score: number;
+  passed: boolean;
+  gradedAt: string;
+}
+
 // ---------------------------------------------------------------------------
 // Endpoint functions
 // ---------------------------------------------------------------------------
@@ -288,4 +337,27 @@ export const api = {
 
   getStudentLesson: (token: string, lessonId: string) =>
     apiFetch<StudentLesson>(`/api/v1/student/lessons/${lessonId}`, { token }),
+
+  getTeacherExam: (token: string, examId: string) =>
+    apiFetch<TeacherExamDetail>(
+      `/api/v1/exams/${examId}?questions=true`,
+      { token },
+    ),
+
+  getGradingQueue: (token: string, examId: string, status?: string) =>
+    apiFetch<GradingQueueResult>(
+      `/api/v1/exams/${examId}/attempts/grading${status ? `?status=${status}` : ""}`,
+      { token },
+    ),
+
+  gradeAttempt: (
+    token: string,
+    attemptId: string,
+    input: { score: number; feedback?: string },
+  ) =>
+    apiFetch<GradeAttemptResult>(`/api/v1/exams/attempts/${attemptId}/grade`, {
+      token,
+      method: "POST",
+      body: input,
+    }),
 };
