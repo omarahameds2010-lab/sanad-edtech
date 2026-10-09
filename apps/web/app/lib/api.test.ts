@@ -201,3 +201,108 @@ describe("remaining nav endpoints", () => {
     expect(JSON.parse(init.body as string).title).toBe("T");
   });
 });
+
+describe("five new pages endpoints", () => {
+  it("getCourseStructureBySlug is public (no token)", async () => {
+    const { fetchMock } = mockFetchOnce({
+      data: { course: { id: "c1" }, sections: [] },
+    });
+    await api.getCourseStructureBySlug("demo-math-1");
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe(
+      "http://localhost:3001/api/v1/public/courses/demo-math-1/structure",
+    );
+    expect(
+      (init.headers as Record<string, string>).Authorization,
+    ).toBeUndefined();
+  });
+
+  it("getStudentCourseStructure passes the token", async () => {
+    const { fetchMock } = mockFetchOnce({
+      data: { course: { id: "c1" }, sections: [] },
+    });
+    await api.getStudentCourseStructure("t", "c1");
+    const [url] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe(
+      "http://localhost:3001/api/v1/student/courses/c1/structure",
+    );
+  });
+
+  it("enrollCourse posts to the enroll endpoint", async () => {
+    const { fetchMock } = mockFetchOnce({
+      data: { id: "e1", status: "ACTIVE" },
+    });
+    const result = await api.enrollCourse("t", "c1");
+    expect(result.status).toBe("ACTIVE");
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toContain("/api/v1/enrollments/courses/c1/enroll");
+    expect(init.method).toBe("POST");
+  });
+
+  it("startAssignment posts lessonId with idempotency key", async () => {
+    const { fetchMock } = mockFetchOnce({
+      data: { attemptId: "s1", expiresAt: "2026-01-01T00:00:00Z" },
+    });
+    await api.startAssignment("t", "a1", "l1", "idem-a");
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toContain("/api/v1/assignments/a1/enter");
+    expect(JSON.parse(init.body as string)).toEqual({ lessonId: "l1" });
+    expect((init.headers as Record<string, string>)["idempotency-key"]).toBe(
+      "idem-a",
+    );
+  });
+
+  it("submitAssignment posts content", async () => {
+    const { fetchMock } = mockFetchOnce({
+      data: { attemptId: "s1", status: "SUBMITTED" },
+    });
+    const result = await api.submitAssignment("t", "a1", "my answer", "k2");
+    expect(result.status).toBe("SUBMITTED");
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(JSON.parse(init.body as string).content).toBe("my answer");
+  });
+
+  it("getSubmissionQueue supports a status filter", async () => {
+    const { fetchMock } = mockFetchOnce({
+      data: { submissions: [], nextCursor: null },
+    });
+    await api.getSubmissionQueue("t", "a1", "SUBMITTED");
+    const [url] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toContain("/api/v1/assignments/a1/submissions?status=SUBMITTED");
+  });
+
+  it("gradeSubmission posts score and feedback", async () => {
+    const { fetchMock } = mockFetchOnce({
+      data: { id: "s1", status: "GRADED", score: 90 },
+    });
+    const result = await api.gradeSubmission("t", "s1", {
+      score: 90,
+      feedback: "Nice",
+    });
+    expect(result.score).toBe(90);
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toContain("/api/v1/assignments/submissions/s1/grade");
+    expect(init.method).toBe("POST");
+  });
+
+  it("getStudentFile hits users/:id", async () => {
+    const { fetchMock } = mockFetchOnce({
+      data: { user: { id: "u1" }, enrollments: [] },
+    });
+    await api.getStudentFile("t", "u1");
+    const [url] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe("http://localhost:3001/api/users/u1");
+  });
+
+  it("listPublicCourses is public and supports search", async () => {
+    const { fetchMock } = mockFetchOnce({
+      data: { courses: [], nextCursor: null },
+    });
+    await api.listPublicCourses("جبر");
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toContain("/api/v1/public/courses?search=");
+    expect(
+      (init.headers as Record<string, string>).Authorization,
+    ).toBeUndefined();
+  });
+});

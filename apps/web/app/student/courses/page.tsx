@@ -47,14 +47,19 @@ export default function StudentCoursesPage() {
       )}
       <div style={{ display: "grid", gap: "var(--space-md)" }}>
         {items.map((en) => (
-          <div key={en.id} className="card">
+          <Link
+            key={en.id}
+            href={`/student/courses/${en.course.id}`}
+            className="card"
+            style={{ display: "block" }}
+          >
             <h3 style={{ marginBottom: 4 }}>{en.course.title}</h3>
             <p style={{ fontSize: 12, color: "var(--text-muted)" }}>
               الحالة: {statusLabels[en.status] ?? en.status}
               {" · "}
               مسجل منذ: {new Date(en.startsAt).toLocaleDateString("ar-EG")}
             </p>
-          </div>
+          </Link>
         ))}
       </div>
     </div>

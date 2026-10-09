@@ -263,6 +263,164 @@ export interface CreatedCourse {
   status: string;
 }
 
+export interface StructureLesson {
+  id: string;
+  title: string;
+  type: string;
+  orderIndex: number;
+  duration: number | null;
+  lockStatus: string;
+  unlockType: string;
+}
+
+export interface StructureSection {
+  id: string;
+  title: string;
+  orderIndex: number;
+  lessons: StructureLesson[];
+}
+
+export interface CourseStructure {
+  course: {
+    id: string;
+    title: string;
+    slug: string;
+    shortDescription: string | null;
+    description: string | null;
+    thumbnailUrl: string | null;
+    visibility: string;
+    level: string | null;
+    language: string;
+    price: number | string;
+    currency: string;
+    status: string;
+    teacher: { name: string };
+  };
+  sections: StructureSection[];
+}
+
+export interface StudentAssignmentView {
+  id: string;
+  title: string;
+  description?: string | null;
+  instructions?: string | null;
+  timerMinutes: number;
+  passingScore: number | null;
+  maxAttempts: number;
+  allowLateSubmission: boolean;
+  status: string;
+  lessonId: string;
+  studentAttemptCount: number;
+  canAttempt: boolean;
+  timeRemainingSeconds?: number;
+  isExpired?: boolean;
+  activeSubmission: {
+    id: string;
+    status: string;
+    submittedAt: string;
+  } | null;
+}
+
+export interface StartAssignmentResult {
+  attemptId: string;
+  assignmentId: string;
+  startedAt: string;
+  expiresAt: string;
+  timeRemainingSeconds: number;
+  timerMinutes: number;
+}
+
+export interface EnterAssignmentResult {
+  attempt: StartAssignmentResult;
+  unlocked: { unlocked: number; lessonIds: string[] };
+}
+
+export interface AssignmentTimer {
+  expiresAt: string;
+  timeRemainingSeconds: number;
+  isExpired: boolean;
+  status: string;
+}
+
+export interface SubmitAssignmentResult {
+  attemptId: string;
+  status: string;
+  submittedAt: string;
+  isLate: boolean;
+  message: string;
+}
+
+export interface AssignmentSubmissionSummary {
+  id: string;
+  status: string;
+  score: number | null;
+  feedback?: string | null;
+  submittedAt: string;
+}
+
+export interface AssignmentDetail {
+  id: string;
+  title: string;
+  description?: string | null;
+  instructions?: string | null;
+  timerMinutes: number;
+  status: string;
+}
+
+export interface GradingSubmission {
+  id: string;
+  assignmentId: string;
+  studentId: string;
+  content: string | null;
+  status: string;
+  score: number | null;
+  feedback: string | null;
+  submittedAt: string;
+  student: { id: string; name: string; phone: string; email: string | null };
+}
+
+export interface SubmissionQueueResult {
+  submissions: GradingSubmission[];
+  nextCursor: string | null;
+}
+
+export interface GradeSubmissionResult {
+  id: string;
+  status: string;
+  score: number;
+}
+
+export interface StudentFile {
+  user: {
+    id: string;
+    name: string;
+    role: string;
+    grade: string | null;
+    status: string;
+  };
+  enrollments: Array<{
+    id: string;
+    status: string;
+    course: { id: string; title: string };
+  }>;
+  examAttempts: Array<{
+    id: string;
+    status: string;
+    score: number | null;
+    passed: boolean | null;
+    submittedAt: string | null;
+    attemptNumber: number;
+    exam: { id: string; title: string };
+  }>;
+  submissions: Array<{
+    id: string;
+    status: string;
+    score: number | null;
+    submittedAt: string;
+    assignment: { id: string; title: string };
+  }>;
+}
+
 export interface ExamListItem {
   id: string;
   title: string;
@@ -282,6 +440,25 @@ export interface NextLessonRef {
   id: string;
   title: string;
   type: string;
+}
+
+export interface PublicCourseCard {
+  id: string;
+  title: string;
+  slug: string;
+  shortDescription: string | null;
+  thumbnailUrl: string | null;
+  visibility: string;
+  level: string | null;
+  language: string;
+  price: number | string;
+  currency: string;
+  teacher: { name: string };
+}
+
+export interface PublicCourseList {
+  courses: PublicCourseCard[];
+  nextCursor: string | null;
 }
 
 export interface LessonVideo {
@@ -467,4 +644,95 @@ export const api = {
       method: "POST",
       body: input,
     }),
+
+  getCourseStructureBySlug: (slug: string) =>
+    apiFetch<CourseStructure>(
+      `/api/v1/public/courses/${slug}/structure`,
+    ),
+
+  listPublicCourses: (search?: string) =>
+    apiFetch<PublicCourseList>(
+      `/api/v1/public/courses${search ? `?search=${encodeURIComponent(search)}` : ""}`,
+    ),
+
+  getStudentCourseStructure: (token: string, courseId: string) =>
+    apiFetch<CourseStructure>(
+      `/api/v1/student/courses/${courseId}/structure`,
+      { token },
+    ),
+
+  enrollCourse: (token: string, courseId: string) =>
+    apiFetch<{ id: string; status: string }>(
+      `/api/v1/enrollments/courses/${courseId}/enroll`,
+      { token, method: "POST", body: {} },
+    ),
+
+  getStudentAssignmentView: (token: string, assignmentId: string) =>
+    apiFetch<StudentAssignmentView>(
+      `/api/v1/assignments/${assignmentId}/view`,
+      { token },
+    ),
+
+  startAssignment: (
+    token: string,
+    assignmentId: string,
+    lessonId: string,
+    idempotencyKey: string = newIdempotencyKey(),
+  ) =>
+    apiFetch<EnterAssignmentResult>(
+      `/api/v1/assignments/${assignmentId}/enter`,
+      { token, method: "POST", body: { lessonId }, idempotencyKey },
+    ),
+
+  getAssignmentTimer: (token: string, assignmentId: string) =>
+    apiFetch<AssignmentTimer>(
+      `/api/v1/assignments/${assignmentId}/timer`,
+      { token },
+    ),
+
+  submitAssignment: (
+    token: string,
+    assignmentId: string,
+    content: string,
+    idempotencyKey: string = newIdempotencyKey(),
+  ) =>
+    apiFetch<SubmitAssignmentResult>(
+      `/api/v1/assignments/${assignmentId}/submit`,
+      {
+        token,
+        method: "POST",
+        body: { content, idempotencyKey },
+        idempotencyKey,
+      },
+    ),
+
+  getMySubmissions: (token: string, assignmentId: string) =>
+    apiFetch<AssignmentSubmissionSummary[]>(
+      `/api/v1/assignments/${assignmentId}/submissions/me`,
+      { token },
+    ),
+
+  getAssignment: (token: string, assignmentId: string) =>
+    apiFetch<AssignmentDetail>(`/api/v1/assignments/${assignmentId}`, {
+      token,
+    }),
+
+  getSubmissionQueue: (token: string, assignmentId: string, status?: string) =>
+    apiFetch<SubmissionQueueResult>(
+      `/api/v1/assignments/${assignmentId}/submissions${status ? `?status=${status}` : ""}`,
+      { token },
+    ),
+
+  gradeSubmission: (
+    token: string,
+    submissionId: string,
+    input: { score: number; feedback?: string },
+  ) =>
+    apiFetch<GradeSubmissionResult>(
+      `/api/v1/assignments/submissions/${submissionId}/grade`,
+      { token, method: "POST", body: input },
+    ),
+
+  getStudentFile: (token: string, studentId: string) =>
+    apiFetch<StudentFile>(`/api/users/${studentId}`, { token }),
 };
