@@ -1,4 +1,4 @@
-import { forwardRef } from 'react';
+import { forwardRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronLeftIcon, ChevronRightIcon, CheckIcon } from '../../icon/icons';
 
@@ -22,14 +22,6 @@ export interface WizardProps {
   validateOnStepChange?: boolean;
 }
 
-interface WizardState {
-  currentStep: number;
-  data: any;
-  errors: Record<string, string>;
-  isSubmitting: boolean;
-  completedSteps: Set<number>;
-}
-
 const Wizard = forwardRef<HTMLDivElement, WizardProps>(
   ({ steps, initialStep = 0, onComplete, onCancel, onStepChange, initialData = {}, validateOnStepChange = true, ...props }, ref) => {
     const [currentStep, setCurrentStep] = useState(initialStep);
@@ -38,7 +30,6 @@ const Wizard = forwardRef<HTMLDivElement, WizardProps>(
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [completedSteps, setCompletedSteps] = useState<Set<number>>(new Set());
 
-    const currentStepData = steps[currentStep];
     const isFirstStep = currentStep === 0;
     const isLastStep = currentStep === steps.length - 1;
 
@@ -58,54 +49,6 @@ const Wizard = forwardRef<HTMLDivElement, WizardProps>(
         return false;
       }
     };
-
-    const handleNext = async () => {
-      if (validateOnStepChange) {
-        const isValid = await validateStep(currentStep, formData);
-        if (!isValid) return;
-      }
-
-      const newCompletedSteps = new Set(completedSteps);
-      newCompletedSteps.add(currentStep);
-      setCompletedSteps(newCompletedSteps);
-
-      if (isLastStep) {
-        setIsSubmitting(true);
-        try {
-          await onComplete(formData);
-        } finally {
-          setIsSubmitting(false);
-        }
-      } else {
-        setCurrentStep(prev => prev + 1);
-      }
-    };
-
-    const handleBack = () => {
-      if (!isFirstStep) {
-        setCurrentStep(prev => prev - 1);
-      }
-    };
-
-    const handleStepClick = (index: number) => {
-      if (index <= Math.max(...completedSteps)) {
-        setCurrentStep(index);
-      }
-    };
-
-    const handleInputChange = (key: string, value: any) => {
-      setFormData(prev => ({ ...prev, [key]: value }));
-      if (errors[key]) {
-        setErrors(prev => {
-          const next = { ...errors };
-          delete next[key];
-          return next;
-        });
-      }
-    };
-
-    const isFirstStep = currentStep === 0;
-    const isLastStep = currentStep === steps.length - 1;
 
     const nextStep = async () => {
       if (validateOnStepChange) {
@@ -170,7 +113,7 @@ const Wizard = forwardRef<HTMLDivElement, WizardProps>(
                 <p style={{ fontSize: '12px', textAlign: 'center', color: index <= currentStep ? 'var(--color-text-primary)' : 'var(--color-text-muted)', fontWeight: index <= currentStep ? 600 : 400 }}>
                   {step.title}
                 </p>
-              </motion.div>
+              </div>
               {index < steps.length - 1 && (
                 <motion.div
                   initial={{ width: 0 }}
@@ -187,92 +130,92 @@ const Wizard = forwardRef<HTMLDivElement, WizardProps>(
               )}
             ))}
           </div>
-
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.4, delay: 0.2 }}
-            style={{ flex: 1, padding: '24px 0', overflow: 'auto' }}
-          >
-            <div style={{ marginBottom: '16px' }}>
-              <h2 style={{ margin: '0 0 4px', fontSize: '24px', fontWeight: 700' }}>
-                {steps[currentStep].title}
-              </h2>
-              {steps[currentStep].description && (
-                <p style={{ margin: '8px 0 0', color: 'var(--color-text-secondary)', lineHeight: 1.5 }}>
-                  {steps[currentStep].description}
-                </p>
-              )}
-            </div>
-
-            <div style={{ flex: 1, minHeight: '300px' }}>
-              {steps[currentStep].content}
-            </div>
-
-            {/* Navigation */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '24px', paddingTop: '24px', borderTop: '1px solid var(--color-border-main)' }}>
-              <motion.button
-                onClick={handleBack}
-                disabled={isFirstStep}
-                style={{
-                  padding: '10px 20px',
-                  background: 'var(--color-bg-surface)',
-                  color: 'var(--color-text-primary)',
-                  border: '1px solid var(--color-border-main)',
-                  borderRadius: '8px',
-                  fontWeight: 500,
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  opacity: isFirstStep ? 0.4 : 1,
-                  pointerEvents: isFirstStep ? 'none' : 'auto',
-                }}
-                whileHover={{ background: 'var(--color-neutral-100)' }}
-                whileTap={{ scale: 0.98 }}
-              >
-                <ChevronLeftIcon size={18} /> Back
-              </motion.button>
-
-              <motion.button
-                onClick={nextStep}
-                disabled={isSubmitting}
-                style={{
-                  padding: '10px 24px',
-                  background: 'var(--color-primary)',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '8px',
-                  fontWeight: 600,
-                  cursor: isSubmitting ? 'not-allowed' : 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  opacity: isSubmitting ? 0.7 : 1,
-                }}
-                whileHover={{ background: 'var(--color-primary-hover)' }}
-                whileTap={{ scale: 0.98 }}
-              >
-                {isSubmitting ? (
-                  <>
-                    <span style={{ width: '16px', height: '16px', border: '2px solid white', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
-                    Processing...
-                  </>
-                ) : isLastStep ? (
-                  <>
-                    Complete
-                    <ChevronRightIcon size={18} />
-                  </>
-                ) : (
-                  <>
-                    Next
-                    <ChevronRightIcon size={18} />
-                  </>
-                )}
-              </motion.button>
-            </div>
-          </div>
         </div>
+
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, delay: 0.2 }}
+          style={{ flex: 1, padding: '24px 0', overflow: 'auto' }}
+        >
+          <div style={{ marginBottom: '16px' }}>
+            <h2 style={{ margin: '0 0 4px', fontSize: '24px', fontWeight: 700 }}>
+              {steps[currentStep].title}
+            </h2>
+            {steps[currentStep].description && (
+              <p style={{ margin: '8px 0 0', color: 'var(--color-text-secondary)', lineHeight: 1.5 }}>
+                {steps[currentStep].description}
+              </p>
+            )}
+          </div>
+
+          <div style={{ flex: 1, minHeight: '300px' }}>
+            {steps[currentStep].content}
+          </div>
+
+          {/* Navigation */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '24px', paddingTop: '24px', borderTop: '1px solid var(--color-border-main)' }}>
+            <motion.button
+              onClick={handleBack}
+              disabled={isFirstStep}
+              style={{
+                padding: '10px 20px',
+                background: 'var(--color-bg-surface)',
+                color: 'var(--color-text-primary)',
+                border: '1px solid var(--color-border-main)',
+                borderRadius: '8px',
+                fontWeight: 500,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                opacity: isFirstStep ? 0.4 : 1,
+                pointerEvents: isFirstStep ? 'none' : 'auto',
+              }}
+              whileHover={{ background: 'var(--color-neutral-100)' }}
+              whileTap={{ scale: 0.98 }}
+            >
+              <ChevronLeftIcon size={18} /> Back
+            </motion.button>
+
+            <motion.button
+              onClick={nextStep}
+              disabled={isSubmitting}
+              style={{
+                padding: '10px 24px',
+                background: 'var(--color-primary)',
+                color: 'white',
+                border: 'none',
+                borderRadius: '8px',
+                fontWeight: 600,
+                cursor: isSubmitting ? 'not-allowed' : 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                opacity: isSubmitting ? 0.7 : 1,
+              }}
+              whileHover={{ background: 'var(--color-primary-hover)' }}
+              whileTap={{ scale: 0.98 }}
+            >
+              {isSubmitting ? (
+                <>
+                  <span style={{ width: '16px', height: '16px', border: '2px solid white', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
+                  Processing...
+                </>
+              ) : isLastStep ? (
+                <>
+                  Complete
+                  <ChevronRightIcon size={18} />
+                </>
+              ) : (
+                <>
+                  Next
+                  <ChevronRightIcon size={18} />
+                </>
+              )}
+            </motion.button>
+          </div>
+        </motion.div>
       </div>
     );
   }

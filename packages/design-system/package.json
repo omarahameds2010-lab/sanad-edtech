@@ -28,8 +28,7 @@
       "require": "./dist/components/index.js"
     },
     "./tokens.css": "./tokens.css",
-    "./theme.css": "./theme.css",
-    "./global.css": "./global.css"
+    "./theme.css": "./theme/theme.css"
   },
   "scripts": {
     "build": "tsup",

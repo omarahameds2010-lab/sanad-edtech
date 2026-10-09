@@ -18,7 +18,6 @@ export default defineConfig({
     index: 'index.ts',
     'tokens/index': 'tokens/index.ts',
     'theme/index': 'theme/index.ts',
-    'components/index': 'components/index.ts',
   },
   format: ['cjs', 'esm'],
   dts: true,

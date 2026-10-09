@@ -33,24 +33,14 @@ const positionStyles = {
   'left-end': { right: '100%', bottom: 0, transform: 'none', marginRight: '8px' },
   'right-start': { left: '100%', top: 0, transform: 'none', marginLeft: '8px' },
   'right-end': { left: '100%', bottom: 0, transform: 'none', marginLeft: '8px' },
-};
-
-export interface TooltipProps {
-  content: React.ReactNode;
-  children: React.ReactElement;
-  position?: 'top' | 'bottom' | 'left' | 'right' | 'top-start' | 'top-end' | 'bottom-start' | 'bottom-end' | 'left-start' | 'left-end' | 'right-start' | 'right-end';
-  openDelay?: number;
-  closeDelay?: number;
-  offset?: number;
-  arrow?: boolean;
-  maxWidth?: number;
-}
+} as const;
 
 const Tooltip = forwardRef<HTMLDivElement, TooltipProps>(
   ({ content, children, position = 'top', openDelay = 200, closeDelay = 100, offset = 8, arrow = true, maxWidth = 280 }, ref) => {
     const [isOpen, setIsOpen] = useState(false);
     const [arrowPosition, setArrowPosition] = useState({ x: 0, y: 0 });
-    const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+    const openTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+    const closeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
     const triggerRef = useRef<HTMLElement>(null);
     const tooltipRef = useRef<HTMLDivElement>(null);
 
@@ -64,9 +54,6 @@ const Tooltip = forwardRef<HTMLDivElement, TooltipProps>(
       closeTimeoutRef.current = window.setTimeout(() => setIsOpen(false), closeDelay);
     };
 
-    const openTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-    const closeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-
     const handleMouseEnter = () => showTooltip();
     const handleMouseLeave = () => hideTooltip();
     const handleFocus = () => showTooltip();
@@ -79,74 +66,17 @@ const Tooltip = forwardRef<HTMLDivElement, TooltipProps>(
     };
 
     useEffect(() => {
-      const trigger = triggerRef.current;
-      const tooltip = tooltipRef.current;
-      if (!trigger || !tooltip) return;
-
-      const updatePosition = () => {
-        const triggerRect = triggerRef.current?.getBoundingClientRect();
-        const tooltipRect = tooltipRef.current?.getBoundingClientRect();
-        if (!triggerRect || !tooltipRect) return;
-
-        const positionStyle = positionStyles[position as keyof typeof positionStyles] || positionStyles.top;
-        const offset = offset || 8;
-
-        // Calculate position based on position prop
-        // This is simplified - a full implementation would use a library like floating-ui
-        // For now, we'll use basic positioning
-      };
-
-      if (isOpen) {
-        updatePosition();
-      }
-    }, [isOpen, position, offset]);
-
-    useEffect(() => {
-      const handleKeyDown = (e: KeyboardEvent) => {
+      const handleKeyDownGlobal = (e: KeyboardEvent) => {
         if (e.key === 'Escape') {
           setIsOpen(false);
         }
       };
-      document.addEventListener('keydown', handleKeyDown);
-      return () => document.removeEventListener('keydown', handleKeyDown);
+      if (isOpen) {
+        document.addEventListener('keydown', handleKeyDownGlobal);
+      }
+      return () => document.removeEventListener('keydown', handleKeyDownGlobal);
     }, [isOpen]);
 
-    // Simplified implementation for now
-    const [isOpen, setIsOpen] = useState(false);
-
-    const handleMouseEnter = () => {
-      clearTimeout(closeTimeoutRef.current);
-      openTimeoutRef.current = window.setTimeout(() => setIsOpen(true), openDelay || 200);
-    };
-
-    const handleMouseLeave = () => {
-      clearTimeout(openTimeoutRef.current);
-      closeTimeoutRef.current = window.setTimeout(() => setIsOpen(false), closeDelay || 100);
-    };
-
-    const handleFocus = () => setIsOpen(true);
-    const handleBlur = () => hideTooltip();
-
-    const openTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-    const closeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-
-    const showTooltip = () => {
-      if (openTimeoutRef.current) clearTimeout(openTimeoutRef.current);
-      openTimeoutRef.current = window.setTimeout(() => setIsOpen(true), openDelay || 200);
-    };
-
-    const hideTooltip = () => {
-      if (openTimeoutRef.current) clearTimeout(openTimeoutRef.current);
-      closeTimeoutRef.current = window.setTimeout(() => setIsOpen(false), closeDelay || 100);
-    };
-
-    const handleKeyDown = (e: React.KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        setIsOpen(false);
-      }
-    };
-
-    // Simplified implementation - just show/hide on hover
     return (
       <div
         ref={triggerRef}
@@ -217,4 +147,5 @@ const Tooltip = forwardRef<HTMLDivElement, TooltipProps>(
 
 Tooltip.displayName = 'Tooltip';
 
-export default Tooltip;
+export { Tooltip };
+export type { TooltipProps };

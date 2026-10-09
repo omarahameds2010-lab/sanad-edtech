@@ -24,70 +24,15 @@ const sizeMap = {
   md: 32,
   lg: 48,
   xl: 64,
-};
-
-const spinnerStyles = {
-  spinner: {
-    border: '3px solid var(--color-neutral-200)',
-    borderTopColor: 'var(--color-primary)',
-    borderRadius: '50%',
-    animation: 'spin 1s linear infinite',
-  },
-  dots: {
-    display: 'flex',
-    gap: '4px',
-  },
-  pulse: {
-    width: '100%',
-    height: '100%',
-    borderRadius: '50%',
-    background: 'var(--color-primary)',
-    animation: 'pulse 1.5s ease-in-out infinite',
-  },
-  bars: {
-    display: 'flex',
-    gap: '4px',
-    alignItems: 'flex-end',
-    height: '100%',
-  },
-  ring: {
-    border: '3px solid var(--color-neutral-200)',
-    borderTopColor: 'var(--color-primary)',
-    borderRadius: '50%',
-    animation: 'spin 1s linear infinite',
-  },
-  skeleton: {
-    background: 'linear-gradient(90deg, var(--color-neutral-200) 25%, var(--color-neutral-300) 50%, var(--color-neutral-200) 75%)',
-    backgroundSize: '200% 100%',
-    animation: 'shimmer 1.5s infinite',
-  },
 } as const;
-
-export interface LoadingProps {
-  variant?: 'spinner' | 'dots' | 'pulse' | 'bars' | 'ring' | 'skeleton';
-  size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl';
-  color?: string;
-  sizePx?: number;
-  label?: string;
-  overlay?: boolean;
-  overlayMessage?: string;
-}
-
-const sizeMap = {
-  xs: 16,
-  sm: 24,
-  md: 32,
-  lg: 48,
-  xl: 64,
-};
 
 const Loading = forwardRef<HTMLDivElement, LoadingProps>(
   ({ variant = 'spinner', size = 'md', color, sizePx, label, overlay = false, overlayMessage, ...props }, ref) => {
-    const sizePx = sizePx || sizeMap[size];
+    const resolvedSizePx = sizePx || sizeMap[size];
 
     const spinnerStyle = {
-      width: sizePx,
-      height: sizePx,
+      width: resolvedSizePx,
+      height: resolvedSizePx,
       border: '3px solid var(--color-neutral-200)',
       borderTopColor: 'var(--color-primary)',
       borderRadius: '50%',
@@ -100,16 +45,16 @@ const Loading = forwardRef<HTMLDivElement, LoadingProps>(
     };
 
     const dotStyle = {
-      width: sizePx / 4,
-      height: sizePx / 4,
+      width: resolvedSizePx / 4,
+      height: resolvedSizePx / 4,
       borderRadius: '50%',
       backgroundColor: 'var(--color-primary)',
       animation: 'bounce 1.4s ease-in-out infinite both',
     };
 
     const pulseStyle = {
-      width: sizePx,
-      height: sizePx,
+      width: resolvedSizePx,
+      height: resolvedSizePx,
       borderRadius: '50%',
       backgroundColor: 'var(--color-primary)',
       animation: 'pulse 1.5s ease-in-out infinite',
@@ -119,7 +64,7 @@ const Loading = forwardRef<HTMLDivElement, LoadingProps>(
       display: 'flex',
       gap: '4px',
       alignItems: 'flex-end',
-      height: sizePx,
+      height: resolvedSizePx,
     };
 
     const barStyle = {
@@ -129,8 +74,8 @@ const Loading = forwardRef<HTMLDivElement, LoadingProps>(
     };
 
     const ringStyle = {
-      width: sizePx,
-      height: sizePx,
+      width: resolvedSizePx,
+      height: resolvedSizePx,
       border: '3px solid var(--color-neutral-200)',
       borderTopColor: 'var(--color-primary)',
       borderRadius: '50%',
@@ -186,7 +131,7 @@ const Loading = forwardRef<HTMLDivElement, LoadingProps>(
     };
 
     const spinner = (
-      <div style={{ ...spinnerStyle, width: size, height: size }} role="status" aria-label={label || 'Loading'} />
+      <div style={{ ...spinnerStyle, width: resolvedSizePx, height: resolvedSizePx }} role="status" aria-label={label || 'Loading'} />
     );
 
     const dots = (
@@ -198,12 +143,12 @@ const Loading = forwardRef<HTMLDivElement, LoadingProps>(
             animate={{ scale: [1, 0.5, 1], opacity: [1, 0.3, 1] }}
             transition={{ duration: 0.6, repeat: Infinity, delay: i * 0.15, ease: 'easeInOut' }}
           />
-        )}
+        ))}
       </div>
     );
 
     const pulse = (
-      <motion.div style={pulseStyle} style={{ width: size, height: size }} />
+      <motion.div style={{ ...pulseStyle, width: resolvedSizePx, height: resolvedSizePx }} />
     );
 
     const bars = (
@@ -215,12 +160,12 @@ const Loading = forwardRef<HTMLDivElement, LoadingProps>(
             animate={{ scaleY: [1, 0.3, 1] }}
             transition={{ duration: 0.6, repeat: Infinity, delay: i * 0.1, ease: 'easeInOut' }}
           />
-        )}
+        ))}
       </div>
     );
 
     const ring = (
-      <div style={{ ...ringStyle, width: size, height: size }} />
+      <div style={{ ...ringStyle, width: resolvedSizePx, height: resolvedSizePx }} />
     );
 
     const skeleton = (

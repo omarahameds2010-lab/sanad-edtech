@@ -1,24 +1,6 @@
-import { forwardRef } from 'react';
+import { forwardRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import { ChevronLeftIcon, ChevronRightIcon, CheckIcon } from '../../icon/icons';
-
-export interface StepperProps {
-  steps: Array<{
-    id: string;
-    label: string;
-    description?: string;
-    icon?: React.ReactNode;
-    content: React.ReactNode;
-    isOptional?: boolean;
-    validation?: (data: any) => boolean | Promise<boolean>;
-  }>;
-  initialStep?: number;
-  onComplete: (data: any) => void | Promise<void>;
-  onCancel?: () => void;
-  onStepChange?: (stepIndex: number, step: any) => void;
-  initialData?: any;
-  validateOnStepChange?: boolean;
-}
 
 export interface StepperStep {
   id: string;
@@ -30,6 +12,16 @@ export interface StepperStep {
   validation?: (data: any) => boolean | Promise<boolean>;
 }
 
+export interface StepperProps {
+  steps: StepperStep[];
+  initialStep?: number;
+  onComplete: (data: any) => void | Promise<void>;
+  onCancel?: () => void;
+  onStepChange?: (stepIndex: number, step: any) => void;
+  initialData?: any;
+  validateOnStepChange?: boolean;
+}
+
 const Stepper = forwardRef<HTMLDivElement, StepperProps>(
   ({ steps, initialStep = 0, onComplete, onCancel, onStepChange, initialData = {}, validateOnStepChange = true, ...props }, ref) => {
     const [currentStep, setCurrentStep] = useState(initialStep);
@@ -38,7 +30,6 @@ const Stepper = forwardRef<HTMLDivElement, StepperProps>(
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [completedSteps, setCompletedSteps] = useState<Set<number>>(new Set());
 
-    const currentStepData = steps[currentStep];
     const isFirstStep = currentStep === 0;
     const isLastStep = currentStep === steps.length - 1;
 
@@ -47,7 +38,7 @@ const Stepper = forwardRef<HTMLDivElement, StepperProps>(
       if (!step.validation) return true;
 
       try {
-        const isValid = await step.validation(formData);
+        const isValid = await step.validation(data);
         if (!isValid) {
           setErrors(prev => ({ ...prev, [steps[stepIndex].id]: 'Validation failed' }));
           return false;
@@ -58,84 +49,6 @@ const Stepper = forwardRef<HTMLDivElement, StepperProps>(
         return false;
       }
     };
-
-    const handleNext = async () => {
-      if (validateOnStepChange) {
-        const isValid = await validateStep(currentStep, formData);
-        if (!isValid) return;
-      }
-
-      const newCompletedSteps = new Set(completedSteps);
-      newCompletedSteps.add(currentStep);
-      setCompletedSteps(newCompletedSteps);
-
-      if (isLastStep) {
-        setIsSubmitting(true);
-        try {
-          await onComplete(formData);
-        } finally {
-          setIsSubmitting(false);
-        }
-      } else {
-        setCurrentStep(prev => prev + 1);
-      }
-    };
-
-    const handleBack = () => {
-      if (!isFirstStep) {
-        setCurrentStep(prev => prev - 1);
-      }
-    };
-
-    const handleStepClick = (index: number) => {
-      if (index <= Math.max(...completedSteps)) {
-        setCurrentStep(index);
-      }
-    };
-
-    const handleInputChange = (key: string, value: any) => {
-      setFormData(prev => ({ ...prev, [key]: value }));
-      if (errors[key]) {
-        setErrors(prev => {
-          const next = { ...errors };
-          delete next[key];
-          return next;
-        });
-      }
-    };
-
-    const isFirstStep = currentStep === 0;
-    const isLastStep = currentStep === steps.length - 1;
-
-    const nextStep = async () => {
-      if (validateOnStepChange) {
-        const isValid = await validateStep(currentStep, formData);
-        if (!isValid) return;
-      }
-
-      if (isLastStep) {
-        setIsSubmitting(true);
-        try {
-          await onComplete(formData);
-        } finally {
-          setIsSubmitting(false);
-        }
-      } else {
-        setCompletedSteps(prev => new Set([...prev, currentStep]));
-        setCurrentStep(prev => prev + 1);
-        onStepChange?.(currentStep + 1, steps[currentStep + 1]);
-      }
-    };
-
-    const handleBack = () => {
-      if (!isFirstStep) {
-        setCurrentStep(prev => prev - 1);
-        onStepChange?.(currentStep - 1, steps[currentStep - 1]);
-      }
-    };
-
-    const isFirstStep = currentStep === 0;
-    const isLastStep = currentStep === steps.length - 1;
 
     const nextStep = async () => {
       if (validateOnStepChange) {
@@ -313,6 +226,8 @@ const Stepper = forwardRef<HTMLDivElement, StepperProps>(
     );
   }
 );
+
+Stepper.displayName = 'Stepper';
 
 export { Stepper };
 export type { StepperProps, StepperStep };

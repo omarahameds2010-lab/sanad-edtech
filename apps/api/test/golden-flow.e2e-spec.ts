@@ -1,4 +1,5 @@
 import { AuditService } from "../src/modules/audit/audit.service";
+import { EntitlementsService } from "../src/modules/entitlements/entitlements.service";
 import { IdempotencyService } from "../src/modules/payments/security/idempotency.service";
 import { ProgressionService } from "../src/modules/courses/progression/progression.service";
 import { CoursesService } from "../src/modules/courses/courses.service";
@@ -307,6 +308,7 @@ describe("Golden LMS Flow (E2E, in-memory Prisma)", () => {
 
     const auditService = new AuditService(prisma);
     const idempotencyService = new IdempotencyService(prisma);
+    const entitlementsService = new EntitlementsService(prisma);
     const progressionService = new ProgressionService(
       prisma,
       idempotencyService,
@@ -315,7 +317,7 @@ describe("Golden LMS Flow (E2E, in-memory Prisma)", () => {
     const coursesService = new CoursesService(prisma);
     const sectionsService = new SectionsService(prisma);
     const lessonsService = new LessonsService(prisma);
-    const enrollmentsService = new EnrollmentsService(prisma);
+    const enrollmentsService = new EnrollmentsService(prisma, entitlementsService);
     const assignmentsService = new AssignmentsService(
       prisma,
       idempotencyService,

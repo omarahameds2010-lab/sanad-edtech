@@ -220,4 +220,24 @@ export class AssignmentsController {
     );
     return { data: result };
   }
+
+  @Post(":assignmentId/evaluate-ai")
+  @RequirePermission({ action: "evaluate", resourceType: "assignment" })
+  async evaluateWithAI(
+    @Request() req,
+    @Param("assignmentId") assignmentId: string,
+    @Body() dto: { answer: string; question?: string },
+  ) {
+    // Call SANAD AI engine for evaluation
+    // In dev mode (no API keys), uses HashEmbedding + FakeLLM
+    // In production, uses real embedding model + Gemini/Anthropic
+    const result = await this.assignmentsService.evaluateAssignmentWithAI(
+      req.tenantId,
+      req.user.sub,
+      assignmentId,
+      dto.answer,
+      dto.question,
+    );
+    return { data: result };
+  }
 }

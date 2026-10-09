@@ -8,26 +8,26 @@
 [![Overall](https://img.shields.io/badge/Overall-62 Percent-yellow?style=for-the-badge)](#-track-dashboard-verified-2026-10-08)
 [![Docs](https://img.shields.io/badge/Docs-World_class-blue?style=for-the-badge&logo=markdown&logoColor=white)](../README.md)
 
-**Overall: ~62% to a live v1.0** (code written ≈ 75% · verified ≈ 40% — loop HTTP complete + 85 tests green + boot DI fixed; live DB still pending)
+**Overall: ~62% to a live v1.0** (code written ≈ 75% · live-verified ≈ 0% — no live DB run has ever happened on this machine; loop HTTP complete; specs last-green per 2026-10-09 field report; boot DI fixed)
 
-*Last inventoried: 2026-10-09 · Method: file walk + independent test re-runs (85/85 unit, golden-flow 1/1, exit 0) + boot verification + overnight agent review · 🆕 = this session*
+*Last inventoried: 2026-10-09 · Method: glob/grep/read inventory + git log/status (32 page.tsx · 13 modules · 42 models · 14 api specs + 2 web tests · 2 packages) — no test/build re-run in this session · 🆕 = this session*
 
 </div>
 
 ---
 
-## 🗺️ Track Dashboard (Verified 2026-10-08)
+## 🗺️ Track Dashboard (Verified 2026-10-09)
 
 | # | Track | % | Signal (evidence, not adjectives) |
 |---|-------|---|-----------------------------------|
 | 1 | Backend foundation (auth, RBAC, tenants, plans, outbox, audit) | 93% | 13 modules; 22 actions; `redeem` EXISTS; 🆕 **4 loop controllers added** (assignments/exams/progression/enrollments, ~30 endpoints, guards on every route); 🆕 **3 boot DI bugs fixed** (AuthModule PrismaService, `@Global()` AuthorizationModule, TerminusModule) — boot reaches DB-connect stage |
-| 2 | Database + RLS | 85% | **41 models** (`schema.prisma`); 178+26 RLS policies; `app_user` cage verified; NOT yet run live (no Docker on this machine) |
-| 3 | LMS Core (assignments/exams/progression/timers) | 80% | Services REAL under `courses/` + 8 unit specs (84/84 green, independently re-run); 🆕 **HTTP layer complete**: enter/submit/timer/grade/progression endpoints wired with `JwtAuthGuard` + `RequirePermission`; ENTER calls chain attempt-start + progression unlock in one request; compiles exit 0 + DI-verified at boot; live-DB proof pending |
+| 2 | Database + RLS | 85% | **42 models** (`schema.prisma`, `^model` grep = 42); 178+26 RLS policies; `app_user` cage verified; NOT yet run live (no Docker on this machine) |
+| 3 | LMS Core (assignments/exams/progression/timers) | 80% | Services REAL under `courses/` + **14 api spec files** (was 8; + route-paths, jwt.strategy, users, entitlements); last-green per 2026-10-09 field report (91/91 api, not re-run today); 🆕 **HTTP layer complete**: enter/submit/timer/grade/progression endpoints wired with `JwtAuthGuard` + `RequirePermission`; ENTER calls chain attempt-start + progression unlock in one request; compiles exit 0 + DI-verified at boot; live-DB proof pending |
 | 4 | Payments | 75% | 18 files; Paymob SHA512 + Fawry HMAC verified in code; 3 stubs fail-closed; ledger + inbox + idempotency present; no live run |
 | 5 | Video + protection | 70% | 13 files (video + video-protection); watermark/token HMAC verified; needs provider keys + live proof |
-| 6 | Frontend Web | 48% | 🆕 **17+ pages**: builder/preview/publish, exams + **student exam runner (server-anchored timer)** + **teacher grading queue (score + feedback)** + **lesson view with videos/YouTube-unlisted embed**; upload/editor components; API wiring in progress |
-| 7 | Design system | 60% | 🆕 **6 packages** (`config, design-system, motion, types, ui, validation`); **20 components** + full token set (colors, motion, spacing, typography, zindex, breakpoints, border) + theme; stories growing |
-| 8 | Testing | 56% | 🆕 **85 unit tests PASS (re-verified 2026-10-09, exit 0)** + golden-flow e2e **1/1 PASS** + new `route-paths.spec.ts`; RLS e2e skipped - needs live DB; loop controllers still have zero tests (next) |
+| 6 | Frontend Web | 55% | **32 `page.tsx`** (glob count, was "17+"): builder/preview/publish, exams + **student exam runner (server-anchored timer)** + **teacher grading queues (score + feedback)** + **lesson view with videos/YouTube-unlisted embed** + public catalog + login; 🆕 P0 visual tokens applied (uncommitted): `paper-50 #FAF7F2` + `tenant-accent #047857` in `globals.css`, emerald CTA in teacher layout; API wiring in progress; known gaps: `/student` hub empty, `/teacher/students` + `/teacher/analytics` mock/static |
+| 7 | Design system | 50% | **2 packages on disk** (`design-system`, `motion`) — NOT 6 (config/types/ui/validation absent); **20 components** + full token set (colors, motion, spacing, typography, zindex, breakpoints, border) + theme; stories growing; ⚠️ `design-system` tsup build has 24 pre-existing JSX/duplicate-symbol errors — web currently consumes embedded CSS tokens in `globals.css` instead; 7 component files + `tsup.config.ts` modified uncommitted |
+| 8 | Testing | 56% | **14 api spec files + 2 web test files** on disk; last-green per 2026-10-09 field report (**91/91 api + 33/33 web**, not re-run in this session) incl. `route-paths.spec.ts`; golden-flow e2e **1/1 PASS** (history, needs live DB to re-prove); RLS e2e skipped - needs live DB; ⚠️ dual jest configs (`jest.config.js` + `package.json` key) — must run `jest --config jest.config.js` |
 | 9 | DevOps / CI | 55% | 🆕 CI jobs: typecheck, lint, **test-unit**, build, e2e refs, **deploy-preview**, release; ⚠️ release fires on `main` but default branch is `master` (never runs — bug) |
 | 10 | Docs & repo hygiene | 95% | README (2900+), ARCHITECTURE, SECURITY (4000+), VISUAL_IDENTITY (5000+), VIDEO_PROTECTION; LICENSE (MIT/OMAR AHMED); root SECURITY.md; CODEOWNERS; PR/issue templates; dependabot; junk lockfiles removed |
 | 11 | Security hardening | 50% | Real: Argon2id, rotation, HMAC ×5 surfaces, RLS, boot validator; Planned: 2FA, rate limits, WAF, KMS, SIEM |
@@ -48,7 +48,8 @@
 | 5 | Frontend barely mentioned | 17 pages + editor/upload components + vitest; teammate shipping components + stories | Frontend is ahead of docs |
 | 6 | Packages undescribed | 6 workspace packages (was assumed 4) | Update all architecture references |
 | 7 | CI undescribed | 7 jobs incl. test-unit + deploy-preview + release | Release-on-`main` bug found 🐛 |
-| 8 | No mention of missing files | ⚠️ **No `.env.example` at repo root** (it exists at `apps/api/.env.example` ✅ but docs tell you to copy from root) · **no seed script** in `prisma/` | Restore root copy + seed — onboarding broken without them |
+| 8 | No mention of missing files | ⚠️ **No `.env.example` at repo root** (`apps/api/.env.example` ✅ exists, verified with hidden-glob) · **seed script `prisma/seed-path2.ts` EXISTS** (tracked) but no `prisma/seed.ts`; `prisma.seed` config added uncommitted in `apps/api/package.json` (ts-node → seed-path2) | Restore root copy — onboarding broken without it; converge seed naming |
+| 9 | Stale counts (pages/packages/tests/models) | `docs/PROJECT_STATE.md` field report (2026-10-09, `891a4fb` + `3a804af`) re-inventoried from code: **32 pages** (not 17), **2 packages** (not 6), **91/91 api + 33/33 web** (not 85), **42 models** (not 41) | This STATUS update adopts the field-report numbers where re-verified today (pages/packages/models/specs); test totals cited as field-report history, NOT re-run |
 
 ---
 
@@ -73,7 +74,7 @@
 - [x] `common/`: guards, decorators, interceptors, filters, **middleware** (tenant context pipeline)
 - [x] Boot secret validation refuses defaults in prod (`main.ts:7,30`)
 
-### Database — 41 Models + RLS (Prisma + PostgreSQL 15)
+### Database — 42 Models + RLS (Prisma + PostgreSQL 15)
 - [x] Identity: Tenant, TenantDomain, TenantConfig, User, Device, Session
 - [x] Catalog: Course, Section, Lesson, Resource (+ versioning fields)
 - [x] LMS: Assignment, AssignmentSubmission, Exam, ExamQuestion, ExamAttempt, Enrollment, LessonProgress
@@ -82,19 +83,20 @@
 - [x] Tenant-scoped UNIQUEs: users (phone/email), devices (fingerprint), attempts, enrollments, idempotency keys (`schema.prisma:137,155,394,514,648,998`)
 - [x] RLS migrations: 178 policies (init) + 26 (lms); `app_user` (LOGIN, CRUD-only, `REVOKE BYPASSRLS`, per-table FORCE)
 
-### Frontend Web — 17 Pages + Components (`apps/web`)
+### Frontend Web — 32 Pages + Components (`apps/web`)
 - [x] Public: landing `/`, `/teachers`, `/teachers/[slug]`, `(public)/courses`
 - [x] Student: dashboard, `/lessons/[id]` (timer display = derived, server owns expiry)
 - [x] Teacher: dashboard, courses (+ `[id]`, builder, preview, publish), lessons, **exams**, **assignments**, students, analytics
 - [x] Components: editor, upload (TUS chunked); hooks; vitest config + shims
 - [x] Command palette pattern (teacher/student registrars in earlier tree — verify current location before extending)
 
-### Design System — 6 Packages, 20 Components
+### Design System — 2 Packages on Disk, 20 Components
 - [x] `packages/design-system`: tokens (colors, typography, spacing, motion, border, breakpoints, zindex, index) + `tokens.css` + theme/ + **20 components** (Avatar, Badge, Button, Card, DataDisplay, DataTable, Dialog, Drawer, EmptyState, FormField, Input, Loading, Modal, Select, Skeleton, Stepper, Tabs, Toast, Tooltip, Wizard) + stories (growing)
 - [x] `packages/{config, motion, types, ui, validation}`: workspace scaffolding present (audit each for stub-vs-real before depending on it)
 
 ### Testing — Specs Exist & Run ✅ (Unit + 1/2 e2e Live)
-- [x] **84 unit tests PASS**: assignments, enrollments, exams, lessons, progress, progression, resources, sections (courses domain)
+- [x] **14 api spec files** (courses domain + `route-paths` + `policy-engine` + `jwt.strategy` + `users` + `entitlements`); last-green 91/91 per 2026-10-09 field report (not re-run in this session)
+- [x] **2 web test files** (`api.test.ts`, `exam.test.ts`); last-green 33/33 per field report
 - [x] 1/2 e2e specs LIVE: `golden-flow.e2e-spec.ts` ✅ PASS (order→pay→enroll with in-memory Prisma)
 - [ ] 1/2 e2e specs SKIPPED: `rls-isolation.e2e-spec.ts` (needs live DB with `RLS_ADMIN_URL` + `RLS_APP_URL` env vars)
 
@@ -159,7 +161,7 @@
 - [x] **Loop HTTP layer** (4 controllers, ~30 endpoints, guards) — DONE this session, compiles + DI-verified ✅
 - [x] **Boot DI trio** (AuthModule PrismaService, `@Global()` AuthorizationModule, TerminusModule) — DONE, boot reaches DB-connect ✅
 - [x] **Independent test re-runs** (84/84 unit + golden-flow 1/1, exit 0) — DONE ✅
-- [ ] Restore **root `.env.example`** (copy of `apps/api/.env.example`, which exists and is tracked ✅) + **seed script** (`prisma/seed.ts`; note: `prisma/seed-path2.ts` WIP appeared 2026-10-09 — review + converge, don't duplicate) — live `.env` confirmed untracked ✅
+- [ ] Restore **root `.env.example`** (copy of `apps/api/.env.example`, which exists and is tracked ✅ — verified today) + converge seed naming (`prisma/seed-path2.ts` EXISTS tracked; no `prisma/seed.ts`; `prisma.seed` → seed-path2 via ts-node added UNCOMMITTED in `apps/api/package.json`) — live `.env` confirmed untracked ✅
 - [ ] Fix **release-on-`main` bug** (default branch is `master`; release job + `needs: [build, e2e]` never fire) — retarget or rename branch
 - [ ] Pin Prisma CLI `5.22.0` (client already pinned; kill the `^5.7.1` drift)
 - [ ] Run isolation + golden-flow e2e against live DB (closes §Database above)
@@ -186,6 +188,9 @@
 | 5 | Some `../../../` cross-module imports | Fragile refactors (build passes) | Ratchet rule + cleanup |
 | 6 | Coverage gates referenced but no coverage upload in CI | Ruleset coverage rule would block/float | Wire coverage upload first (see SECURITY App. D) |
 | 7 | `node_modules` committed inside `packages/design-system` (seen in listing) | Bloat + merge noise | 🆕 Add nested `.gitignore` / remove from tracking |
+| 8 | `evaluate-ai` half-built (uncommitted): `POST :assignmentId/evaluate-ai` route EXISTS (`assignments.controller.ts:224`), `evaluate` granted to TEACHER + STUDENT (`policy-engine.ts:50,295,320`, commit `dd0b6ee`) — but NO `modules/ai/` on disk, service is dev-mode random 70–100, zero AI tests | Demo showing AI scores today shows random numbers, not analysis | Finish Path-4: fix duplicate `evaluateAssignmentWithAI` impl + real Gemini wiring + persist to grading + "قيّم بالذكاء" button (see `PROJECT_STATE.md` §13) |
+| 9 | Dirty tree + junk logs: 16 modified files (controllers, services, layouts, `package.json`, 7 design-system files) + ~40 untracked `*-out.txt`/`build*.txt`/`.bak`/storybook WIP | Review noise; some txt logs may hold secrets | Commit-or-revert per file, then one agreed `git clean` (review before delete) |
+| 10 | P0 visual tokens applied UNCOMMITTED (`globals.css` paper/emerald, teacher/student layouts, `package.json` seed config) | Looks done locally, invisible to team/CI until committed | Commit as one "P0 visual + seed config" change after a green build |
 
 ---
 
@@ -225,6 +230,10 @@
 | 2026-10-08 | Loop HTTP layer: 4 controllers under `courses/` (enrollments/assignments/exams/progression) | 🆕 Services existed without routes; ENTER endpoints chain attempt-start + progression unlock; guards on every route |
 | 2026-10-08 | Boot trio fixed (AuthModule provider, `@Global()` AuthorizationModule, TerminusModule import) | 🆕 App had never booted (proven via stash A/B); boot now reaches DB-connect stage |
 | 2026-10-08 | Independent re-verification before trusting concurrent edits (84/84 + golden-flow 1/1) | 🆕 Two people editing live files; verify-then-keep protocol (see note below) |
+| 2026-10-09 | Field report `docs/PROJECT_STATE.md` adopted (`891a4fb`, `3a804af`): 32 pages / 2 packages / 42 models / 91+33 tests / no-live-DB / evaluate-ai gaps | 🆕 STATUS counts were stale; field report re-inventoried from code — adopted where re-verified today |
+| 2026-10-09 | `evaluate` action granted to TEACHER + STUDENT (`dd0b6ee`) for demo | 🆕 Unblocks `POST evaluate-ai` RBAC (SUPER_ADMIN-only before); service/AI wiring still pending |
+| 2026-10-09 | P0 visual tokens embedded in `apps/web/app/globals.css` + layouts (UNCOMMITTED) | 🆕 `design-system` tsup red (24 errors) so web consumes embedded CSS; commit after green build |
+| 2026-10-09 | `prisma.seed` → `seed-path2` via ts-node added to `apps/api/package.json` (UNCOMMITTED) | 🆕 `npx prisma db seed` runnable once a DB exists; root `.env.example` still missing |
 
 ---
 
@@ -255,7 +264,7 @@ cd ..\web; pnpm run dev        # :3001 — open /teachers
 
 **Expected**: build exits 0, e2e green, `/health` ok, teacher discovery renders.
 
-### 🏁 Verified Output (2026-10-08)
+### 🏁 Verified Output (2026-10-08 · history — NOT re-run 2026-10-09)
 
 ```powershell
 # Unit tests (84 passing)

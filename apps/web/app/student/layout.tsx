@@ -13,8 +13,8 @@ export default function StudentLayout({ children }: { children: React.ReactNode 
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '200px 1fr', minHeight: '100vh' }}>
       <StudentCommandRegistrar />
-      <aside style={{ borderInlineEnd: '1px solid var(--border-subtle)', padding: 'var(--space-lg)' }}>
-        <Link href="/student" style={{ fontWeight: 700, fontSize: 16, display: 'block', marginBottom: 'var(--space-lg)' }}>
+      <aside style={{ borderRight: '1px solid #e5e5e5', padding: 24 }}>
+        <Link href="/student" style={{ fontWeight: 700, fontSize: 16, color: '#0b0d10' }}>
           لوحة الطالب
         </Link>
         <nav style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
@@ -22,14 +22,19 @@ export default function StudentLayout({ children }: { children: React.ReactNode 
             <Link
               key={item.href}
               href={item.href}
-              style={{ padding: '6px 10px', borderRadius: 'var(--radius-control)', fontSize: 14, color: 'var(--text-primary)' }}
+              style={{
+                padding: '6px 10px',
+                borderRadius: 16,
+                color: '#525252',
+                fontSize: 13,
+              }}
             >
               {item.label}
             </Link>
           ))}
         </nav>
       </aside>
-      <main style={{ padding: 'var(--space-lg)' }}>{children}</main>
+      <main style={{ padding: 24 }}>{children}</main>
     </div>
   );
 }
