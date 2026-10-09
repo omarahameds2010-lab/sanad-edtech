@@ -10,7 +10,7 @@
 
 **Overall: ~62% to a live v1.0** (code written ≈ 75% · verified ≈ 40% — loop HTTP complete + 85 tests green + boot DI fixed; live DB still pending)
 
-*Last inventoried: 2026-10-08 · Method: file walk + independent test re-runs (84/84 unit, golden-flow 1/1, exit 0) + boot verification · 🆕 = this session*
+*Last inventoried: 2026-10-09 · Method: file walk + independent test re-runs (85/85 unit, golden-flow 1/1, exit 0) + boot verification + overnight agent review · 🆕 = this session*
 
 </div>
 
@@ -25,9 +25,9 @@
 | 3 | LMS Core (assignments/exams/progression/timers) | 80% | Services REAL under `courses/` + 8 unit specs (84/84 green, independently re-run); 🆕 **HTTP layer complete**: enter/submit/timer/grade/progression endpoints wired with `JwtAuthGuard` + `RequirePermission`; ENTER calls chain attempt-start + progression unlock in one request; compiles exit 0 + DI-verified at boot; live-DB proof pending |
 | 4 | Payments | 75% | 18 files; Paymob SHA512 + Fawry HMAC verified in code; 3 stubs fail-closed; ledger + inbox + idempotency present; no live run |
 | 5 | Video + protection | 70% | 13 files (video + video-protection); watermark/token HMAC verified; needs provider keys + live proof |
-| 6 | Frontend Web | 50% | 🆕 **17 pages** (builder, preview, publish, exams, grading inbox, analytics, upload/editor components) + vitest config; mostly shells, API wiring partial |
+| 6 | Frontend Web | 48% | 🆕 **17+ pages**: builder/preview/publish, exams + **student exam runner (server-anchored timer)** + **teacher grading queue (score + feedback)** + **lesson view with videos/YouTube-unlisted embed**; upload/editor components; API wiring in progress |
 | 7 | Design system | 60% | 🆕 **6 packages** (`config, design-system, motion, types, ui, validation`); **20 components** + full token set (colors, motion, spacing, typography, zindex, breakpoints, border) + theme; stories growing |
-| 8 | Testing | 55% | 🆕 **84 unit tests PASS (independently re-run, exit 0)** + golden-flow e2e **1/1 PASS (independently re-run, exit 0)**; RLS e2e skipped — needs live DB (`RLS_ADMIN_URL` + `RLS_APP_URL`); new controllers have zero tests yet (next) |
+| 8 | Testing | 56% | 🆕 **85 unit tests PASS (re-verified 2026-10-09, exit 0)** + golden-flow e2e **1/1 PASS** + new `route-paths.spec.ts`; RLS e2e skipped - needs live DB; loop controllers still have zero tests (next) |
 | 9 | DevOps / CI | 55% | 🆕 CI jobs: typecheck, lint, **test-unit**, build, e2e refs, **deploy-preview**, release; ⚠️ release fires on `main` but default branch is `master` (never runs — bug) |
 | 10 | Docs & repo hygiene | 95% | README (2900+), ARCHITECTURE, SECURITY (4000+), VISUAL_IDENTITY (5000+), VIDEO_PROTECTION; LICENSE (MIT/OMAR AHMED); root SECURITY.md; CODEOWNERS; PR/issue templates; dependabot; junk lockfiles removed |
 | 11 | Security hardening | 50% | Real: Argon2id, rotation, HMAC ×5 surfaces, RLS, boot validator; Planned: 2FA, rate limits, WAF, KMS, SIEM |
@@ -159,7 +159,7 @@
 - [x] **Loop HTTP layer** (4 controllers, ~30 endpoints, guards) — DONE this session, compiles + DI-verified ✅
 - [x] **Boot DI trio** (AuthModule PrismaService, `@Global()` AuthorizationModule, TerminusModule) — DONE, boot reaches DB-connect ✅
 - [x] **Independent test re-runs** (84/84 unit + golden-flow 1/1, exit 0) — DONE ✅
-- [ ] Restore **root `.env.example`** (copy of `apps/api/.env.example`, which exists and is tracked ✅) + **seed script** (`prisma/seed.ts`: demo tenant → teacher → course → voucher) — live `.env` confirmed untracked ✅
+- [ ] Restore **root `.env.example`** (copy of `apps/api/.env.example`, which exists and is tracked ✅) + **seed script** (`prisma/seed.ts`; note: `prisma/seed-path2.ts` WIP appeared 2026-10-09 — review + converge, don't duplicate) — live `.env` confirmed untracked ✅
 - [ ] Fix **release-on-`main` bug** (default branch is `master`; release job + `needs: [build, e2e]` never fire) — retarget or rename branch
 - [ ] Pin Prisma CLI `5.22.0` (client already pinned; kill the `^5.7.1` drift)
 - [ ] Run isolation + golden-flow e2e against live DB (closes §Database above)
