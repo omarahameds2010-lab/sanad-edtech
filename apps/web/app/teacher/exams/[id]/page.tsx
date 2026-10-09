@@ -177,7 +177,9 @@ export default function TeacherExamGradingPage({
                 {attempts.map((att) => (
                   <tr key={att.id} style={{ borderBottom: "1px solid var(--border-subtle)" }}>
                     <td style={{ padding: "var(--space-md)", fontWeight: 600 }}>
-                      {att.student.name}
+                      <Link href={`/teacher/students/${att.student.id}`}>
+                        {att.student.name}
+                      </Link>
                       <div style={{ fontSize: 11, fontWeight: 400, color: "var(--text-muted)" }} dir="ltr">
                         {att.student.phone}
                       </div>
