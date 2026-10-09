@@ -49,11 +49,16 @@ export default function StudentAssignmentsPage() {
                 الحالة: {a.status} · المدة: {a.timerMinutes} دقيقة
                 {a.lesson ? ` · الدرس: ${a.lesson.title}` : ""}
               </p>
-              {lessonId && (
-                <Link href={`/student/lessons/${lessonId}`}>
-                  فتح صفحة الدرس
+              <div style={{ display: "flex", gap: 12 }}>
+                <Link href={`/student/assignments/${a.id}`}>
+                  فتح الواجب
                 </Link>
-              )}
+                {lessonId && (
+                  <Link href={`/student/lessons/${lessonId}`}>
+                    صفحة الدرس
+                  </Link>
+                )}
+              </div>
             </div>
           );
         })}
