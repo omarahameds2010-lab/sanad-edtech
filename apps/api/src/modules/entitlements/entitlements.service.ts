@@ -230,7 +230,35 @@ export class EntitlementsService {
       ),
     );
 
-    return [courseEntitlement, ...lessonEntitlements, ...examEntitlements];
+    // Get assignments for the course
+    const assignments = await this.prisma.assignment.findMany({
+      where: {
+        tenantId,
+        status: "PUBLISHED",
+        lesson: { section: { courseId } },
+      },
+      select: { id: true },
+    });
+
+    const assignmentEntitlements = await Promise.all(
+      assignments.map((assignment) =>
+        this.grantEntitlement({
+          tenantId,
+          userId,
+          resourceType: "assignment",
+          resourceId: assignment.id,
+          source,
+          metadata: { courseId, ...metadata },
+        }),
+      ),
+    );
+
+    return [
+      courseEntitlement,
+      ...lessonEntitlements,
+      ...examEntitlements,
+      ...assignmentEntitlements,
+    ];
   }
 
   async revokeEntitlement(id: string, reason?: string): Promise<Entitlement> {

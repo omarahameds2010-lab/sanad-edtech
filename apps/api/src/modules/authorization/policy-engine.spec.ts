@@ -1,0 +1,75 @@
+import { PolicyEngine } from "./policy-engine";
+
+/**
+ * RBAC gates for the student exam/assignment loop.
+ * Runs with in-context entitlements/flags — no database needed.
+ */
+describe("PolicyEngine (student loop)", () => {
+  const engine = new PolicyEngine({} as any);
+  const student = {
+    userId: "student-1",
+    tenantId: "tenant-1",
+    role: "STUDENT",
+  };
+
+  it("allows a student to submit an exam", async () => {
+    const decision = await engine.can(
+      {
+        ...student,
+        featureFlags: { exams: true },
+        entitlements: [
+          {
+            resourceType: "exam",
+            resourceId: "exam-1",
+            status: "ACTIVE",
+            source: "admin_grant",
+          },
+        ],
+      } as any,
+      "submit",
+      "exam",
+      {
+        id: "exam-1",
+      },
+    );
+    expect(decision.allowed).toBe(true);
+  });
+
+  it("allows a student to enter (attempt) an assignment with entitlement", async () => {
+    const decision = await engine.can(
+      {
+        ...student,
+        featureFlags: { assignments: true },
+        entitlements: [
+          {
+            resourceType: "assignment",
+            resourceId: "a-1",
+            status: "ACTIVE",
+            source: "admin_grant",
+          },
+        ],
+      } as any,
+      "attempt",
+      "assignment",
+      { id: "a-1" },
+    );
+    expect(decision.allowed).toBe(true);
+  });
+
+  it("still forbids a student from grading", async () => {
+    const decision = await engine.can(student, "grade", "exam", {
+      id: "exam-1",
+    });
+    expect(decision.allowed).toBe(false);
+  });
+
+  it("allows a teacher to grade attempts", async () => {
+    const decision = await engine.can(
+      { ...student, role: "TEACHER" },
+      "grade",
+      "attempt",
+      { id: "att-1" },
+    );
+    expect(decision.allowed).toBe(true);
+  });
+});

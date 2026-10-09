@@ -2,6 +2,7 @@ import { Module } from "@nestjs/common";
 import { CoursesService } from "./courses.service";
 import { TeacherCoursesController } from "./courses.controller";
 import { PublicCoursesController } from "./courses.controller";
+import { StudentCoursesController } from "./courses.controller";
 import { SectionsController } from "./courses.controller";
 import { TeacherLessonsController } from "./courses.controller";
 import { StudentLessonsController } from "./courses.controller";
@@ -41,6 +42,7 @@ import { ResourcesModule } from "./resources/resources.module";
   controllers: [
     TeacherCoursesController,
     PublicCoursesController,
+    StudentCoursesController,
     SectionsController,
     TeacherLessonsController,
     StudentLessonsController,

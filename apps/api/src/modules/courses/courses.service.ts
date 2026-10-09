@@ -464,4 +464,78 @@ export class CoursesService {
       ),
     };
   }
+
+  /**
+   * Full curriculum structure for course detail pages.
+   * Public variant shows published content only; the student variant
+   * additionally requires an ACTIVE enrollment and exposes lock states.
+   */
+  async getCourseStructureBySlug(tenantId: string, slug: string) {
+    const course = await this.prisma.course.findFirst({
+      where: { tenantId, slug, status: "PUBLISHED" },
+      select: { id: true },
+    });
+    if (!course) {
+      throw new NotFoundException("Course not found");
+    }
+    return this.buildCourseStructure(tenantId, course.id);
+  }
+
+  async getCourseStructureForStudent(
+    tenantId: string,
+    courseId: string,
+    userId: string,
+  ) {
+    const enrollment = await this.prisma.enrollment.findFirst({
+      where: { tenantId, userId, courseId, status: "ACTIVE" },
+    });
+    if (!enrollment) {
+      throw new ForbiddenException("Not enrolled in this course");
+    }
+    return this.buildCourseStructure(tenantId, courseId);
+  }
+
+  private async buildCourseStructure(tenantId: string, courseId: string) {
+    const course = await this.prisma.course.findFirst({
+      where: { id: courseId, tenantId },
+      select: {
+        id: true,
+        title: true,
+        slug: true,
+        shortDescription: true,
+        description: true,
+        thumbnailUrl: true,
+        visibility: true,
+        level: true,
+        language: true,
+        price: true,
+        currency: true,
+        status: true,
+        teacher: { select: { name: true } },
+      },
+    });
+    if (!course) {
+      throw new NotFoundException("Course not found");
+    }
+    const sections = await this.prisma.section.findMany({
+      where: { tenantId, courseId },
+      include: {
+        lessons: {
+          where: { status: "PUBLISHED" },
+          select: {
+            id: true,
+            title: true,
+            type: true,
+            orderIndex: true,
+            duration: true,
+            lockStatus: true,
+            unlockType: true,
+          },
+          orderBy: { orderIndex: "asc" },
+        },
+      },
+      orderBy: { orderIndex: "asc" },
+    });
+    return { course, sections };
+  }
 }

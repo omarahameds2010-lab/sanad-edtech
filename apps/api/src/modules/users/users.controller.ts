@@ -1,6 +1,14 @@
-import { Controller, Get, UseGuards, Request } from "@nestjs/common";
+import {
+  Controller,
+  Get,
+  Param,
+  UseGuards,
+  Request,
+  ForbiddenException,
+} from "@nestjs/common";
 import { UsersService } from "./users.service";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
+import { RequirePermission } from "../authorization/authorization.decorators";
 
 @Controller("users")
 export class UsersController {
@@ -16,5 +24,23 @@ export class UsersController {
       role: user.role,
       grade: user.grade,
     };
+  }
+
+  @Get(":id")
+  @RequirePermission({
+    action: "read",
+    resourceType: "user",
+    resourceIdParam: "id",
+  })
+  async getStudentDetail(@Request() req, @Param("id") id: string) {
+    // Students may only read their own file; teachers/admins per RBAC.
+    if (req.user.role === "STUDENT" && id !== req.user.sub) {
+      throw new ForbiddenException("You can only view your own profile");
+    }
+    const result = await this.usersService.getStudentDetail(
+      req.tenantId,
+      id,
+    );
+    return { data: result };
   }
 }

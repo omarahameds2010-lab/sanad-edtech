@@ -188,6 +188,39 @@ export class PublicCoursesController {
     );
     return { data: preview };
   }
+
+  @Get(":slug/structure")
+  async courseStructure(@Request() req, @Param("slug") slug: string) {
+    const result = await this.coursesService.getCourseStructureBySlug(
+      req.tenantId,
+      slug,
+    );
+    return { data: result };
+  }
+}
+
+@Controller("v1/student/courses")
+@UseGuards(JwtAuthGuard)
+export class StudentCoursesController {
+  constructor(private coursesService: CoursesService) {}
+
+  @Get(":courseId/structure")
+  @RequirePermission({
+    action: "read",
+    resourceType: "course",
+    resourceIdParam: "courseId",
+  })
+  async courseStructure(
+    @Request() req,
+    @Param("courseId") courseId: string,
+  ) {
+    const result = await this.coursesService.getCourseStructureForStudent(
+      req.tenantId,
+      courseId,
+      req.user.sub,
+    );
+    return { data: result };
+  }
 }
 
 @Controller("v1/teacher")

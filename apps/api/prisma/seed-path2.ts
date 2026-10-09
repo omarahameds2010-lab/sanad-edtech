@@ -238,12 +238,75 @@ async function main() {
     },
   });
 
+  // Assignment lesson so /student/assignments/[id] is demoable.
+  const assignmentLesson = await prisma.lesson.create({
+    data: {
+      tenantId: tenant.id,
+      sectionId: section.id,
+      type: "ASSIGNMENT",
+      title: "واجب: حل المعادلات",
+      slug: "demo-assignment-equations",
+      description: "واجب الديمو — إجابة نصية",
+      duration: 18000,
+      orderIndex: 3,
+      status: "PUBLISHED",
+      publishedAt: new Date(),
+      lockStatus: "UNLOCKED",
+    },
+  });
+
+  const assignment = await prisma.assignment.create({
+    data: {
+      tenantId: tenant.id,
+      lessonId: assignmentLesson.id,
+      title: "واجب: حل المعادلات",
+      description: "حل المعادلتين التاليتين واكتب خطواتك.",
+      instructions: "اكتب إجابتك كمتن ثم اضغط تسليم قبل انتهاء المؤقت.",
+      timerMinutes: 300,
+      maxAttempts: 1,
+      status: "PUBLISHED",
+    },
+  });
+
+  // Entitlements mirror grantCourseEntitlement (course + lessons + exam +
+  // assignments) so guards pass without a purchase in the demo.
+  const entitlementTargets = [
+    { resourceType: "course", resourceId: course.id },
+    { resourceType: "lesson", resourceId: lesson1.id },
+    { resourceType: "lesson", resourceId: examLesson.id },
+    { resourceType: "lesson", resourceId: nextLesson.id },
+    { resourceType: "lesson", resourceId: assignmentLesson.id },
+    { resourceType: "exam", resourceId: exam.id },
+    { resourceType: "assignment", resourceId: assignment.id },
+  ];
+  for (const target of entitlementTargets) {
+    await prisma.entitlement.upsert({
+      where: {
+        // No unique constraint on (user, type, id) — guard by lookup.
+        id: `seed-${student.id}-${target.resourceType}-${target.resourceId}`,
+      },
+      update: { status: "ACTIVE" },
+      create: {
+        id: `seed-${student.id}-${target.resourceType}-${target.resourceId}`,
+        tenantId: tenant.id,
+        userId: student.id,
+        resourceType: target.resourceType,
+        resourceId: target.resourceId,
+        source: "admin_grant",
+        startsAt: new Date(),
+        status: "ACTIVE",
+        metadata: { courseId: course.id, seed: true },
+      },
+    });
+  }
+
   console.log("Seeded Path-2 demo:");
   console.log(`  teacher: ${TEACHER_PHONE} / ${TEACHER_PASSWORD}`);
   console.log(`  student: ${STUDENT_PHONE} / ${STUDENT_PASSWORD}`);
   console.log(`  courseId: ${course.id}`);
   console.log(`  lessonId (video): ${lesson1.id}`);
   console.log(`  examId:   ${exam.id}  (lesson ${examLesson.id})`);
+  console.log(`  assignmentId: ${assignment.id}  (lesson ${assignmentLesson.id})`);
   console.log(`  nextLesson (locked): ${nextLesson.id}`);
   console.log("Flow: login → /student/exams → enter → submit → lesson → teacher grades.");
 }

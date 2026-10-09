@@ -6,8 +6,13 @@ import {
 } from "@nestjs/common/constants";
 import { AuthController } from "./modules/auth/auth.controller";
 import { StudentLessonsController } from "./modules/courses/courses.controller";
+import {
+  PublicCoursesController,
+  StudentCoursesController,
+} from "./modules/courses/courses.controller";
 import { ExamsController } from "./modules/courses/exams/exams.controller";
 import { ProgressionController } from "./modules/courses/progression/progression.controller";
+import { UsersController } from "./modules/users/users.controller";
 
 /**
  * Locks the public HTTP contract of the Path-2 loop
@@ -120,6 +125,27 @@ describe("Path-2 HTTP contract", () => {
       "getLesson",
       RequestMethod.GET,
       "/api/v1/student/lessons/:lessonId",
+    );
+  });
+
+  it("exposes course structure and student files", () => {
+    expectRoute(
+      PublicCoursesController,
+      "courseStructure",
+      RequestMethod.GET,
+      "/api/v1/public/courses/:slug/structure",
+    );
+    expectRoute(
+      StudentCoursesController,
+      "courseStructure",
+      RequestMethod.GET,
+      "/api/v1/student/courses/:courseId/structure",
+    );
+    expectRoute(
+      UsersController,
+      "getStudentDetail",
+      RequestMethod.GET,
+      "/api/users/:id",
     );
   });
 });

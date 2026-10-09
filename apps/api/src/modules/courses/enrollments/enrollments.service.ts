@@ -5,10 +5,14 @@ import {
   ConflictException,
 } from "@nestjs/common";
 import { PrismaService } from "../../tenants/prisma.service";
+import { EntitlementsService } from "../../entitlements/entitlements.service";
 
 @Injectable()
 export class EnrollmentsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private entitlementsService: EntitlementsService,
+  ) {}
 
   async enroll(tenantId: string, userId: string, courseId: string) {
     const course = await this.prisma.course.findFirst({
@@ -28,7 +32,7 @@ export class EnrollmentsService {
       throw new ConflictException("Already enrolled in this course");
     }
 
-    return this.prisma.enrollment.create({
+    const enrollment = await this.prisma.enrollment.create({
       data: {
         tenantId,
         userId,
@@ -38,6 +42,17 @@ export class EnrollmentsService {
         startsAt: new Date(),
       },
     });
+
+    // Direct enrollment must unlock the loop (lessons/exams/assignments),
+    // mirroring the purchase flow — otherwise guards reject everything.
+    await this.entitlementsService.grantCourseEntitlement(
+      tenantId,
+      userId,
+      courseId,
+      "admin_grant",
+    );
+
+    return enrollment;
   }
 
   async listEnrollments(tenantId: string, userId: string, status?: string) {

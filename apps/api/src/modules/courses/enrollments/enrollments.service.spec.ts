@@ -8,6 +8,7 @@ import { EnrollmentsService } from "./enrollments.service";
 describe("EnrollmentsService", () => {
   let service: EnrollmentsService;
   let prisma: any;
+  let entitlements: any;
 
   const tenantId = "tenant1";
   const userId = "user1";
@@ -22,7 +23,10 @@ describe("EnrollmentsService", () => {
         update: jest.fn(),
       },
     };
-    service = new EnrollmentsService(prisma);
+    entitlements = {
+      grantCourseEntitlement: jest.fn().mockResolvedValue([]),
+    };
+    service = new EnrollmentsService(prisma, entitlements);
   });
 
   describe("enroll", () => {
@@ -77,6 +81,12 @@ describe("EnrollmentsService", () => {
         }),
       );
       expect(result.status).toBe("ACTIVE");
+      expect(entitlements.grantCourseEntitlement).toHaveBeenCalledWith(
+        tenantId,
+        userId,
+        "c1",
+        "admin_grant",
+      );
     });
   });
 
