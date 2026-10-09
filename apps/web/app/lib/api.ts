@@ -178,6 +178,91 @@ export interface LoginResult {
   user: { id: string; name: string; role: string };
 }
 
+export interface EnrollmentItem {
+  id: string;
+  status: string;
+  startsAt: string;
+  expiresAt: string | null;
+  course: { id: string; title: string; slug: string; status: string };
+}
+
+export interface AssignmentListItem {
+  id: string;
+  title: string;
+  status: string;
+  lessonId: string;
+  timerMinutes: number;
+  lesson?: { id: string; title: string } | null;
+}
+
+export interface AssignmentListResult {
+  assignments: AssignmentListItem[];
+  nextCursor: string | null;
+}
+
+export interface UserProfile {
+  id: string;
+  name: string;
+  role: string;
+  grade: string | null;
+}
+
+export interface OrderListItem {
+  id: string;
+  number: string;
+  currency: string;
+  subtotalMinor: number | string;
+  discountMinor: number | string;
+  totalMinor: number | string;
+  status: string;
+  createdAt: string;
+  items: Array<{
+    resourceType: string;
+    resourceId: string;
+    name: string;
+    totalMinor: number | string;
+  }>;
+  payments: Array<{
+    id: string;
+    status: string;
+    amountMinor: number | string;
+    provider: string;
+  }>;
+}
+
+export interface OrderListResult {
+  orders: OrderListItem[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
+export interface CurrentTenant {
+  id: string;
+  name: string;
+  slug: string;
+  status: string;
+}
+
+export interface CreateCourseInput {
+  title: string;
+  slug: string;
+  shortDescription?: string;
+  description?: string;
+  visibility: string;
+  language: string;
+  price?: number;
+  currency?: string;
+}
+
+export interface CreatedCourse {
+  id: string;
+  title: string;
+  slug: string;
+  status: string;
+}
+
 export interface ExamListItem {
   id: string;
   title: string;
@@ -356,6 +441,28 @@ export const api = {
     input: { score: number; feedback?: string },
   ) =>
     apiFetch<GradeAttemptResult>(`/api/v1/exams/attempts/${attemptId}/grade`, {
+      token,
+      method: "POST",
+      body: input,
+    }),
+
+  getMyEnrollments: (token: string) =>
+    apiFetch<EnrollmentItem[]>("/api/v1/enrollments/me", { token }),
+
+  listAssignments: (token: string) =>
+    apiFetch<AssignmentListResult>("/api/v1/assignments", { token }),
+
+  getProfile: (token: string) =>
+    apiFetch<UserProfile>("/api/users/me", { token }),
+
+  listOrders: (token: string) =>
+    apiFetch<OrderListResult>("/api/payments/orders", { token }),
+
+  getCurrentTenant: (token: string) =>
+    apiFetch<CurrentTenant>("/api/tenants/current", { token }),
+
+  createCourse: (token: string, input: CreateCourseInput) =>
+    apiFetch<CreatedCourse>("/api/v1/teacher/courses", {
       token,
       method: "POST",
       body: input,

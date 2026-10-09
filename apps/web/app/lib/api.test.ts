@@ -134,3 +134,70 @@ describe("teacher grading endpoints", () => {
     expect(url).toContain("/api/v1/exams/e1?questions=true");
   });
 });
+
+describe("remaining nav endpoints", () => {
+  it("getMyEnrollments hits the enrollments endpoint", async () => {
+    const { fetchMock } = mockFetchOnce({ data: [] });
+    await api.getMyEnrollments("t");
+    const [url] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe("http://localhost:3001/api/v1/enrollments/me");
+  });
+
+  it("listAssignments hits the assignments endpoint", async () => {
+    const { fetchMock } = mockFetchOnce({
+      data: { assignments: [], nextCursor: null },
+    });
+    await api.listAssignments("t");
+    const [url] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe("http://localhost:3001/api/v1/assignments");
+  });
+
+  it("getProfile hits users/me (raw, no envelope)", async () => {
+    mockFetchOnce({ id: "u1", name: "N", role: "STUDENT", grade: null });
+    await expect(api.getProfile("t")).resolves.toEqual({
+      id: "u1",
+      name: "N",
+      role: "STUDENT",
+      grade: null,
+    });
+  });
+
+  it("listOrders hits the payments orders endpoint", async () => {
+    const { fetchMock } = mockFetchOnce({
+      orders: [],
+      total: 0,
+      page: 1,
+      limit: 20,
+      totalPages: 0,
+    });
+    const result = await api.listOrders("t");
+    expect(result.total).toBe(0);
+    const [url] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe("http://localhost:3001/api/payments/orders");
+  });
+
+  it("getCurrentTenant hits tenants/current", async () => {
+    const { fetchMock } = mockFetchOnce({ id: "t1", name: "T" });
+    await api.getCurrentTenant("t");
+    const [url] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe("http://localhost:3001/api/tenants/current");
+  });
+
+  it("createCourse posts the course payload and returns 201 data", async () => {
+    const { fetchMock } = mockFetchOnce({
+      data: { id: "c1", title: "T", slug: "t", status: "DRAFT" },
+    });
+    const result = await api.createCourse("t", {
+      title: "T",
+      slug: "t",
+      visibility: "PUBLIC",
+      language: "ar",
+      price: 0,
+      currency: "EGP",
+    });
+    expect(result.id).toBe("c1");
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(init.method).toBe("POST");
+    expect(JSON.parse(init.body as string).title).toBe("T");
+  });
+});
