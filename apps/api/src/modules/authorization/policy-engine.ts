@@ -46,7 +46,8 @@ export type Action =
   | "configure"
   | "redeem"
   | "archive"
-  | "reorder";
+  | "reorder"
+  | "evaluate";  // AI evaluation action
 
 export interface AuthorizationContext {
   userId: string;
@@ -291,7 +292,7 @@ export class PolicyEngine {
         user: ["read"],
         tenant: ["read"],
         certificate: ["create", "read"],
-        assignment: ["create", "read", "update", "grade"],
+        assignment: ["create", "read", "update", "grade", "evaluate"],
         question: ["create", "read", "update", "delete"],
         questionBank: ["create", "read", "update", "delete"],
         video: ["create", "read", "update", "delete"],
@@ -314,7 +315,9 @@ export class PolicyEngine {
         user: ["read", "update"],
         tenant: ["read"],
         certificate: ["read"],
-        assignment: ["read", "attempt", "submit"],
+        // NOTE (demo): student self-evaluation is open; production needs
+        // rate-limiting here (LLM cost per call once real models attach).
+        assignment: ["read", "attempt", "submit", "evaluate"],
         question: ["read"],
         questionBank: [],
         video: ["watch"],

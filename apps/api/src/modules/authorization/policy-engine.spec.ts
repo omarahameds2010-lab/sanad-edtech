@@ -72,4 +72,21 @@ describe("PolicyEngine (student loop)", () => {
     );
     expect(decision.allowed).toBe(true);
   });
+
+  it("allows a teacher to call AI evaluation on assignments", async () => {
+    const decision = await engine.can(
+      { ...student, role: "TEACHER" },
+      "evaluate",
+      "assignment",
+      { id: "a-1" },
+    );
+    expect(decision.allowed).toBe(true);
+  });
+
+  it("allows a student to self-evaluate an assignment answer", async () => {
+    const decision = await engine.can(student, "evaluate", "assignment", {
+      id: "a-1",
+    });
+    expect(decision.allowed).toBe(true);
+  });
 });
