@@ -71,3 +71,15 @@ test-auth.txt
 *.bak
 *.tsbuildinfo
 tsconfig.tsbuildinfo
+
+# ---------------------------------------------------------------------------
+# NOTE: `*.txt` above already covers every loose log/scratch file in the repo
+# root and apps/*, which is why the earlier per-pattern entries are redundant.
+# They are kept as documentation of intent rather than as distinct rules.
+# ---------------------------------------------------------------------------
+
+# Scratch scripts / throwaway probes written while verifying a change.
+theft.ps1
+checkevents.js
+checkevents.cjs
+diag-*.ps1

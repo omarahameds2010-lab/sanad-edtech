@@ -15,7 +15,12 @@
     "format": "turbo run format",
     "clean": "turbo run clean && rm -rf node_modules",
     "export:openapi": "ts-node -r tsconfig-paths/register apps/api/scripts/export-openapi.ts",
-    "prepare": "husky"
+    "prepare": "husky",
+    "precommit:check": "pnpm --filter api exec tsc --noEmit -p tsconfig.json && pnpm --filter api run build"
+  },
+  "lint-staged": {
+    "*.{ts,tsx,js,mjs,json,css,md}": "prettier --check",
+    "apps/api/src/**/*.ts": "eslint --fix --no-error-on-unmatched-pattern"
   },
   "devDependencies": {
     "@apidevtools/swagger-parser": "^13.1.0",
@@ -28,8 +33,5 @@
   "workspaces": [
     "apps/*",
     "packages/*"
-  ],
-  "lint-staged": {
-    "*.{ts,tsx,js,mjs,json,css,md}": "prettier --check"
-  }
+  ]
 }
