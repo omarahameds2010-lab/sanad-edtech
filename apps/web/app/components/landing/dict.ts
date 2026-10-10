@@ -1,7 +1,7 @@
 export type Lang = "ar" | "en";
 
 export interface Dict {
-  header: { courses: string; teachers: string; how: string; sanad: string; faq: string; login: string; menuOpen: string; menuClose: string };
+  header: { courses: string; teachers: string; how: string; sanad: string; faq: string; login: string; signup: string; dashboard: string; menuOpen: string; menuClose: string };
   hero: {
     eyebrow: string;
     titleA: string;
@@ -107,12 +107,39 @@ export interface Dict {
     offline: string;
     brandLines: { strong: string; rest: string }[];
   };
+  signup: {
+    title: string;
+    subtitle: string;
+    step: string;
+    of: string;
+    firstName: string;
+    lastName: string;
+    role: string;
+    roleStudent: string;
+    roleTeacher: string;
+    next: string;
+    back: string;
+    phone: string;
+    password: string;
+    show: string;
+    hide: string;
+    submit: string;
+    pending: string;
+    haveAccount: string;
+    loginLink: string;
+    duplicate: string;
+    invalidPhone: string;
+    shortPassword: string;
+    requiredNames: string;
+    invalid: string;
+    offline: string;
+  };
   footer: { courses: string; teachers: string; login: string; tagline: string };
 }
 
 export const dict: Record<Lang, Dict> = {
   ar: {
-    header: { courses: "الكورسات", teachers: "المدرسون", how: "كيف تعمل سند", sanad: "SANAD", faq: "الأسئلة الشائعة", login: "دخول", menuOpen: "فتح القائمة", menuClose: "إغلاق القائمة" },
+    header: { courses: "الكورسات", teachers: "المدرسون", how: "كيف تعمل سند", sanad: "SANAD", faq: "الأسئلة الشائعة", login: "دخول", signup: "إنشاء حساب", dashboard: "لوحتي", menuOpen: "فتح القائمة", menuClose: "إغلاق القائمة" },
     hero: {
       eyebrow: "منصة تعليمية لطلاب الثانوية العامة المصرية",
       titleA: "دروسك. واجباتك. اختباراتك.",
@@ -293,11 +320,38 @@ export const dict: Record<Lang, Dict> = {
         { strong: "وتقييم ذكي", rest: " يراجعه مدرسك البشري." },
       ],
     },
+    signup: {
+      title: "إنشاء حساب جديد",
+      subtitle: "خطوتان فقط ويبدأ مسارك التعليمي",
+      step: "الخطوة",
+      of: "من",
+      firstName: "الاسم الأول",
+      lastName: "اسم العائلة",
+      role: "أنا",
+      roleStudent: "طالب",
+      roleTeacher: "مدرس",
+      next: "المتابعة",
+      back: "رجوع",
+      phone: "رقم الموبايل",
+      password: "كلمة السر",
+      show: "إظهار كلمة السر",
+      hide: "إخفاء كلمة السر",
+      submit: "إنشاء الحساب",
+      pending: "جاري إنشاء الحساب…",
+      haveAccount: "لديك حساب بالفعل؟",
+      loginLink: "سجّل الدخول",
+      duplicate: "هذا الرقم مسجل بالفعل — سجّل الدخول",
+      invalidPhone: "رقم الموبايل يجب أن يكون 11 رقمًا يبدأ بـ 01",
+      shortPassword: "كلمة السر 8 أحرف على الأقل",
+      requiredNames: "اكتب الاسم الأول واسم العائلة",
+      invalid: "راجع البيانات المطلوبة",
+      offline: "تعذر الاتصال بالخادم",
+    },
     footer: { courses: "الكورسات", teachers: "المدرسون", login: "دخول", tagline: "مساحة تعليمية واضحة لكل خطوة." },
   },
 
   en: {
-    header: { courses: "Courses", teachers: "Teachers", how: "How Sanad works", sanad: "SANAD", faq: "FAQ", login: "Log in", menuOpen: "Open menu", menuClose: "Close menu" },
+    header: { courses: "Courses", teachers: "Teachers", how: "How Sanad works", sanad: "SANAD", faq: "FAQ", login: "Log in", signup: "Sign up", dashboard: "My space", menuOpen: "Open menu", menuClose: "Close menu" },
     hero: {
       eyebrow: "A learning platform for Egyptian Thanaweya Amma students",
       titleA: "Your lessons. Your assignments. Your exams.",
@@ -477,6 +531,33 @@ export const dict: Record<Lang, Dict> = {
         { strong: "Fair timers", rest: " run by the server." },
         { strong: "And smart evaluation", rest: " reviewed by your human teacher." },
       ],
+    },
+    signup: {
+      title: "Create a new account",
+      subtitle: "Two quick steps and your learning path begins",
+      step: "Step",
+      of: "of",
+      firstName: "First name",
+      lastName: "Last name",
+      role: "I am a",
+      roleStudent: "Student",
+      roleTeacher: "Teacher",
+      next: "Continue",
+      back: "Back",
+      phone: "Phone number",
+      password: "Password",
+      show: "Show password",
+      hide: "Hide password",
+      submit: "Create account",
+      pending: "Creating account…",
+      haveAccount: "Already have an account?",
+      loginLink: "Log in",
+      duplicate: "This number is already registered — log in",
+      invalidPhone: "Phone must be 11 digits starting with 01",
+      shortPassword: "Password must be at least 8 characters",
+      requiredNames: "Enter your first and last name",
+      invalid: "Please review the required fields",
+      offline: "Could not reach the server",
     },
     footer: { courses: "Courses", teachers: "Teachers", login: "Log in", tagline: "A clear learning space for every step." },
   },

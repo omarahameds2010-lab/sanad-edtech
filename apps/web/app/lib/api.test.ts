@@ -1,5 +1,14 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import { ApiError, api, apiFetch, newIdempotencyKey } from "./api";
+import {
+  ApiError,
+  API_BASE_URL,
+  api,
+  apiFetch,
+  buildFullName,
+  isValidEgyptianPhone,
+  landingForRole,
+  newIdempotencyKey,
+} from "./api";
 
 function mockFetchOnce(payload: unknown, status = 200) {
   const json = vi.fn().mockResolvedValue(payload);
@@ -107,7 +116,7 @@ describe("teacher grading endpoints", () => {
     const { fetchMock } = mockFetchOnce({ data: { attempts: [], nextCursor: null } });
     await api.getGradingQueue("t", "exam-1");
     const [url] = fetchMock.mock.calls[0] as [string, RequestInit];
-    expect(url).toBe("http://localhost:3001/api/v1/exams/exam-1/attempts/grading");
+    expect(url).toBe(`${API_BASE_URL}/api/v1/exams/exam-1/attempts/grading`);
   });
 
   it("gradeAttempt posts score and feedback", async () => {
@@ -140,7 +149,7 @@ describe("remaining nav endpoints", () => {
     const { fetchMock } = mockFetchOnce({ data: [] });
     await api.getMyEnrollments("t");
     const [url] = fetchMock.mock.calls[0] as [string, RequestInit];
-    expect(url).toBe("http://localhost:3001/api/v1/enrollments/me");
+    expect(url).toBe(`${API_BASE_URL}/api/v1/enrollments/me`);
   });
 
   it("listAssignments hits the assignments endpoint", async () => {
@@ -149,7 +158,7 @@ describe("remaining nav endpoints", () => {
     });
     await api.listAssignments("t");
     const [url] = fetchMock.mock.calls[0] as [string, RequestInit];
-    expect(url).toBe("http://localhost:3001/api/v1/assignments");
+    expect(url).toBe(`${API_BASE_URL}/api/v1/assignments`);
   });
 
   it("getProfile hits users/me (raw, no envelope)", async () => {
@@ -173,14 +182,14 @@ describe("remaining nav endpoints", () => {
     const result = await api.listOrders("t");
     expect(result.total).toBe(0);
     const [url] = fetchMock.mock.calls[0] as [string, RequestInit];
-    expect(url).toBe("http://localhost:3001/api/payments/orders");
+    expect(url).toBe(`${API_BASE_URL}/api/payments/orders`);
   });
 
   it("getCurrentTenant hits tenants/current", async () => {
     const { fetchMock } = mockFetchOnce({ id: "t1", name: "T" });
     await api.getCurrentTenant("t");
     const [url] = fetchMock.mock.calls[0] as [string, RequestInit];
-    expect(url).toBe("http://localhost:3001/api/tenants/current");
+    expect(url).toBe(`${API_BASE_URL}/api/tenants/current`);
   });
 
   it("createCourse posts the course payload and returns 201 data", async () => {
@@ -210,7 +219,7 @@ describe("five new pages endpoints", () => {
     await api.getCourseStructureBySlug("demo-math-1");
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
     expect(url).toBe(
-      "http://localhost:3001/api/v1/public/courses/demo-math-1/structure",
+      `${API_BASE_URL}/api/v1/public/courses/demo-math-1/structure`,
     );
     expect(
       (init.headers as Record<string, string>).Authorization,
@@ -224,7 +233,7 @@ describe("five new pages endpoints", () => {
     await api.getStudentCourseStructure("t", "c1");
     const [url] = fetchMock.mock.calls[0] as [string, RequestInit];
     expect(url).toBe(
-      "http://localhost:3001/api/v1/student/courses/c1/structure",
+      `${API_BASE_URL}/api/v1/student/courses/c1/structure`,
     );
   });
 
@@ -291,7 +300,7 @@ describe("five new pages endpoints", () => {
     });
     await api.getStudentFile("t", "u1");
     const [url] = fetchMock.mock.calls[0] as [string, RequestInit];
-    expect(url).toBe("http://localhost:3001/api/users/u1");
+    expect(url).toBe(`${API_BASE_URL}/api/users/u1`);
   });
 
   it("listPublicCourses is public and supports search", async () => {
@@ -304,5 +313,50 @@ describe("five new pages endpoints", () => {
     expect(
       (init.headers as Record<string, string>).Authorization,
     ).toBeUndefined();
+  });
+});
+
+describe("signup helpers", () => {
+  it("register posts to /api/auth/register", async () => {
+    const { fetchMock } = mockFetchOnce({
+      accessToken: "a",
+      refreshToken: "r",
+      user: { id: "u1", name: "N", role: "STUDENT" },
+    });
+    const result = await api.register({
+      name: "أحمد محمد",
+      phone: "01012345678",
+      password: "password123",
+      role: "STUDENT",
+    });
+    expect(result.accessToken).toBe("a");
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe(`${API_BASE_URL}/api/auth/register`);
+    expect(init.method).toBe("POST");
+    expect(JSON.parse(init.body as string)).toEqual({
+      name: "أحمد محمد",
+      phone: "01012345678",
+      password: "password123",
+      role: "STUDENT",
+    });
+  });
+
+  it("buildFullName joins and collapses whitespace", () => {
+    expect(buildFullName("  أحمد ", " محمد  علي ")).toBe("أحمد محمد علي");
+    expect(buildFullName("", "")).toBe("");
+  });
+
+  it("landingForRole routes teachers and students", () => {
+    expect(landingForRole("TEACHER")).toBe("/teacher");
+    expect(landingForRole("STUDENT")).toBe("/student");
+    expect(landingForRole(null)).toBe("/student");
+  });
+
+  it("isValidEgyptianPhone mirrors the server DTO", () => {
+    expect(isValidEgyptianPhone("01012345678")).toBe(true);
+    expect(isValidEgyptianPhone("01512345678")).toBe(true);
+    expect(isValidEgyptianPhone("02012345678")).toBe(false);
+    expect(isValidEgyptianPhone("0101234567")).toBe(false);
+    expect(isValidEgyptianPhone("")).toBe(false);
   });
 });

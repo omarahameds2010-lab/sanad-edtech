@@ -1,7 +1,7 @@
 /**
  * Typed HTTP client for the NestJS API.
  *
- * - Base URL comes from NEXT_PUBLIC_API_URL (demo default: http://localhost:3001).
+ * - Base URL comes from NEXT_PUBLIC_API_URL (demo default: http://localhost:3002).
  * - Auth is a Bearer access token obtained from POST /api/auth/login.
  *   The token is kept in memory (React context) — never in localStorage.
  * - Tenant is resolved server-side from the Host header, so the client
@@ -10,7 +10,7 @@
  */
 
 export const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
+  process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3002";
 
 export class ApiError extends Error {
   readonly status: number;
@@ -176,6 +176,29 @@ export interface LoginResult {
   accessToken: string;
   refreshToken: string;
   user: { id: string; name: string; role: string };
+}
+
+export interface RegisterInput {
+  name: string;
+  phone: string;
+  password: string;
+  role?: "STUDENT" | "TEACHER";
+  grade?: string;
+}
+
+/** "/teacher" for teachers, "/student" for everyone else. */
+export function landingForRole(role: string | null | undefined): string {
+  return role === "TEACHER" ? "/teacher" : "/student";
+}
+
+/** Join first/last names, collapsing extra whitespace. */
+export function buildFullName(first: string, last: string): string {
+  return `${first.trim()} ${last.trim()}`.trim().replace(/\s+/g, " ");
+}
+
+/** Egyptian mobile format enforced server-side (register DTO). */
+export function isValidEgyptianPhone(phone: string): boolean {
+  return /^01[0125][0-9]{8}$/.test(phone.trim());
 }
 
 export interface EnrollmentItem {
@@ -548,6 +571,12 @@ export const api = {
     apiFetch<LoginResult>("/api/auth/login", {
       method: "POST",
       body: { phone, password },
+    }),
+
+  register: (input: RegisterInput) =>
+    apiFetch<LoginResult>("/api/auth/register", {
+      method: "POST",
+      body: input,
     }),
 
   getStudentExamView: (token: string, examId: string) =>

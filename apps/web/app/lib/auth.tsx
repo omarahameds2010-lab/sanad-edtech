@@ -18,7 +18,8 @@ interface AuthState {
 }
 
 interface AuthContextValue extends AuthState {
-  login: (phone: string, password: string) => Promise<void>;
+  login: (phone: string, password: string) => Promise<import("./api").LoginResult>;
+  applySession: (result: import("./api").LoginResult) => void;
   logout: () => void;
 }
 
@@ -47,15 +48,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       userName: result.user.name,
       role: result.user.role,
     });
+    return result;
   }, []);
+
+  const applySession = useCallback(
+    (result: import("./api").LoginResult) => {
+      setState({
+        token: result.accessToken,
+        userId: result.user.id,
+        userName: result.user.name,
+        role: result.user.role,
+      });
+    },
+    [],
+  );
 
   const logout = useCallback(() => {
     setState(INITIAL_STATE);
   }, []);
 
   const value = useMemo<AuthContextValue>(
-    () => ({ ...state, login, logout }),
-    [state, login, logout],
+    () => ({ ...state, login, applySession, logout }),
+    [state, login, applySession, logout],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
