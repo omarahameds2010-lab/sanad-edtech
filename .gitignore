@@ -46,3 +46,27 @@ storybook-static
 package-lock.json
 build-out.txt
 *-out.txt
+
+# Local experiment/verification logs (never commit — keep the tree reviewable)
+build*.txt
+*-build.txt
+webbuild*.txt
+compare*.txt
+*-fixed.txt
+service_backup.txt
+test-auth.txt
+typecheck-output.txt
+*.tsbuildinfo
+*.bak
+build*.txt
+webbuild*.txt
+apibuild*.txt
+compare*.txt
+*-fixed.txt
+service_backup.txt
+e2e-fixed.txt
+webdev.txt
+test-auth.txt
+*.bak
+*.tsbuildinfo
+tsconfig.tsbuildinfo

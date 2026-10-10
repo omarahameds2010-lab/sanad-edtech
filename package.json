@@ -10,15 +10,22 @@
     "lint": "turbo run lint",
     "format": "turbo run format",
     "clean": "turbo run clean && rm -rf node_modules",
-    "export:openapi": "ts-node -r tsconfig-paths/register apps/api/scripts/export-openapi.ts"
+    "export:openapi": "ts-node -r tsconfig-paths/register apps/api/scripts/export-openapi.ts",
+    "prepare": "husky"
   },
   "devDependencies": {
     "@apidevtools/swagger-parser": "^13.1.0",
+    "husky": "^9.1.7",
+    "lint-staged": "^17.6.0",
+    "prettier": "^3.0.0",
     "turbo": "^2.0.0",
     "typescript": "^5.3.3"
   },
   "workspaces": [
     "apps/*",
     "packages/*"
-  ]
+  ],
+  "lint-staged": {
+    "*.{ts,tsx,js,mjs,json,css,md}": "prettier --check"
+  }
 }

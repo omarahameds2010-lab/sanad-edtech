@@ -1,0 +1,10 @@
+echo "[pre-commit] lint-staged (prettier --check on staged files)..."
+pnpm exec lint-staged || exit 1
+
+echo "[pre-commit] typecheck apps/api..."
+(cd apps/api && pnpm exec tsc --noEmit -p tsconfig.json) || exit 1
+
+echo "[pre-commit] typecheck apps/web..."
+(cd apps/web && pnpm exec tsc --noEmit -p tsconfig.json) || exit 1
+
+echo "[pre-commit] all gates passed."

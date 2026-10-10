@@ -32,8 +32,8 @@ pnpm seed:path2
 
 The seed prints credentials and ids. Demo accounts:
 
-| Role | Phone | Password |
-|------|-------|----------|
+| Role    | Phone       | Password    |
+| ------- | ----------- | ----------- |
 | Teacher | 01000000001 | Teacher123! |
 | Student | 01000000002 | Student123! |
 
@@ -42,20 +42,19 @@ It also registers the `localhost` tenant domain (required: tenant resolution is 
 ## 3) Run the apps (two terminals)
 
 ```powershell
-# Terminal 1 — API on :3001 (web takes :3000)
+# Terminal 1 — API on :3002 (canonical lock: API :3002, Web :3001)
 cd apps/api
-$env:PORT=3001
 pnpm run dev
 
-# Terminal 2 — Web on :3000 (expects NEXT_PUBLIC_API_URL=http://localhost:3001)
+# Terminal 2 — Web on :3001 (expects NEXT_PUBLIC_API_URL=http://localhost:3002)
 cd apps/web
-$env:NEXT_PUBLIC_API_URL="http://localhost:3001"
+$env:NEXT_PUBLIC_API_URL="http://localhost:3002"
 pnpm dev
 ```
 
 ## 4) Pitch flow (student)
 
-1. Open `http://localhost:3000/login` → login as student.
+1. Open `http://localhost:3001/login` → login as student.
 2. Go to `/student/exams` → open "اختبار: أساسيات الجبر".
 3. Intro shows question count, server timer, attempts used → "بدء الاختبار".
 4. Answer Q1 (MCQ, option `b`), Q2 (True/False), Q3 (essay — this is where Sanad AI grading plugs in later).
@@ -79,18 +78,18 @@ pnpm dev
 - `pnpm --filter web test` (18 tests) + `next build`.
 - Locked HTTP contract (global prefix `/api`):
 
-| Call | Method + Path |
-|------|---------------|
-| login | POST /api/auth/login |
-| exam view (no answers) | GET /api/v1/exams/:id/view |
-| enter (idempotent) | POST /api/v1/exams/:id/enter + `idempotency-key` |
-| timer (server expiresAt) | GET /api/v1/exams/:id/timer |
-| submit (idempotent) | POST /api/v1/exams/:id/submit + `idempotency-key` |
-| my attempts | GET /api/v1/exams/:id/attempts/me |
-| next lesson | GET /api/v1/progression/lessons/:id/next |
-| lesson + videos | GET /api/v1/student/lessons/:id |
-| grading queue | GET /api/v1/exams/:id/attempts/grading |
-| grade | POST /api/v1/exams/attempts/:attemptId/grade |
+| Call                     | Method + Path                                     |
+| ------------------------ | ------------------------------------------------- |
+| login                    | POST /api/auth/login                              |
+| exam view (no answers)   | GET /api/v1/exams/:id/view                        |
+| enter (idempotent)       | POST /api/v1/exams/:id/enter + `idempotency-key`  |
+| timer (server expiresAt) | GET /api/v1/exams/:id/timer                       |
+| submit (idempotent)      | POST /api/v1/exams/:id/submit + `idempotency-key` |
+| my attempts              | GET /api/v1/exams/:id/attempts/me                 |
+| next lesson              | GET /api/v1/progression/lessons/:id/next          |
+| lesson + videos          | GET /api/v1/student/lessons/:id                   |
+| grading queue            | GET /api/v1/exams/:id/attempts/grading            |
+| grade                    | POST /api/v1/exams/attempts/:attemptId/grade      |
 
 ## Next (explicitly out of Path-2 scope)
 
