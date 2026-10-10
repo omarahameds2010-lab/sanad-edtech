@@ -211,6 +211,13 @@ a:hover { text-decoration: underline; }
 /* -- 23b. SIGNUP SPLIT (45% brand : 55% form — asymmetric premium canvas) -- */
 .lp-signup-split { display: grid; grid-template-columns: 45fr 55fr; min-height: 100vh; }
 @media (max-width: 900px) { .lp-signup-split { grid-template-columns: 1fr; } }
+
+/* -- 23c. STUDENT DASHBOARD BENTO (dark panels, 240px base rows) -- */
+.lp-dash-bento { display: grid; grid-template-columns: repeat(3, 1fr); grid-auto-rows: minmax(240px, auto); gap: 24px; }
+.lp-dash-wide { grid-column: span 2; }
+.lp-dash-tall { grid-row: span 2; }
+.lp-dash-panel { background: #0A0A0C; color: #F4F4F6; border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 32px; position: relative; overflow: hidden; }
+@media (max-width: 900px) { .lp-dash-bento { grid-template-columns: 1fr; } .lp-dash-wide { grid-column: span 1; } .lp-dash-tall { grid-row: auto; } }
 @keyframes lp-blob-drift {
   0%, 100% { transform: translate(0, 0) scale(1); }
   50% { transform: translate(30px, -24px) scale(1.12); }

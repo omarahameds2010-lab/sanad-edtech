@@ -303,6 +303,16 @@ describe("five new pages endpoints", () => {
     expect(url).toBe(`${API_BASE_URL}/api/users/u1`);
   });
 
+  it("getStudentProgression hits the progression endpoint", async () => {
+    const { fetchMock } = mockFetchOnce({
+      data: { courseId: "c1", userId: "u1", progression: [] },
+    });
+    const result = await api.getStudentProgression("t", "c1");
+    expect(result.courseId).toBe("c1");
+    const [url] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe(`${API_BASE_URL}/api/v1/progression/courses/c1`);
+  });
+
   it("listPublicCourses is public and supports search", async () => {
     const { fetchMock } = mockFetchOnce({
       data: { courses: [], nextCursor: null },
