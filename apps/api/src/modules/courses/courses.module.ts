@@ -10,7 +10,6 @@ import { StudentEnrollmentsController } from "./courses.controller";
 import { ProgressController } from "./progress/progress.controller";
 import { TeacherResourcesController } from "./courses.controller";
 import { StudentResourcesController } from "./courses.controller";
-import { PrismaService } from "../tenants/prisma.service";
 import { AuthorizationModule } from "../authorization/authorization.module";
 import { FeatureFlagsModule } from "../feature-flags/feature-flags.module";
 import { EntitlementsModule } from "../entitlements/entitlements.module";
@@ -51,7 +50,7 @@ import { ResourcesModule } from "./resources/resources.module";
     TeacherResourcesController,
     StudentResourcesController,
   ],
-  providers: [CoursesService, PrismaService],
+  providers: [CoursesService],
   exports: [CoursesService],
 })
 export class CoursesModule {}

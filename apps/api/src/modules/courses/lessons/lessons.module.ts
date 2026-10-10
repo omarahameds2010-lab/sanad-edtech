@@ -4,11 +4,10 @@ import {
   LessonsController,
   StudentLessonsController,
 } from "./lessons.controller";
-import { PrismaService } from "../../tenants/prisma.service";
 
 @Module({
   controllers: [LessonsController, StudentLessonsController],
-  providers: [LessonsService, PrismaService],
+  providers: [LessonsService],
   exports: [LessonsService],
 })
 export class LessonsModule {}

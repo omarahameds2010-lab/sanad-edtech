@@ -3,6 +3,7 @@ import './globals.css';
 import type { Metadata } from 'next';
 import { CommandPaletteProvider } from '@/app/hooks/useCommandPalette';
 import { AuthProvider } from '@/app/lib/auth';
+import { LangProvider } from '@/app/components/landing/i18n';
 
 export const metadata: Metadata = {
   title: 'Learning Platform',
@@ -14,7 +15,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="ar" dir="rtl">
       <body>
         <CommandPaletteProvider>
-          <AuthProvider>{children}</AuthProvider>
+          <AuthProvider>
+            <LangProvider>{children}</LangProvider>
+          </AuthProvider>
         </CommandPaletteProvider>
       </body>
     </html>

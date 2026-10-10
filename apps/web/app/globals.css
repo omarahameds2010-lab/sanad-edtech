@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap');
+
 /* ======================================================================
    P0 VISUAL IDENTITY — MASTER TOKENS (P0 SCOPE LOCKED)
    One Learning Universe · Multi-Tenant LMS · Arabic Tenant (P0 Proof)
@@ -98,8 +100,246 @@ html[dir="ltr"] {
   --tenant-accent: #047857;
 }
 
-/* -- 14. LINK STYLES -- */
+/* -- 14. BASE SURFACE (P0: paper page, ink text) -- */
+body {
+  background: var(--bg-reading);
+  color: var(--text-on-light);
+  margin: 0;
+}
+
+/* -- 15. LINK STYLES -- */
 a { color: var(--color-action); text-decoration: none; }
 a:hover { text-decoration: underline; }
+
+/* -- 16. LANDING PRIMITIVES (P0 visual identity, server-safe) -- */
+.lp-container { max-width: 1280px; margin: 0 auto; padding: 0 24px; }
+.lp-section { padding: 64px 0; }
+@media (max-width: 768px) { .lp-section { padding: 48px 0; } }
+.lp-eyebrow {
+  color: var(--color-action-strong);
+  font-size: 13px;
+  font-weight: 600;
+  /* No letter-spacing: it breaks Arabic letter joining */
+  margin: 0 0 16px;
+}
+.lp-h2 { font-size: 32px; line-height: 1.25; font-weight: 700; color: var(--ink-950); margin: 0 0 12px; }
+.lp-lead { font-size: 17px; line-height: 1.8; color: var(--text-muted); margin: 0; max-width: 640px; }
+.lp-btn {
+  display: inline-block;
+  border-radius: var(--radius-lg);
+  padding: 12px 28px;
+  font-weight: 700;
+  font-size: 16px;
+  text-decoration: none;
+}
+.lp-btn:hover { text-decoration: none; filter: brightness(0.96); }
+.lp-btn-primary { background: var(--color-action-strong); color: #ffffff; }
+.lp-btn-secondary { background: var(--paper-100); color: var(--ink-700); border: 1px solid var(--paper-200); }
+.lp-grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; }
+@media (max-width: 900px) { .lp-grid-3 { grid-template-columns: 1fr; } }
+.lp-faq { border: 1px solid var(--paper-200); border-radius: var(--radius-lg); background: #ffffff; margin-bottom: 12px; }
+.lp-faq summary { cursor: pointer; padding: 16px 20px; font-weight: 600; color: var(--ink-700); list-style: none; }
+.lp-faq summary::-webkit-details-marker { display: none; }
+.lp-faq summary::before { content: '+'; color: var(--color-action-strong); font-weight: 700; margin-inline-end: 8px; }
+.lp-faq[open] summary::before { content: '−'; }
+.lp-faq .lp-faq-body { padding: 0 20px 16px; color: var(--text-muted); line-height: 1.8; }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+  .lp-lang-enter, .lp-tab-enter, .lp-logo-letter, .lp-logo-dot { animation: none !important; }
+}
+
+/* -- 19. LOGO CHOREOGRAPHY (entrance + pulse dot) -- */
+@keyframes lp-letter-in {
+  from { opacity: 0; transform: translateY(14px); filter: blur(3px); }
+  to { opacity: 1; transform: none; filter: none; }
+}
+.lp-logo-letter {
+  opacity: 0;
+  animation: lp-letter-in 500ms cubic-bezier(.2, 0, 0, 1) forwards;
+  animation-delay: var(--lp-letter-delay, 0ms);
+}
+@keyframes lp-dot-pulse {
+  0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(4, 120, 87, 0.45); }
+  50% { transform: scale(1.15); box-shadow: 0 0 12px 3px rgba(4, 120, 87, 0.35); }
+}
+.lp-logo-dot { animation: lp-dot-pulse 2.6s ease-in-out infinite; }
+
+/* -- 20. SUBJECT BENTO (asymmetric grid + glow follower) -- */
+.lp-bento { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-top: 32px; }
+.lp-bento-wide { grid-column: span 2; }
+.lp-bento-tall { grid-row: span 2; }
+@media (max-width: 900px) {
+  .lp-bento { grid-template-columns: 1fr 1fr; }
+  .lp-bento-wide { grid-column: span 2; }
+  .lp-bento-tall { grid-row: auto; }
+}
+@media (max-width: 560px) {
+  .lp-bento { grid-template-columns: 1fr; }
+  .lp-bento-wide { grid-column: span 1; }
+}
+.lp-bento-card { position: relative; overflow: hidden; }
+.lp-bento-glow {
+  position: absolute; inset: 0; opacity: 0; transition: opacity 300ms ease; pointer-events: none;
+  background: radial-gradient(320px circle at var(--gx, 50%) var(--gy, 50%), var(--glow, rgba(255,255,255,0.12)), transparent 65%);
+}
+.lp-bento-card:hover .lp-bento-glow, .lp-bento-card:focus-within .lp-bento-glow { opacity: 1; }
+.lp-token { transition: transform 350ms cubic-bezier(.2, 0, 0, 1); }
+.lp-bento-card:hover .lp-token, .lp-bento-card:focus-within .lp-token { transform: translateY(-6px) scale(1.12) rotate(-4deg); }
+.lp-unveil { display: grid; grid-template-rows: 0fr; opacity: 0; transition: grid-template-rows 300ms ease, opacity 300ms ease, margin 300ms ease; margin-top: 0; }
+.lp-bento-card:hover .lp-unveil, .lp-bento-card:focus-within .lp-unveil { grid-template-rows: 1fr; opacity: 1; margin-top: 12px; }
+.lp-unveil > div { overflow: hidden; }
+
+/* -- 21. FAQ SPLIT (sticky title + accordion rail) -- */
+@media (max-width: 900px) {
+  .lp-faq-split { grid-template-columns: 1fr !important; }
+  .lp-faq-split > div:first-child { position: static !important; }
+}
+
+/* -- 22. LOGIN SPLIT (brand stage + glass form) -- */
+.lp-login-split { display: grid; grid-template-columns: 1fr 1fr; min-height: 100vh; }
+@media (max-width: 900px) { .lp-login-split { grid-template-columns: 1fr; } }
+@keyframes lp-blob-drift {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(30px, -24px) scale(1.12); }
+}
+.lp-blob { position: absolute; border-radius: 50%; filter: blur(70px); opacity: 0.35; animation: lp-blob-drift 9s ease-in-out infinite; }
+@keyframes lp-line-rise {
+  from { opacity: 0; transform: translateY(18px); }
+  to { opacity: 1; transform: none; }
+}
+.lp-line-rise { opacity: 0; animation: lp-line-rise 600ms cubic-bezier(.2, 0, 0, 1) forwards; animation-delay: var(--lp-d, 0ms); }
+.lp-float { position: relative; display: block; }
+.lp-float input {
+  width: 100%;
+  border-radius: 12px;
+  border: 1px solid rgba(11, 13, 16, 0.08);
+  background: rgba(250, 247, 242, 0.55);
+  padding: 22px 16px 8px;
+  font-size: 16px;
+  color: var(--ink-950);
+  outline: none;
+  transition: border-color 200ms ease, box-shadow 200ms ease;
+}
+.lp-float input:focus { border-color: var(--color-action); box-shadow: 0 0 0 3px var(--color-action-soft); }
+.lp-float label {
+  position: absolute;
+  inset-inline-start: 16px;
+  top: 16px;
+  font-size: 15px;
+  color: var(--text-muted);
+  pointer-events: none;
+  transition: all 200ms ease;
+  background: transparent;
+}
+.lp-float input:focus + label,
+.lp-float input:not(:placeholder-shown) + label {
+  top: 7px;
+  font-size: 12px;
+  color: var(--color-action-strong);
+  font-weight: 700;
+}
+.lp-login-btn { position: relative; overflow: hidden; }
+.lp-login-btn .lp-thread {
+  position: absolute; top: 50%; inset-inline: 16px; height: 1px;
+  background: rgba(255, 255, 255, 0.25); pointer-events: none;
+}
+.lp-login-btn .lp-pulse {
+  position: absolute; top: 50%; width: 8px; height: 8px; margin-top: -4px;
+  inset-inline-start: 22px; border-radius: 50%;
+  background: #34D399; box-shadow: 0 0 10px 2px rgba(52, 211, 153, 0.7);
+  opacity: 0; pointer-events: none;
+}
+.lp-login-btn:hover .lp-pulse { opacity: 1; animation: lp-pulse-run 1.1s ease-in-out infinite; }
+@keyframes lp-pulse-run {
+  0% { transform: translateX(0); opacity: 0; }
+  15% { opacity: 1; }
+  85% { opacity: 1; }
+  100% { transform: translateX(calc(-1 * var(--lp-travel, 200px))); opacity: 0; }
+}
+[dir="ltr"] .lp-login-btn:hover .lp-pulse { animation-name: lp-pulse-run-ltr; }
+@keyframes lp-pulse-run-ltr {
+  0% { transform: translateX(0); opacity: 0; }
+  15% { opacity: 1; }
+  85% { opacity: 1; }
+  100% { transform: translateX(var(--lp-travel, 200px)); opacity: 0; }
+}
+@keyframes lp-spin { to { transform: rotate(360deg); } }
+.lp-spinner {
+  display: inline-block; width: 18px; height: 18px; border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.35); border-top-color: #ffffff;
+  animation: lp-spin 0.7s linear infinite; vertical-align: -3px;
+}
+
+/* -- 23. LANGUAGE MORPH (staggered text entrance, no page flash) -- */
+@keyframes lp-lang-in {
+  from { opacity: 0; transform: translateY(15px); }
+  to { opacity: 1; transform: none; }
+}
+.lp-lang-enter { animation: lp-lang-in 320ms ease; }
+.lp-tab-enter { animation: lp-lang-in 260ms ease; }
+
+html { scroll-behavior: smooth; }
+
+/* -- 17. TEACHER UNIVERSE CARDS (glass + glow + sheen) -- */
+.lp-glass {
+  background: rgba(255, 255, 255, 0.06);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 24px;
+}
+.lp-text-gradient {
+  background: linear-gradient(180deg, #ffffff 20%, #cbd5e1 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.lp-tag {
+  display: inline-block;
+  border-radius: 999px;
+  padding: 10px 18px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #e2e8f0;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  transition: all 200ms ease;
+  cursor: default;
+}
+.lp-tag:hover {
+  background: var(--tag-accent-soft, rgba(255, 255, 255, 0.12));
+  border-color: var(--tag-accent, rgba(255, 255, 255, 0.3));
+  box-shadow: 0 0 16px var(--tag-accent-soft, transparent);
+  color: #ffffff;
+}
+.lp-cta { display: inline-flex; align-items: center; gap: 8px; font-weight: 700; text-decoration: none; }
+.lp-cta:hover { text-decoration: none; }
+.lp-cta .lp-arrow { display: inline-block; transition: transform 220ms ease; }
+.lp-cta:hover .lp-arrow { transform: translateX(-5px); }
+
+/* -- 18. CARD MICRO-INTERACTIONS -- */
+.lp-lift { transition: transform 220ms ease, box-shadow 220ms ease, border-color 220ms ease; }
+.lp-lift:hover { transform: scale(1.02); box-shadow: 0 12px 28px rgba(11, 13, 16, 0.1); border-color: var(--color-action-soft); }
+
+/* -- 18. HEADER NAV (responsive) -- */
+.lp-menu-btn { display: none; background: none; border: 1px solid var(--paper-200); border-radius: 10px; padding: 8px 12px; font-weight: 700; color: var(--ink-700); cursor: pointer; }
+.lp-nav-links { display: flex; gap: 20px; align-items: center; }
+@media (max-width: 860px) {
+  .lp-menu-btn { display: block; }
+  .lp-nav-links { display: none; }
+  .lp-nav-links.open {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    position: absolute;
+    top: 64px;
+    inset-inline: 16px;
+    background: #ffffff;
+    border: 1px solid var(--paper-200);
+    border-radius: var(--radius-lg);
+    padding: 12px;
+    box-shadow: 0 12px 32px rgba(11, 13, 16, 0.12);
+  }
+}
 
 /* End P0 Visual Identity */

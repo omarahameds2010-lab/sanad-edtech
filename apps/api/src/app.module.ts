@@ -5,6 +5,7 @@ import { LoggerModule } from "nestjs-pino";
 import { APP_INTERCEPTOR } from "@nestjs/core";
 import { HealthController } from "./common/health.controller";
 import { TenantContextInterceptor } from "./common/interceptors/tenant-context.interceptor";
+import { PrismaModule } from "./common/prisma/prisma.module";
 import { TenantModule } from "./modules/tenants/tenant.module";
 import { AuthModule } from "./modules/auth/auth.module";
 import { UsersModule } from "./modules/users/users.module";
@@ -34,6 +35,7 @@ import { CoursesModule } from "./modules/courses/courses.module";
         level: process.env.LOG_LEVEL || "info",
       },
     }),
+    PrismaModule,
     TenantModule,
     TerminusModule,
     AuthModule,

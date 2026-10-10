@@ -10,7 +10,6 @@ import { LedgerService } from "./ledger/ledger.service";
 import { PaymentRiskService } from "./fraud/payment-risk.service";
 import { IdempotencyService } from "./security/idempotency.service";
 import { PaymentAuditService } from "./security/payment-audit.service";
-import { PrismaService } from "../tenants/prisma.service";
 import { PaymobProvider } from "./providers/paymob/paymob.provider";
 import { FawryProvider } from "./providers/fawry/fawry.provider";
 import { InstapayProvider } from "./providers/instapay/instapay.provider";
@@ -41,7 +40,6 @@ import { AuthModule } from "../auth/auth.module";
     PaymentRiskService,
     IdempotencyService,
     PaymentAuditService,
-    PrismaService,
     PaymobProvider,
     FawryProvider,
     InstapayProvider,

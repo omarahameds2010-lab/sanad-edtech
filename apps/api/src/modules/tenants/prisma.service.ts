@@ -7,8 +7,22 @@ export class PrismaService
   implements OnModuleInit, OnModuleDestroy
 {
   async onModuleInit() {
-    await this.$connect();
-    console.log("✅ Database connected");
+    // Railway's public proxy intermittently refuses the first handshake(s).
+    // Retry with backoff instead of crashing the boot on a transient P1001.
+    const attempts = 10;
+    for (let i = 1; i <= attempts; i++) {
+      try {
+        await this.$connect();
+        console.log(`✅ Database connected (attempt ${i})`);
+        return;
+      } catch (err: any) {
+        console.log(
+          `⏳ DB connect attempt ${i}/${attempts} failed (${err?.code ?? "unknown"}), retrying...`,
+        );
+        if (i === attempts) throw err;
+        await new Promise((r) => setTimeout(r, 3000));
+      }
+    }
   }
 
   async onModuleDestroy() {
