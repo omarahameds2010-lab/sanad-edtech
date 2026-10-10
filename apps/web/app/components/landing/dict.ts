@@ -105,6 +105,8 @@ export interface Dict {
     back: string;
     invalid: string;
     offline: string;
+    signupPrompt: string;
+    signupLink: string;
     brandLines: { strong: string; rest: string }[];
   };
   signup: {
@@ -133,6 +135,7 @@ export interface Dict {
     requiredNames: string;
     invalid: string;
     offline: string;
+    brandLines: { strong: string; rest: string }[];
   };
   footer: { courses: string; teachers: string; login: string; tagline: string };
 }
@@ -314,6 +317,8 @@ export const dict: Record<Lang, Dict> = {
       back: "العودة للصفحة الرئيسية",
       invalid: "بيانات الدخول غير صحيحة",
       offline: "تعذر الاتصال بالخادم",
+      signupPrompt: "ليس لديك حساب؟",
+      signupLink: "أنشئ حسابًا جديدًا",
       brandLines: [
         { strong: "مسار واحد", rest: " من الدرس إلى التقييم." },
         { strong: "مؤقتات عادلة", rest: " تُدار من الخادم." },
@@ -346,6 +351,11 @@ export const dict: Record<Lang, Dict> = {
       requiredNames: "اكتب الاسم الأول واسم العائلة",
       invalid: "راجع البيانات المطلوبة",
       offline: "تعذر الاتصال بالخادم",
+      brandLines: [
+        { strong: "خطوتان", rest: ". مسار واحد آمن." },
+        { strong: "كل بكسل هنا", rest: " يخدم رحلتك." },
+        { strong: "وتقييم ذكي", rest: " يراجعه مدرسك البشري." },
+      ],
     },
     footer: { courses: "الكورسات", teachers: "المدرسون", login: "دخول", tagline: "مساحة تعليمية واضحة لكل خطوة." },
   },
@@ -526,6 +536,8 @@ export const dict: Record<Lang, Dict> = {
       back: "Back to home",
       invalid: "Invalid credentials",
       offline: "Could not reach the server",
+      signupPrompt: "No account yet?",
+      signupLink: "Create a new account",
       brandLines: [
         { strong: "One path", rest: " from lesson to evaluation." },
         { strong: "Fair timers", rest: " run by the server." },
@@ -558,6 +570,11 @@ export const dict: Record<Lang, Dict> = {
       requiredNames: "Enter your first and last name",
       invalid: "Please review the required fields",
       offline: "Could not reach the server",
+      brandLines: [
+        { strong: "Two steps", rest: ". One safe path." },
+        { strong: "Every pixel here", rest: " serves your journey." },
+        { strong: "And smart evaluation", rest: " reviewed by your human teacher." },
+      ],
     },
     footer: { courses: "Courses", teachers: "Teachers", login: "Log in", tagline: "A clear learning space for every step." },
   },

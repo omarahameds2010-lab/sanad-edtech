@@ -208,6 +208,9 @@ a:hover { text-decoration: underline; }
 /* -- 23. LOGIN SPLIT (brand stage + glass form) -- */
 .lp-login-split { display: grid; grid-template-columns: 1fr 1fr; min-height: 100vh; }
 @media (max-width: 900px) { .lp-login-split { grid-template-columns: 1fr; } }
+/* -- 23b. SIGNUP SPLIT (45% brand : 55% form — asymmetric premium canvas) -- */
+.lp-signup-split { display: grid; grid-template-columns: 45fr 55fr; min-height: 100vh; }
+@media (max-width: 900px) { .lp-signup-split { grid-template-columns: 1fr; } }
 @keyframes lp-blob-drift {
   0%, 100% { transform: translate(0, 0) scale(1); }
   50% { transform: translate(30px, -24px) scale(1.12); }
