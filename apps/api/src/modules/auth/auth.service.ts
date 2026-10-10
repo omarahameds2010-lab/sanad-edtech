@@ -36,8 +36,40 @@ export class AuthService {
     return user;
   }
 
-  async login(user: any, deviceFingerprint?: string) {
-    const payload = {
+  /**
+   * Public self-registration. Tenant always comes from the Host header
+   * (middleware) — never from the client body. Only STUDENT/TEACHER
+   * self-register; privileged roles are created out-of-band.
+   */
+  async register(
+    tenantId: string,
+    dto: {
+      name: string;
+      phone: string;
+      password: string;
+      role?: string;
+      grade?: string;
+      deviceFingerprint?: string;
+    },
+  ) {
+    const role = dto.role ?? "STUDENT";
+    if (role !== "STUDENT" && role !== "TEACHER") {
+      throw new BadRequestException("Only STUDENT or TEACHER can self-register");
+    }
+
+    const user = await this.usersService.create({
+      tenantId,
+      role,
+      name: dto.name.trim(),
+      phone: dto.phone,
+      password: dto.password,
+      grade: dto.grade,
+    });
+
+    return this.login(user, dto.deviceFingerprint);
+  }
+
+  async login(user: any, deviceFingerprint?: string) {    const payload = {
       sub: user.id,
       tenantId: user.tenantId,
       role: user.role,
