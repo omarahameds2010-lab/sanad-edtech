@@ -5,6 +5,10 @@
   "packageManager": "pnpm@9.15.0",
   "scripts": {
     "dev": "turbo run dev",
+    "dev:web": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/dev-web.ps1",
+    "dev:api": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/dev-api.ps1",
+    "ports": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/ports.ps1",
+    "ports:kill": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/ports.ps1 -Kill",
     "build": "turbo run build",
     "test": "turbo run test",
     "lint": "turbo run lint",
