@@ -67,6 +67,7 @@ service_backup.txt
 e2e-fixed.txt
 webdev.txt
 test-auth.txt
+*.txt
 *.bak
 *.tsbuildinfo
 tsconfig.tsbuildinfo
