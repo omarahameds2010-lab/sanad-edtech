@@ -3,9 +3,11 @@
 import Link from "next/link";
 import { Magnetic, Reveal } from "./interactive";
 import { useLang } from "./i18n";
+import { useAuth } from "@/app/lib/auth";
 
 export default function Hero() {
   const { t } = useLang();
+  const { token } = useAuth();
   return (
     <section style={{ position: "relative", overflow: "hidden" }}>
       <div
@@ -43,7 +45,10 @@ export default function Hero() {
         <Reveal delay={220}>
           <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginTop: 32 }}>
             <Magnetic>
-              <Link href="/courses" className="lp-btn lp-btn-primary">
+              <Link
+                href={token ? "/courses" : "/signup"}
+                className="lp-btn lp-btn-primary"
+              >
                 {t.hero.ctaCourses}
               </Link>
             </Magnetic>

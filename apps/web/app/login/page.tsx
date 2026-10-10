@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/app/lib/auth";
-import { ApiError } from "@/app/lib/api";
+import { ApiError, landingForRole } from "@/app/lib/api";
 import { Magnetic } from "@/app/components/landing/interactive";
 import { LanguageSwitcher, useLang } from "@/app/components/landing/i18n";
 
@@ -44,10 +44,8 @@ export default function LoginPage() {
     setError(null);
     setPending(true);
     try {
-      await login(phone.trim(), password);
-      // Role is in context after login; route optimistically to student home.
-      // Role-aware landing is resolved on the dashboard via /api/auth/me.
-      router.push("/student");
+      const result = await login(phone.trim(), password);
+      router.push(landingForRole(result.user.role));
     } catch (err) {
       setError(
         err instanceof ApiError
@@ -227,6 +225,11 @@ export default function LoginPage() {
             </button>
           </Magnetic>
           <p style={{ marginTop: 20, fontSize: 13, color: "var(--text-muted)", textAlign: "center", lineHeight: 1.8 }}>
+            {L.signupPrompt}{" "}
+            <Link href="/signup" style={{ fontWeight: 700 }}>
+              {L.signupLink}
+            </Link>
+            <br />
             <Link href="/" style={{ fontWeight: 700 }}>
               {L.back}
             </Link>

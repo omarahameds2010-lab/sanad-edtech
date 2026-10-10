@@ -4,9 +4,12 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { LanguageSwitcher, useLang } from "./i18n";
 import Logo from "./Logo";
+import { useAuth } from "@/app/lib/auth";
+import { landingForRole } from "@/app/lib/api";
 
 export default function SiteHeader() {
   const { t } = useLang();
+  const { token, role } = useAuth();
   const [open, setOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
 
@@ -81,14 +84,35 @@ export default function SiteHeader() {
           ))}
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <LanguageSwitcher />
-            <Link
-              href="/login"
-              onClick={() => setOpen(false)}
-              className="lp-btn lp-btn-primary"
-              style={{ padding: "8px 20px", fontSize: 14 }}
-            >
-              {t.header.login}
-            </Link>
+            {token ? (
+              <Link
+                href={landingForRole(role)}
+                onClick={() => setOpen(false)}
+                className="lp-btn lp-btn-primary"
+                style={{ padding: "8px 20px", fontSize: 14 }}
+              >
+                {t.header.dashboard}
+              </Link>
+            ) : (
+              <>
+                <Link
+                  href="/signup"
+                  onClick={() => setOpen(false)}
+                  className="lp-btn lp-btn-ghost"
+                  style={{ padding: "8px 20px", fontSize: 14 }}
+                >
+                  {t.header.signup}
+                </Link>
+                <Link
+                  href="/login"
+                  onClick={() => setOpen(false)}
+                  className="lp-btn lp-btn-primary"
+                  style={{ padding: "8px 20px", fontSize: 14 }}
+                >
+                  {t.header.login}
+                </Link>
+              </>
+            )}
           </div>
         </nav>
       </div>
