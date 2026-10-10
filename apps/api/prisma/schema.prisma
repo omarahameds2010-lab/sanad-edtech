@@ -160,16 +160,39 @@ model Session {
   tenantId          String
   userId            String
   deviceId          String?
+
+  // Rotation chain. One login = one family. Every refresh issues a NEW row in
+  // the same family and revokes the row it superseded, so replaying ANY
+  // earlier token (not just the most recent) lands on a revoked row — an
+  // unambiguous theft signal that revokes the whole family.
+  familyId          String   @default(uuid())
+
+  // Argon2id hash of the refresh token. The raw token never touches the DB:
+  // a leaked dump yields no usable session. Kept @unique so a hash can never
+  // alias another session.
   refreshTokenHash  String   @unique
+  // sha256 of the SAME token — deterministic, therefore indexable and
+  // searchable. Argon2id is salted and unsearchable, which is exactly why the
+  // previous implementation's `findUnique({ where: { refreshTokenHash } })`
+  // could never match anything and refresh was 100% broken.
+  refreshTokenLookup String? @unique
+  // Chain link to the successor row — the audit trail of a rotation chain.
+  replacedById      String?
+
   createdAt         DateTime @default(now())
   expiresAt         DateTime
   revokedAt         DateTime?
+  // ROTATED | THEFT_DETECTED | LOGOUT | USER_REVOKED
+  revokedReason     String?
+  lastRotatedAt     DateTime?
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("sessions")
   @@index([tenantId])
   @@index([userId])
+  @@index([familyId])
+  @@index([replacedById])
 }
 
 enum UserRole {
