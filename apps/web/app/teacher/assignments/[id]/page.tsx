@@ -100,8 +100,18 @@ export default function TeacherAssignmentGradingPage({
     );
   }
 
-  if (error) return <div className="card"><p>{error}</p></div>;
-  if (!assignment) return <div className="card"><p>جاري التحميل…</p></div>;
+  if (error)
+    return (
+      <div className="card">
+        <p>{error}</p>
+      </div>
+    );
+  if (!assignment)
+    return (
+      <div className="card">
+        <p>جاري التحميل…</p>
+      </div>
+    );
 
   const stats = {
     total: submissions.length,
@@ -113,10 +123,18 @@ export default function TeacherAssignmentGradingPage({
 
   return (
     <>
-      <nav style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: "var(--space-sm)" }}>
+      <nav
+        style={{
+          fontSize: 12,
+          color: "var(--text-muted)",
+          marginBottom: "var(--space-sm)",
+        }}
+      >
         <Link href="/teacher/assignments">الواجبات</Link> › {assignment.title}
       </nav>
-      <h1 style={{ marginBottom: "var(--space-md)" }}>تصحيح: {assignment.title}</h1>
+      <h1 style={{ marginBottom: "var(--space-md)" }}>
+        تصحيح: {assignment.title}
+      </h1>
 
       <div
         style={{
@@ -128,14 +146,22 @@ export default function TeacherAssignmentGradingPage({
       >
         <div className="card" style={{ textAlign: "center" }}>
           <div style={{ fontSize: 28, fontWeight: 700 }}>{stats.total}</div>
-          <div style={{ fontSize: 12, color: "var(--text-muted)" }}>الإجمالي</div>
+          <div style={{ fontSize: 12, color: "var(--text-muted)" }}>
+            الإجمالي
+          </div>
         </div>
         <div className="card" style={{ textAlign: "center" }}>
-          <div style={{ fontSize: 28, fontWeight: 700, color: "#3b82f6" }}>{stats.pending}</div>
-          <div style={{ fontSize: 12, color: "var(--text-muted)" }}>بانتظار التصحيح</div>
+          <div style={{ fontSize: 28, fontWeight: 700, color: "#3b82f6" }}>
+            {stats.pending}
+          </div>
+          <div style={{ fontSize: 12, color: "var(--text-muted)" }}>
+            بانتظار التصحيح
+          </div>
         </div>
         <div className="card" style={{ textAlign: "center" }}>
-          <div style={{ fontSize: 28, fontWeight: 700, color: "#10b981" }}>{stats.graded}</div>
+          <div style={{ fontSize: 28, fontWeight: 700, color: "#10b981" }}>
+            {stats.graded}
+          </div>
           <div style={{ fontSize: 12, color: "var(--text-muted)" }}>مُصحّح</div>
         </div>
       </div>
@@ -147,7 +173,13 @@ export default function TeacherAssignmentGradingPage({
           ) : (
             <table style={{ width: "100%", borderCollapse: "collapse" }}>
               <thead>
-                <tr style={{ textAlign: "right", borderBottom: "1px solid var(--border-subtle)", background: "var(--bg-surface)" }}>
+                <tr
+                  style={{
+                    textAlign: "right",
+                    borderBottom: "1px solid var(--border-subtle)",
+                    background: "var(--bg-surface)",
+                  }}
+                >
                   <th style={{ padding: "var(--space-md)" }}>الطالب</th>
                   <th style={{ padding: "var(--space-md)" }}>الحالة</th>
                   <th style={{ padding: "var(--space-md)" }}>الدرجة</th>
@@ -157,12 +189,22 @@ export default function TeacherAssignmentGradingPage({
               </thead>
               <tbody>
                 {submissions.map((sub) => (
-                  <tr key={sub.id} style={{ borderBottom: "1px solid var(--border-subtle)" }}>
+                  <tr
+                    key={sub.id}
+                    style={{ borderBottom: "1px solid var(--border-subtle)" }}
+                  >
                     <td style={{ padding: "var(--space-md)", fontWeight: 600 }}>
                       <Link href={`/teacher/students/${sub.student.id}`}>
                         {sub.student.name}
                       </Link>
-                      <div style={{ fontSize: 11, fontWeight: 400, color: "var(--text-muted)" }} dir="ltr">
+                      <div
+                        style={{
+                          fontSize: 11,
+                          fontWeight: 400,
+                          color: "var(--text-muted)",
+                        }}
+                        dir="ltr"
+                      >
                         {sub.student.phone}
                       </div>
                     </td>
@@ -182,13 +224,29 @@ export default function TeacherAssignmentGradingPage({
                       </span>
                     </td>
                     <td style={{ padding: "var(--space-md)", fontWeight: 600 }}>
-                      {sub.score !== null && sub.score !== undefined ? `${sub.score}/100` : "—"}
+                      {sub.score !== null && sub.score !== undefined
+                        ? `${sub.score}/100`
+                        : "—"}
                     </td>
-                    <td style={{ padding: "var(--space-md)", fontSize: 12, color: "var(--text-muted)" }}>
-                      {sub.submittedAt ? new Date(sub.submittedAt).toLocaleString("ar-EG") : "—"}
+                    <td
+                      style={{
+                        padding: "var(--space-md)",
+                        fontSize: 12,
+                        color: "var(--text-muted)",
+                      }}
+                    >
+                      {sub.submittedAt
+                        ? new Date(sub.submittedAt).toLocaleString("ar-EG")
+                        : "—"}
                     </td>
                     <td style={{ padding: "var(--space-md)" }}>
-                      <button onClick={() => { setSelectedId(sub.id); setNotice(null); }} style={{ padding: "4px 12px", fontSize: 12 }}>
+                      <button
+                        onClick={() => {
+                          setSelectedId(sub.id);
+                          setNotice(null);
+                        }}
+                        style={{ padding: "4px 12px", fontSize: 12 }}
+                      >
                         تصحيح
                       </button>
                     </td>
@@ -199,7 +257,14 @@ export default function TeacherAssignmentGradingPage({
           )}
         </div>
       ) : (
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 320px", gap: "var(--space-lg)", maxWidth: 1200 }}>
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "1fr 320px",
+            gap: "var(--space-lg)",
+            maxWidth: 1200,
+          }}
+        >
           <div className="card">
             <h3 style={{ marginBottom: "var(--space-md)" }}>
               إجابة {selected.student.name}
@@ -223,14 +288,24 @@ export default function TeacherAssignmentGradingPage({
           <aside>
             <div className="card">
               <h3 style={{ marginBottom: "var(--space-md)" }}>التصحيح</h3>
-              <p style={{ fontSize: 13, color: "var(--text-muted)", marginBottom: 8 }}>
+              <p
+                style={{
+                  fontSize: 13,
+                  color: "var(--text-muted)",
+                  marginBottom: 8,
+                }}
+              >
                 الحالة الحالية: {statusLabel(selected.status)}
                 {selected.score !== null && selected.score !== undefined
                   ? ` · الدرجة: ${selected.score}/100`
                   : ""}
               </p>
-              <label style={{ display: "block", marginBottom: "var(--space-sm)" }}>
-                <span style={{ display: "block", fontSize: 13, marginBottom: 4 }}>
+              <label
+                style={{ display: "block", marginBottom: "var(--space-sm)" }}
+              >
+                <span
+                  style={{ display: "block", fontSize: 13, marginBottom: 4 }}
+                >
                   الدرجة (0–100)
                 </span>
                 <input
@@ -243,8 +318,12 @@ export default function TeacherAssignmentGradingPage({
                   style={{ width: "100%" }}
                 />
               </label>
-              <label style={{ display: "block", marginBottom: "var(--space-md)" }}>
-                <span style={{ display: "block", fontSize: 13, marginBottom: 4 }}>
+              <label
+                style={{ display: "block", marginBottom: "var(--space-md)" }}
+              >
+                <span
+                  style={{ display: "block", fontSize: 13, marginBottom: 4 }}
+                >
                   ملاحظات للطالب
                 </span>
                 <textarea
@@ -256,18 +335,34 @@ export default function TeacherAssignmentGradingPage({
                 />
               </label>
               {notice && (
-                <p style={{ fontSize: 13, marginBottom: "var(--space-sm)" }}>{notice}</p>
+                <p style={{ fontSize: 13, marginBottom: "var(--space-sm)" }}>
+                  {notice}
+                </p>
               )}
               <button
                 onClick={() => void handleGrade()}
                 disabled={grading}
-                style={{ width: "100%", background: "var(--color-action)", color: "white", marginBottom: "var(--space-sm)" }}
+                style={{
+                  width: "100%",
+                  background: "var(--color-action)",
+                  color: "white",
+                  marginBottom: "var(--space-sm)",
+                }}
               >
                 {grading ? "جاري الحفظ…" : "حفظ الدرجة"}
               </button>
               <button
-                onClick={() => { setSelectedId(null); setScore(""); setFeedback(""); setNotice(null); }}
-                style={{ width: "100%", background: "var(--bg-surface)", border: "1px solid var(--border-subtle)" }}
+                onClick={() => {
+                  setSelectedId(null);
+                  setScore("");
+                  setFeedback("");
+                  setNotice(null);
+                }}
+                style={{
+                  width: "100%",
+                  background: "var(--bg-surface)",
+                  border: "1px solid var(--border-subtle)",
+                }}
               >
                 رجوع إلى الطابور
               </button>

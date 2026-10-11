@@ -30,14 +30,26 @@ export default function TeacherAssignmentsPage() {
     );
   }
 
-  if (error) return <div className="card"><p>{error}</p></div>;
-  if (items === null) return <div className="card"><p>جاري التحميل…</p></div>;
+  if (error)
+    return (
+      <div className="card">
+        <p>{error}</p>
+      </div>
+    );
+  if (items === null)
+    return (
+      <div className="card">
+        <p>جاري التحميل…</p>
+      </div>
+    );
 
   return (
     <div>
       <h1 style={{ marginBottom: "var(--space-lg)" }}>الواجبات والتصحيح</h1>
       {items.length === 0 && (
-        <div className="card"><p>لا توجد واجبات بعد.</p></div>
+        <div className="card">
+          <p>لا توجد واجبات بعد.</p>
+        </div>
       )}
       <div style={{ display: "grid", gap: "var(--space-md)" }}>
         {items.map((a) => (
@@ -48,7 +60,9 @@ export default function TeacherAssignmentsPage() {
             style={{ display: "block" }}
           >
             <h3 style={{ marginBottom: 4 }}>{a.title}</h3>
-            <p style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 8 }}>
+            <p
+              style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 8 }}
+            >
               المدة: {a.timerMinutes} دقيقة · الحالة: {a.status}
               {a.lesson ? ` · الدرس: ${a.lesson.title}` : ""}
             </p>

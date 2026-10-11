@@ -43,8 +43,18 @@ export default function TeacherPaymentsPage() {
     );
   }
 
-  if (error) return <div className="card"><p>{error}</p></div>;
-  if (orders === null) return <div className="card"><p>جاري التحميل…</p></div>;
+  if (error)
+    return (
+      <div className="card">
+        <p>{error}</p>
+      </div>
+    );
+  if (orders === null)
+    return (
+      <div className="card">
+        <p>جاري التحميل…</p>
+      </div>
+    );
 
   const confirmedTotal = orders
     .filter((o) => o.status === "CONFIRMED")
@@ -64,23 +74,35 @@ export default function TeacherPaymentsPage() {
       >
         <div className="card" style={{ textAlign: "center" }}>
           <div style={{ fontSize: 28, fontWeight: 700 }}>{orders.length}</div>
-          <div style={{ fontSize: 12, color: "var(--text-muted)" }}>إجمالي الطلبات</div>
+          <div style={{ fontSize: 12, color: "var(--text-muted)" }}>
+            إجمالي الطلبات
+          </div>
         </div>
         <div className="card" style={{ textAlign: "center" }}>
           <div style={{ fontSize: 22, fontWeight: 700, color: "#10b981" }}>
             {formatMinor(confirmedTotal, orders[0]?.currency ?? "EGP")}
           </div>
-          <div style={{ fontSize: 12, color: "var(--text-muted)" }}>إجمالي المؤكد</div>
+          <div style={{ fontSize: 12, color: "var(--text-muted)" }}>
+            إجمالي المؤكد
+          </div>
         </div>
       </div>
 
       {orders.length === 0 ? (
-        <div className="card"><p>لا توجد طلبات دفع بعد.</p></div>
+        <div className="card">
+          <p>لا توجد طلبات دفع بعد.</p>
+        </div>
       ) : (
         <div className="card" style={{ overflow: "hidden" }}>
           <table style={{ width: "100%", borderCollapse: "collapse" }}>
             <thead>
-              <tr style={{ textAlign: "right", borderBottom: "1px solid var(--border-subtle)", background: "var(--bg-surface)" }}>
+              <tr
+                style={{
+                  textAlign: "right",
+                  borderBottom: "1px solid var(--border-subtle)",
+                  background: "var(--bg-surface)",
+                }}
+              >
                 <th style={{ padding: "var(--space-md)" }}>رقم الطلب</th>
                 <th style={{ padding: "var(--space-md)" }}>المنتجات</th>
                 <th style={{ padding: "var(--space-md)" }}>الإجمالي</th>
@@ -90,8 +112,14 @@ export default function TeacherPaymentsPage() {
             </thead>
             <tbody>
               {orders.map((order) => (
-                <tr key={order.id} style={{ borderBottom: "1px solid var(--border-subtle)" }}>
-                  <td style={{ padding: "var(--space-md)", fontWeight: 600 }} dir="ltr">
+                <tr
+                  key={order.id}
+                  style={{ borderBottom: "1px solid var(--border-subtle)" }}
+                >
+                  <td
+                    style={{ padding: "var(--space-md)", fontWeight: 600 }}
+                    dir="ltr"
+                  >
                     {order.number}
                   </td>
                   <td style={{ padding: "var(--space-md)", fontSize: 13 }}>
@@ -103,7 +131,13 @@ export default function TeacherPaymentsPage() {
                   <td style={{ padding: "var(--space-md)", fontSize: 13 }}>
                     {orderStatusLabels[order.status] ?? order.status}
                   </td>
-                  <td style={{ padding: "var(--space-md)", fontSize: 12, color: "var(--text-muted)" }}>
+                  <td
+                    style={{
+                      padding: "var(--space-md)",
+                      fontSize: 12,
+                      color: "var(--text-muted)",
+                    }}
+                  >
                     {new Date(order.createdAt).toLocaleDateString("ar-EG")}
                   </td>
                 </tr>

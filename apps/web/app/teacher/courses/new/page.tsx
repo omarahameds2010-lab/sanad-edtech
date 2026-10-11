@@ -49,7 +49,10 @@ export default function NewCoursePage() {
       return;
     }
     const priceNumber = price.trim() === "" ? undefined : Number(price);
-    if (priceNumber !== undefined && (!Number.isFinite(priceNumber) || priceNumber < 0)) {
+    if (
+      priceNumber !== undefined &&
+      (!Number.isFinite(priceNumber) || priceNumber < 0)
+    ) {
       setError("السعر يجب أن يكون رقمًا موجبًا");
       return;
     }
@@ -58,7 +61,8 @@ export default function NewCoursePage() {
       const course = await api.createCourse(token as string, {
         title: title.trim(),
         slug: finalSlug,
-        shortDescription: shortDescription.trim() === "" ? undefined : shortDescription.trim(),
+        shortDescription:
+          shortDescription.trim() === "" ? undefined : shortDescription.trim(),
         visibility,
         language: "ar",
         price: priceNumber,
@@ -74,7 +78,13 @@ export default function NewCoursePage() {
 
   return (
     <div className="card" style={{ maxWidth: 560 }}>
-      <nav style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: "var(--space-sm)" }}>
+      <nav
+        style={{
+          fontSize: 12,
+          color: "var(--text-muted)",
+          marginBottom: "var(--space-sm)",
+        }}
+      >
         <Link href="/teacher/courses">الكورسات</Link> › كورس جديد
       </nav>
       <h1 style={{ marginBottom: "var(--space-lg)" }}>كورس جديد</h1>
@@ -125,7 +135,14 @@ export default function NewCoursePage() {
           />
         </label>
 
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-md)", marginBottom: "var(--space-md)" }}>
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "1fr 1fr",
+            gap: "var(--space-md)",
+            marginBottom: "var(--space-md)",
+          }}
+        >
           <label style={{ display: "block" }}>
             <span style={{ display: "block", fontSize: 13, marginBottom: 4 }}>
               الظهور
@@ -157,7 +174,13 @@ export default function NewCoursePage() {
         </div>
 
         {error && (
-          <p style={{ color: "#ef4444", fontSize: 13, marginBottom: "var(--space-md)" }}>
+          <p
+            style={{
+              color: "#ef4444",
+              fontSize: 13,
+              marginBottom: "var(--space-md)",
+            }}
+          >
             {error}
           </p>
         )}
