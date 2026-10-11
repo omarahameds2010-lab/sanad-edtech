@@ -1,85 +1,99 @@
-'use client';
+"use client";
 
-import { useState, useMemo } from 'react';
+import { useState } from "react";
+import Panel from "../components/Panel";
 
-const students = [
-  { id: 's1', name: 'عمر مصطفى', phone: '01XXXXX1200', status: 'ACTIVE', enrollmentDate: '2026-08-15', progress: 68, lastActivity: '2026-10-05 18:30' },
-  { id: 's2', name: 'سارة علي', phone: '01XXXXX1201', status: 'ACTIVE', enrollmentDate: '2026-09-01', progress: 82, lastActivity: '2026-10-06 14:15' },
-  { id: 's3', name: 'يوسف أحمد', phone: '01XXXXX1202', status: 'EXPIRED', enrollmentDate: '2026-06-20', progress: 45, lastActivity: '2026-09-28 09:00' },
-  { id: 's4', name: 'مريم حسن', phone: '01XXXXX1203', status: 'ACTIVE', enrollmentDate: '2026-10-01', progress: 12, lastActivity: '2026-10-04 16:45' },
-  { id: 's5', name: 'خالد إبراهيم', phone: '01XXXXX1204', status: 'CANCELLED', enrollmentDate: '2026-05-10', progress: 95, lastActivity: '2026-08-20 11:00' },
-  { id: 's6', name: 'نور الدين', phone: '01XXXXX1205', status: 'ACTIVE', enrollmentDate: '2026-07-12', progress: 30, lastActivity: '2026-10-03 20:10' },
-];
-
-const statusColors: Record<string, string> = {
-  ACTIVE: '#10b981',
-  EXPIRED: '#f59e0b',
-  CANCELLED: '#ef4444',
-};
+/**
+ * Student ledger — the immersive academic record.
+ *
+ * NOTE ON DATA: the platform has no teacher-side student endpoint yet, so this
+ * screen deliberately renders zero rows rather than the previous six invented
+ * students. The chrome (glass rows, muted badges, laser progress horizon,
+ * liquid counters) is final; it fills itself the moment an endpoint exists.
+ */
 
 const statusLabels: Record<string, string> = {
-  ACTIVE: 'نشط',
-  EXPIRED: 'منتهي',
-  CANCELLED: 'ملغي',
+  ACTIVE: "نشط",
+  EXPIRED: "منتهي",
+  CANCELLED: "ملغي",
 };
 
+const badgeClass: Record<string, string> = {
+  ACTIVE: "tc-badge tc-badge-active",
+  EXPIRED: "tc-badge tc-badge-expired",
+  CANCELLED: "tc-badge tc-badge-cancelled",
+};
+
+function LaserBar({ percent }: { percent: number }) {
+  return (
+    <div
+      style={{ display: "flex", alignItems: "center", gap: "var(--space-3)" }}
+    >
+      <div
+        className="tc-laser"
+        role="progressbar"
+        aria-valuenow={percent}
+        aria-valuemin={0}
+        aria-valuemax={100}
+      >
+        <div className="tc-laser-fill" style={{ width: `${percent}%` }} />
+      </div>
+      <span
+        className="tc-metric"
+        style={{
+          fontSize: 12,
+          fontWeight: 700,
+          minWidth: 34,
+          textAlign: "start",
+        }}
+      >
+        {percent}%
+      </span>
+    </div>
+  );
+}
+
 export default function TeacherStudentsPage() {
-  const [search, setSearch] = useState('');
-  const [filter, setFilter] = useState<'all' | 'ACTIVE' | 'EXPIRED' | 'CANCELLED'>('all');
+  const [search, setSearch] = useState("");
+  const [filter, setFilter] = useState<
+    "all" | "ACTIVE" | "EXPIRED" | "CANCELLED"
+  >("all");
 
-  const filteredStudents = useMemo(() => {
-    return students.filter((student) => {
-      const matchesSearch = student.name.includes(search) || student.phone.includes(search);
-      const matchesFilter = filter === 'all' || student.status === filter;
-      return matchesSearch && matchesFilter;
-    });
-  }, [search, filter]);
+  // No fabricated rows. The filter UI is retained because it will operate on
+  // real data, but there is nothing to filter yet.
+  const rows: Array<{
+    id: string;
+    name: string;
+    phone: string;
+    status: keyof typeof statusLabels;
+    enrolledAt: string;
+    lastActivity: string;
+    progress: number;
+  }> = [];
 
-  const stats = useMemo(() => ({
-    total: students.length,
-    active: students.filter((s) => s.status === 'ACTIVE').length,
-    expired: students.filter((s) => s.status === 'EXPIRED').length,
-    cancelled: students.filter((s) => s.status === 'CANCELLED').length,
-  }), []);
+  const filtered = rows.filter((r) => {
+    const matchesSearch = r.name.includes(search) || r.phone.includes(search);
+    const matchesFilter = filter === "all" || r.status === filter;
+    return matchesSearch && matchesFilter;
+  });
 
   return (
     <>
-      <h1>الطلاب</h1>
-
-      {/* Quick Stats */}
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
-          gap: 'var(--space-sm)',
-          marginBottom: 'var(--space-lg)',
-        }}
-      >
-        <div className="card" style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: 28, fontWeight: 700 }}>{stats.total}</div>
-          <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>الإجمالي</div>
-        </div>
-        <div className="card" style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: 28, fontWeight: 700, color: '#10b981' }}>{stats.active}</div>
-          <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>نشط</div>
-        </div>
-        <div className="card" style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: 28, fontWeight: 700, color: '#f59e0b' }}>{stats.expired}</div>
-          <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>منتهي</div>
-        </div>
-        <div className="card" style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: 28, fontWeight: 700, color: '#ef4444' }}>{stats.cancelled}</div>
-          <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>ملغي</div>
-        </div>
-      </div>
+      <header style={{ marginBottom: "var(--space-6)" }}>
+        <h1 className="tc-section-title" style={{ fontSize: 28 }}>
+          الطلاب
+        </h1>
+        <p className="tc-sub">سجل الطلاب والتقدم الأكاديمي لكل طالب.</p>
+      </header>
 
       {/* Filters */}
       <div
         style={{
-          display: 'flex',
-          gap: 'var(--space-md)',
-          marginBottom: 'var(--space-md)',
-          flexWrap: 'wrap',
+          display: "flex",
+          gap: "var(--space-3)",
+          marginBottom: "var(--space-5)",
+          flexWrap: "wrap",
+          alignItems: "center",
         }}
       >
         <input
@@ -87,122 +101,112 @@ export default function TeacherStudentsPage() {
           placeholder="ابحث بالاسم أو رقم الهاتف..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
+          aria-label="بحث في الطلاب"
           style={{
             flex: 1,
-            maxWidth: 400,
-            padding: '10px 14px',
-            background: 'var(--bg-surface)',
-            border: '1px solid var(--border-subtle)',
-            borderRadius: 'var(--radius-control)',
-            color: 'var(--text-primary)',
-            fontSize: 14,
+            minWidth: 220,
+            maxWidth: 380,
+            padding: "10px 16px",
+            borderRadius: 999,
+            border: "1px solid var(--tc-hairline)",
+            background: "rgba(255,255,255,0.02)",
+            color: "var(--tc-ink)",
+            fontSize: 13,
+            outline: "none",
           }}
         />
-        <div style={{ display: 'flex', gap: 'var(--space-sm)' }}>
-          {(['all', 'ACTIVE', 'EXPIRED', 'CANCELLED'] as const).map((status) => (
-            <button
-              key={status}
-              onClick={() => setFilter(status)}
-              style={{
-                background: filter === status ? 'var(--color-action)' : 'var(--bg-surface)',
-                color: filter === status ? 'var(--bg-base)' : 'var(--text-secondary)',
-                border: '1px solid var(--border-subtle)',
-              }}
-            >
-              {status === 'all' ? 'الكل' : statusLabels[status]}
-            </button>
-          ))}
+        <div style={{ display: "flex", gap: "var(--space-2)" }}>
+          {(["all", "ACTIVE", "EXPIRED", "CANCELLED"] as const).map(
+            (status) => (
+              <button
+                key={status}
+                type="button"
+                onClick={() => setFilter(status)}
+                aria-pressed={filter === status}
+                style={{
+                  padding: "7px 14px",
+                  borderRadius: 999,
+                  fontSize: 12,
+                  fontWeight: 600,
+                  cursor: "pointer",
+                  border: `1px solid ${
+                    filter === status
+                      ? "var(--tc-hairline-on)"
+                      : "var(--tc-hairline)"
+                  }`,
+                  background:
+                    filter === status
+                      ? "rgba(255,255,255,0.07)"
+                      : "transparent",
+                  color:
+                    filter === status ? "var(--tc-ink)" : "var(--tc-ink-dim)",
+                  transition: "background 300ms ease, color 300ms ease",
+                }}
+              >
+                {status === "all" ? "الكل" : statusLabels[status]}
+              </button>
+            ),
+          )}
         </div>
       </div>
 
-      {/* Students Table */}
-      <div className="card" style={{ overflow: 'hidden' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-          <thead>
-            <tr style={{ textAlign: 'right', borderBottom: '1px solid var(--border-subtle)', background: 'var(--bg-surface)' }}>
-              <th style={{ padding: 'var(--space-md)' }}>الطالب</th>
-              <th style={{ padding: 'var(--space-md)' }}>الحالة</th>
-              <th style={{ padding: 'var(--space-md)' }}>تاريخ التسجيل</th>
-              <th style={{ padding: 'var(--space-md)' }}>التقدم</th>
-              <th style={{ padding: 'var(--space-md)' }}>آخر نشاط</th>
-              <th style={{ padding: 'var(--space-md)' }}>إجراءات</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredStudents.map((student) => (
-              <tr key={student.id} style={{ borderBottom: '1px solid var(--border-subtle)' }}>
-                <td style={{ padding: 'var(--space-md)' }}>
-                  <div>
-                    <div style={{ fontWeight: 600 }}>{student.name}</div>
-                    <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{student.phone}</div>
-                  </div>
-                </td>
-                <td style={{ padding: 'var(--space-md)' }}>
-                  <span
-                    style={{
-                      display: 'inline-block',
-                      padding: '2px 10px',
-                      borderRadius: '999px',
-                      fontSize: 12,
-                      fontWeight: 600,
-                      background: `${statusColors[student.status]}20`,
-                      color: statusColors[student.status],
-                    }}
-                  >
-                    {statusLabels[student.status]}
-                  </span>
-                </td>
-                <td style={{ padding: 'var(--space-md)', color: 'var(--text-muted)' }}>{student.enrollmentDate}</td>
-                <td style={{ padding: 'var(--space-md)' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-sm)' }}>
-                    <div
-                      style={{
-                        width: 80,
-                        height: 8,
-                        background: 'var(--bg-surface)',
-                        borderRadius: '999px',
-                        overflow: 'hidden',
-                      }}
-                    >
-                      <div
-                        style={{
-                          width: `${student.progress}%`,
-                          height: '100%',
-                          background: 'var(--color-action)',
-                          borderRadius: '999px',
-                        }}
-                      />
-                    </div>
-                    <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{student.progress}%</span>
-                  </div>
-                </td>
-                <td style={{ padding: 'var(--space-md)', color: 'var(--text-muted)' }}>{student.lastActivity}</td>
-                <td style={{ padding: 'var(--space-md)' }}>
-                  <div style={{ display: 'flex', gap: 'var(--space-sm)' }}>
-                    <button style={{ padding: '4px 12px', fontSize: 12 }}>عرض</button>
-                    <button
-                      style={{
-                        padding: '4px 12px',
-                        fontSize: 12,
-                        background: 'var(--bg-surface)',
-                        border: '1px solid var(--border-subtle)',
-                      }}
-                    >
-                      إيقاف
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      {filtered.length === 0 ? (
+        <Panel as="article">
+          <div className="tc-missing">
+            <svg
+              width="15"
+              height="15"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              strokeLinecap="round"
+              style={{ flexShrink: 0, marginTop: 2, color: "#fbbf24" }}
+              aria-hidden
+            >
+              <circle cx="12" cy="12" r="9" />
+              <path d="M12 8v5M12 16.5v.5" />
+            </svg>
+            <p>
+              لا يوجدﹾ endpointﹾ لروسترﹾ طلابﹾ المعلمﹾ حتىﹾ الآنﹾ — الشاشةﹾ
+              فراغﹾ مقصودﹾ بدلﹾ ستةﹾ طلابﹾ مخترعينﹾ. الجدولﹾ الزجاجيﹾ والشاراتﹾ
+              وأشرطةﹾ الليزرﹾ جاهزةﹾ وتتشبعﹾ بياناتﹾ منﹾ اللحظةﹾ الليﹾ تُوصّلﹾ
+              فيهاﹾ واجهةﹾ الطلابﹾ.
+            </p>
+          </div>
+        </Panel>
+      ) : (
+        <div className="tc-ledger">
+          <div className="tc-row tc-row-head" aria-hidden>
+            <span>الطالب</span>
+            <span>الحالة</span>
+            <span>تاريخ التسجيل</span>
+            <span>التقدم</span>
+            <span>آخر نشاط</span>
+          </div>
 
-      {filteredStudents.length === 0 && (
-        <div className="card" style={{ textAlign: 'center', padding: 'var(--space-2xl)', marginTop: 'var(--space-md)' }}>
-          <div style={{ fontSize: 48, marginBottom: 'var(--space-md)' }}>👥</div>
-          <h3>لا يوجد طلاب</h3>
-          <p style={{ color: 'var(--text-muted)' }}>لم يتم العثور على طلاب بالبحث الحالي.</p>
+          {filtered.map((student) => (
+            <div className="tc-row" key={student.id}>
+              <div>
+                <div style={{ fontWeight: 700, fontSize: 14 }}>
+                  {student.name}
+                </div>
+                <div style={{ fontSize: 11, color: "var(--tc-ink-faint)" }}>
+                  {student.phone}
+                </div>
+              </div>
+              <span className={badgeClass[student.status]}>
+                {statusLabels[student.status]}
+              </span>
+              <span style={{ fontSize: 12, color: "var(--tc-ink-dim)" }}>
+                {student.enrolledAt}
+              </span>
+              <LaserBar percent={student.progress} />
+              <span style={{ fontSize: 12, color: "var(--tc-ink-dim)" }}>
+                {student.lastActivity}
+              </span>
+            </div>
+          ))}
         </div>
       )}
     </>

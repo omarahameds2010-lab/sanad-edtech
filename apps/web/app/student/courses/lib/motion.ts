@@ -41,16 +41,36 @@ export function useTickingMetric(target: number, durationMs = 1200): number {
     }
 
     let frame = 0;
+    let guard = 0;
+    let done = false;
     const start = performance.now();
 
+    const finish = () => {
+      if (done) return;
+      done = true;
+      cancelAnimationFrame(frame);
+      clearTimeout(guard);
+      setValue(target);
+    };
+
     const step = (now: number) => {
+      if (done) return;
       const t = Math.min(1, Math.max(0, (now - start) / durationMs));
       setValue(target * easeOut(t));
       if (t < 1) frame = requestAnimationFrame(step);
+      else finish();
     };
 
     frame = requestAnimationFrame(step);
-    return () => cancelAnimationFrame(frame);
+    // requestAnimationFrame never fires in a hidden or occluded tab, so the
+    // real value is guaranteed by a timer rather than left stuck at zero.
+    guard = setTimeout(finish, durationMs + 120) as unknown as number;
+
+    return () => {
+      done = true;
+      cancelAnimationFrame(frame);
+      clearTimeout(guard);
+    };
   }, [target, durationMs, reduced]);
 
   return value;

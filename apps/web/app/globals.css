@@ -755,6 +755,395 @@ html {
 /* End P0 Visual Identity */
 
 /* ======================================================================
+   TEACHER COMMAND ROOM — graphite canvas · aero-glass · kinetic capsule
+   Built on the locked master tokens. No new brand hues: emerald stays the
+   only accent, everything else is graphite/paper/white-alpha.
+   ====================================================================== */
+.tc-canvas {
+  --tc-graphite: #070708;
+  --tc-glass: rgba(255, 255, 255, 0.01);
+  --tc-hairline: rgba(255, 255, 255, 0.04);
+  --tc-hairline-on: rgba(255, 255, 255, 0.14);
+  --tc-ink: #f4f4f6;
+  --tc-ink-dim: rgba(244, 244, 246, 0.4);
+  --tc-ink-faint: rgba(244, 244, 246, 0.3);
+  --tc-emerald: #047857;
+  --tc-emerald-lit: #34d399;
+  --tc-radius: 32px;
+
+  min-height: 100vh;
+  padding: var(--space-16) var(--space-6) var(--space-24);
+  background-color: var(--tc-graphite);
+  /* Grain layer: a fine, deterministic texture that keeps the matte surface
+     from banding on dark panels without shipping an image. */
+  background-image:
+    radial-gradient(rgba(255, 255, 255, 0.014) 1px, transparent 1px),
+    radial-gradient(rgba(255, 255, 255, 0.014) 1px, transparent 1px);
+  background-size:
+    3px 3px,
+    7px 7px;
+  background-position:
+    0 0,
+    2px 3px;
+  color: var(--tc-ink);
+}
+
+.tc-inner {
+  max-width: 1240px;
+  margin: 0 auto;
+}
+
+/* -- Aero-glass panel ------------------------------------------------ */
+.tc-panel {
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--tc-radius);
+  background: var(--tc-glass);
+  border: 1px solid var(--tc-hairline);
+  backdrop-filter: blur(32px);
+  -webkit-backdrop-filter: blur(32px);
+  padding: clamp(var(--space-5), 2.6vw, var(--space-8));
+}
+
+/* Pearl-gleam: a radial mask riding the 1px border, following the pointer.
+   The card itself never scales or moves — only the edge reacts. */
+.tc-gleam {
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 450ms ease;
+  background: radial-gradient(
+    360px circle at var(--tc-mx, 50%) var(--tc-my, 50%),
+    rgba(255, 255, 255, 0.1),
+    transparent 62%
+  );
+  mix-blend-mode: screen;
+}
+
+.tc-panel:hover .tc-gleam,
+.tc-panel:focus-within .tc-gleam {
+  opacity: 1;
+}
+
+/* -- Typography hierarchy -------------------------------------------- */
+.tc-hello {
+  font-size: 20px;
+  font-weight: 300;
+  color: var(--tc-ink-dim);
+  margin: 0;
+}
+
+.tc-name {
+  display: block;
+  margin-top: var(--space-1);
+  font-size: 30px;
+  font-weight: 800;
+  color: var(--tc-ink);
+  line-height: 1.15;
+}
+
+.tc-sub {
+  font-size: 12px;
+  color: var(--tc-ink-faint);
+  margin: var(--space-2) 0 0;
+}
+
+.tc-section-title {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--tc-ink);
+  margin: 0 0 var(--space-5);
+}
+
+.tc-kpi-label {
+  font-size: 11px;
+  font-weight: 500;
+  /* No letter-spacing: it breaks Arabic letter joining. */
+  color: var(--tc-ink-dim);
+  margin: 0;
+}
+
+.tc-metric {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+  font-weight: 700;
+  color: var(--tc-ink);
+  line-height: 1.05;
+}
+
+.tc-metric-value {
+  font-size: clamp(30px, 4vw, 44px);
+}
+
+.tc-metric-sign {
+  font-size: 40%;
+  font-weight: 500;
+  margin-inline-start: 2px;
+  color: var(--tc-ink-dim);
+}
+
+/* -- Metrics grid ----------------------------------------------------- */
+.tc-metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: var(--space-4);
+}
+
+/* -- Live pulse dot --------------------------------------------------- */
+@keyframes tc-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(52, 211, 153, 0.5);
+    transform: scale(1);
+  }
+  50% {
+    box-shadow: 0 0 0 7px rgba(52, 211, 153, 0);
+    transform: scale(1.12);
+  }
+}
+
+.tc-pulse {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--tc-emerald-lit);
+  flex-shrink: 0;
+  animation: tc-pulse 3s ease-in-out infinite;
+}
+
+/* -- Action hub rows -------------------------------------------------- */
+.tc-actions {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.tc-action-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+  padding: var(--space-4);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--tc-hairline);
+  background: rgba(255, 255, 255, 0.008);
+}
+
+.tc-action-title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  font-size: 14px;
+  color: var(--tc-ink);
+  margin: 0;
+}
+
+/* The grade-now capsule: velvet, not a text link. */
+.tc-grade-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 10px 22px;
+  border-radius: 999px;
+  border: 1px solid var(--tc-hairline-on);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--tc-ink);
+  font-size: 13px;
+  font-weight: 700;
+  text-decoration: none;
+  cursor: pointer;
+  transition:
+    background 320ms ease,
+    border-color 320ms ease,
+    box-shadow 320ms ease;
+}
+
+/* Internal emerald halo + the silk thread that carries the pulse. */
+.tc-grade-btn::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  opacity: 0;
+  transition: opacity 320ms ease;
+  background: radial-gradient(
+    120% 140% at 50% 120%,
+    rgba(4, 120, 87, 0.4),
+    transparent 62%
+  );
+}
+
+.tc-grade-btn:hover::before,
+.tc-grade-btn:focus-visible::before {
+  opacity: 1;
+}
+
+.tc-grade-btn > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* The logo dot that unwinds into an arrow. */
+.tc-thread {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--tc-emerald-lit);
+  transition:
+    width 320ms cubic-bezier(0.2, 0, 0, 1),
+    border-radius 320ms cubic-bezier(0.2, 0, 0, 1);
+}
+
+.tc-grade-btn:hover .tc-thread,
+.tc-grade-btn:focus-visible .tc-thread {
+  width: 14px;
+  height: 1.5px;
+  border-radius: 999px;
+}
+
+.tc-grade-btn .tc-arrow {
+  opacity: 0;
+  transform: translateX(4px);
+  transition:
+    opacity 320ms ease,
+    transform 320ms ease;
+}
+
+.tc-grade-btn:hover .tc-arrow,
+.tc-grade-btn:focus-visible .tc-arrow {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+/* -- Status badges (muted, engraved in glass) ------------------------- */
+.tc-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 12px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+
+.tc-badge-active {
+  background: rgba(16, 185, 129, 0.06);
+  border-color: rgba(16, 185, 129, 0.12);
+  color: var(--tc-emerald-lit);
+}
+
+.tc-badge-expired {
+  background: rgba(245, 158, 11, 0.06);
+  border-color: rgba(245, 158, 11, 0.12);
+  color: #fbbf24;
+}
+
+.tc-badge-cancelled {
+  background: rgba(239, 68, 68, 0.05);
+  border-color: rgba(239, 68, 68, 0.1);
+  color: #f87171;
+}
+
+/* -- Student ledger rows --------------------------------------------- */
+.tc-ledger {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.tc-row {
+  display: grid;
+  grid-template-columns:
+    minmax(160px, 2fr) auto minmax(120px, 1fr) minmax(150px, 1.6fr)
+    auto;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-4);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--tc-hairline);
+  background: rgba(255, 255, 255, 0.008);
+  transition:
+    background 300ms ease,
+    border-color 300ms ease;
+}
+
+.tc-row:hover,
+.tc-row:focus-within {
+  background: rgba(255, 255, 255, 0.03);
+  border-color: var(--tc-hairline-on);
+}
+
+.tc-row-head {
+  border: none;
+  background: none;
+  padding-block: var(--space-2);
+}
+
+.tc-row-head > * {
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--tc-ink-faint);
+}
+
+/* Laser progress horizon: 3px, near-invisible track, emerald with bloom. */
+.tc-laser {
+  position: relative;
+  height: 3px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  overflow: visible;
+}
+
+.tc-laser-fill {
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: 0;
+  border-radius: inherit;
+  background: var(--tc-emerald);
+  box-shadow:
+    0 0 8px rgba(52, 211, 153, 0.45),
+    0 0 18px rgba(4, 120, 87, 0.28);
+}
+
+/* -- Unavailable-data state (honest, never a fabricated number) ------- */
+.tc-missing {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-5);
+  border-radius: var(--radius-lg);
+  border: 1px dashed var(--tc-hairline-on);
+  background: rgba(255, 255, 255, 0.006);
+}
+
+.tc-missing p {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.8;
+  color: var(--tc-ink-dim);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tc-pulse,
+  .tc-grade-btn,
+  .tc-grade-btn::before,
+  .tc-thread,
+  .tc-row,
+  .tc-laser-fill {
+    transition: none !important;
+    animation: none !important;
+  }
+  .tc-grade-btn .tc-arrow {
+    transition: none !important;
+  }
+}
+
+/* ======================================================================
    STUDENT COURSES CANVAS — "The Curated Learning Ledger"
    Bento horizon grid · aero-glass panels · emerald-only accent.
    Constructed on the locked master tokens above (no new raw hexes; the two
