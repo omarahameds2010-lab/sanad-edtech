@@ -1,15 +1,25 @@
-import { forwardRef } from 'react';
-import { motion, AnimatePresence, HTMLMotionProps } from 'framer-motion';
+import { forwardRef } from "react";
+import { motion, AnimatePresence, HTMLMotionProps } from "framer-motion";
 
-export interface PageTransitionProps extends HTMLMotionProps<'div'> {
+export interface PageTransitionProps extends HTMLMotionProps<"div"> {
   pageKey?: string;
-  type?: 'fade' | 'slide' | 'push' | 'fade-scale';
+  type?: "fade" | "slide" | "push" | "fade-scale";
   duration?: number;
   ease?: string | number[];
 }
 
 export const PageTransition = forwardRef<HTMLDivElement, PageTransitionProps>(
-  ({ pageKey, type = 'fade', duration = 300, ease = 'ease-in-out', children, ...props }, ref) => {
+  (
+    {
+      pageKey,
+      type = "fade",
+      duration = 300,
+      ease = "ease-in-out",
+      children,
+      ...props
+    },
+    ref,
+  ) => {
     const variants = {
       fade: {
         initial: { opacity: 0 },
@@ -26,7 +36,7 @@ export const PageTransition = forwardRef<HTMLDivElement, PageTransitionProps>(
         animate: { x: 0, opacity: 1 },
         exit: { x: -30, opacity: 0 },
       },
-      'fade-scale': {
+      "fade-scale": {
         initial: { scale: 0.95, opacity: 0 },
         animate: { scale: 1, opacity: 1 },
         exit: { scale: 0.95, opacity: 0 },
@@ -34,22 +44,22 @@ export const PageTransition = forwardRef<HTMLDivElement, PageTransitionProps>(
     };
 
     return (
-      AnimatePresence mode="wait"
-        motion.div
+      <AnimatePresence mode="wait">
+        <motion.div
           ref={ref}
           key={props.pageKey}
           initial={variants[type]?.initial}
           animate={variants[type]?.animate}
           exit={variants[type]?.exit}
-          transition={{ duration: 0.3, ease: 'ease-in-out' }}
+          transition={{ duration: 0.3, ease: "ease-in-out" }}
         >
           {children}
-        /motion.div
-      /AnimatePresence
+        </motion.div>
+      </AnimatePresence>
     );
-  }
+  },
 );
 
-PageTransition.displayName = 'PageTransition';
+PageTransition.displayName = "PageTransition";
 
 export default PageTransition;
