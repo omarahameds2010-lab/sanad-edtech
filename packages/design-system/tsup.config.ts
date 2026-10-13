@@ -1,27 +1,8 @@
-import { defineConfig } from 'tsup';
-
-/**
- * Build config for @lp/design-system.
- *
- * Entries mirror the package.json "exports" map so every public subpath
- * resolves to a real artifact in dist/:
- *   @lp/design-system            -> dist/index.{js,mjs}
- *   @lp/design-system/tokens     -> dist/tokens/index.{js,mjs}
- *   @lp/design-system/theme      -> dist/theme/index.{js,mjs}
- *   @lp/design-system/components -> dist/components/index.{js,mjs}
- *
- * CSS entry points (./tokens.css, ./theme.css, ./global.css) are shipped
- * from source files — no build step needed for them.
- */
+import { defineConfig } from "tsup";
 export default defineConfig({
-  entry: {
-    index: 'index.ts',
-    'tokens/index': 'tokens/index.ts',
-    'theme/index': 'theme/index.ts',
-  },
-  format: ['cjs', 'esm'],
-  dts: true,
-  sourcemap: true,
+  entry: ["index.ts"],
   clean: true,
-  external: ['react', 'react-dom', 'framer-motion'],
+  dts: true,
+  format: ["cjs", "esm"],
+  external: ["react"],
 });
