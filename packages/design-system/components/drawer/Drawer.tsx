@@ -1,6 +1,6 @@
 import { forwardRef } from 'react';
 import { motion, AnimatePresence, HTMLMotionProps } from 'framer-motion';
-import { XIcon } from '../../icon/icons';
+import { XIcon } from '../icon/icons';
 
 export interface DrawerProps extends HTMLMotionProps<'div'> {
   open: boolean;
@@ -21,7 +21,7 @@ const positionStyles = {
   right: { right: 0, left: 'auto', transform: 'translateX(100%)' },
   top: { top: 0, bottom: 'auto', transform: 'translateY(-100%)' },
   bottom: { bottom: 0, top: 'auto', transform: 'translateY(100%)' },
-};
+} as const;
 
 const sizeStyles = {
   sm: { width: '320px', maxWidth: '100%' },
@@ -29,21 +29,7 @@ const sizeStyles = {
   lg: { width: '640px', maxWidth: '100%' },
   xl: { width: '800px', maxWidth: '100%' },
   full: { width: '100%', height: '100%', maxWidth: '100%', maxHeight: '100%' },
-};
-
-export interface DrawerProps {
-  open: boolean;
-  onClose: () => void;
-  title?: string;
-  description?: string;
-  size?: 'sm' | 'md' | 'lg' | 'xl' | 'full';
-  position?: 'left' | 'right' | 'top' | 'bottom';
-  showClose?: boolean;
-  closeOnOverlayClick?: boolean;
-  closeOnEscape?: boolean;
-  children: React.ReactNode;
-  footer?: React.ReactNode;
-}
+} as const;
 
 const Drawer = forwardRef<HTMLDivElement, DrawerProps>(
   ({ open, onClose, title, description, size = 'md', position = 'right', showClose = true, closeOnOverlayClick = true, closeOnEscape = true, children, footer, ...props }, ref) => {
@@ -166,8 +152,8 @@ const Drawer = forwardRef<HTMLDivElement, DrawerProps>(
               </div>
             )}
           </motion.div>
-        </AnimatePresence>
-      </>
+        </motion.div>
+      </AnimatePresence>
     );
   }
 );

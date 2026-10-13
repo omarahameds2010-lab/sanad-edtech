@@ -47,7 +47,7 @@ export const PageTransition = forwardRef<HTMLDivElement, PageTransitionProps>(
       <AnimatePresence mode="wait">
         <motion.div
           ref={ref}
-          key={props.pageKey}
+          key={pageKey}
           initial={variants[type]?.initial}
           animate={variants[type]?.animate}
           exit={variants[type]?.exit}

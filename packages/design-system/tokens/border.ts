@@ -19,17 +19,6 @@ export const borderRadius = {
   '3xl': '32px',
   full: '9999px',
 
-  // Semantic radius
-  none: '0',
-  xs: '2px',
-  sm: '4px',
-  md: '8px',
-  lg: '12px',
-  xl: '16px',
-  '2xl': '24px',
-  '3xl': '32px',
-  full: '9999px',
-
   // Component-specific
   button: '8px',
   input: '8px',
@@ -40,22 +29,15 @@ export const borderRadius = {
   badge: '9999px',
   avatar: '9999px',
   image: '8px',
-  card: '12px',
-  modal: '16px',
-  drawer: '16px',
   popover: '12px',
   dropdown: '8px',
   menu: '8px',
-  button: '8px',
-  input: '8px',
   select: '8px',
   checkbox: '4px',
   radio: '9999px',
   switch: '9999px',
   progress: '9999px',
   slider: '9999px',
-  avatar: '9999px',
-  badge: '9999px',
   tag: '9999px',
   chip: '9999px',
   pill: '9999px',
@@ -66,20 +48,6 @@ export const borderRadius = {
 // ============================================
 
 export const borderWidth = {
-  none: '0',
-  thin: '1px',
-  medium: '2px',
-  thick: '3px',
-  heavy: '4px',
-
-  // Semantic
-  none: '0',
-  thin: '1px',
-  medium: '2px',
-  thick: '3px',
-  heavy: '4px',
-
-  // Semantic
   none: '0',
   thin: '1px',
   medium: '2px',
@@ -144,7 +112,6 @@ export const ring = {
     default: '2px',
     thick: '3px',
     focus: '3px',
-    thick: '4px',
   },
 
   offset: {
@@ -161,13 +128,6 @@ export const ring = {
     warning: 'status.warning',
     info: 'status.info',
     focus: 'primary.500',
-  },
-
-  offset: {
-    none: '0',
-    sm: '1px',
-    default: '2px',
-    lg: '3px',
   },
 
   offsetColor: {
@@ -209,13 +169,6 @@ export const outline = {
     success: 'status.success',
     warning: 'status.warning',
     info: 'status.info',
-  },
-
-  offset: {
-    none: '0',
-    sm: '1px',
-    default: '2px',
-    lg: '3px',
   },
 } as const;
 
@@ -282,7 +235,6 @@ export const opacity = {
   active: '0.6',
   overlay: '0.5',
   backdrop: '0.8',
-  disabled: '0.5',
   placeholder: '0.4',
   subtle: '0.6',
   muted: '0.5',

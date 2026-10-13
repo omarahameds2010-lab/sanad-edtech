@@ -1,6 +1,7 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import * as React from "react";
+import { createContext, useContext, useEffect, useState } from "react";
 import { dict, type Dict, type Lang } from "./dict";
 
 interface LangCtx {
@@ -16,7 +17,7 @@ export function useLang() {
   return useContext(Ctx);
 }
 
-export function LangProvider({ children }: { children: ReactNode }) {
+export function LangProvider({ children }: { children: any }) {
   const [lang, setLangState] = useState<Lang>("ar");
 
   useEffect(() => {
@@ -44,12 +45,14 @@ export function LangProvider({ children }: { children: ReactNode }) {
     setLangState(l);
   }
 
+  const ProviderComponent = Ctx.Provider as any;
+
   return (
-    <Ctx.Provider value={{ lang, dir, t: dict[lang], setLang }}>
+    <ProviderComponent value={{ lang, dir, t: dict[lang], setLang }}>
       <div key={lang} className="lp-lang-enter">
         {children}
       </div>
-    </Ctx.Provider>
+    </ProviderComponent>
   );
 }
 

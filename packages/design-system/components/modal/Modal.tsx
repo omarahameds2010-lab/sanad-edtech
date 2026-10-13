@@ -1,6 +1,6 @@
 import { forwardRef } from 'react';
 import { motion, AnimatePresence, HTMLMotionProps } from 'framer-motion';
-import { XIcon } from '../../icon/icons';
+import { XIcon } from '../icon/icons';
 
 export interface ModalProps extends HTMLMotionProps<'div'> {
   open: boolean;
@@ -21,20 +21,7 @@ const sizeStyles = {
   lg: { maxWidth: '640px' },
   xl: { maxWidth: '800px' },
   full: { maxWidth: '100%', width: '100%', height: '100%', borderRadius: 0 },
-};
-
-export interface ModalProps extends HTMLMotionProps<'div'> {
-  open: boolean;
-  onClose: () => void;
-  title?: string;
-  description?: string;
-  size?: 'sm' | 'md' | 'lg' | 'xl' | 'full';
-  showClose?: boolean;
-  closeOnOverlayClick?: boolean;
-  closeOnEscape?: boolean;
-  children: React.ReactNode;
-  footer?: React.ReactNode;
-}
+} as const;
 
 const Modal = forwardRef<HTMLDivElement, ModalProps>(
   ({ open, onClose, title, description, size = 'md', showClose = true, closeOnOverlayClick = true, closeOnEscape = true, children, footer, ...props }, ref) => {
@@ -153,8 +140,8 @@ const Modal = forwardRef<HTMLDivElement, ModalProps>(
               </div>
             )}
           </motion.div>
-        </AnimatePresence>
-      </>
+        </motion.div>
+      </AnimatePresence>
     );
   }
 );

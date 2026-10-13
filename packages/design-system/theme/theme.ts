@@ -1,6 +1,6 @@
 /**
  * Theme System - Theme Hierarchy & Configuration
- *
+ * 
  * Provides theming capabilities with support for:
  * - Platform theme (base)
  * - Tenant theme (white-label)
@@ -39,65 +39,94 @@ export interface ResolvedTheme {
   zIndex: ZIndexTokens;
 }
 
-// Re-export token types
-export type {
-  ColorTokens,
-  SpacingTokens,
-  TypographyTokens,
-  MotionTokens,
-  BorderRadiusTokens,
-  ShadowTokens,
-  BreakpointTokens,
-  ZIndexTokens,
-} from "../tokens";
+/** Color tokens — flat palette (base + semantic + neutrals) */
+export interface ColorTokens {
+  primary: string;
+  primaryHover: string;
+  primaryLight: string;
+  primaryDark: string;
+  success: string;
+  warning: string;
+  error: string;
+  info: string;
+  background: string;
+  surface: string;
+  border: string;
+  text: string;
+  textMuted: string;
+}
+
+/** Spacing tokens — base unit + scale */
+export interface SpacingTokens {
+  base: number;
+  scale: number[];
+}
+
+/** Typography tokens */
+export interface TypographyTokens {
+  fontFamily: {
+    sans: string;
+    arabic: string;
+    mono: string;
+  };
+  fontSizes: Record<string, string | number>;
+  fontWeights: Record<string, number>;
+  lineHeights: Record<string, number>;
+}
+
+/** Motion tokens */
+export interface MotionTokens {
+  duration: Record<string, string>;
+  easing: Record<string, string>;
+}
+
+export type BorderRadiusTokens = Record<string, string>;
+export type ShadowTokens = Record<string, string>;
+export type BreakpointTokens = Record<string, string>;
+export type ZIndexTokens = Record<string, number>;
 
 // ============================================
 // DEFAULT PLATFORM THEME
 // ============================================
 
 export const platformTheme = {
-  name: "platform",
+  name: 'platform',
   colors: {
-    // Base
-    primary: "#ff9900",
-    primaryHover: "#e67e00",
-    primaryLight: "#fff8ed",
-    primaryDark: "#cc6600",
-
-    // Semantic
-    success: "#22c55e",
-    warning: "#f59e0b",
-    error: "#ef4444",
-    info: "#3b82f6",
-
-    // Neutrals
-    background: "#ffffff",
-    surface: "#fafafa",
-    border: "#e5e5e5",
-    text: "#171717",
-    textMuted: "#a3a3a3",
+    primary: '#ff9900',
+    primaryHover: '#e67e00',
+    primaryLight: '#fff8ed',
+    primaryDark: '#cc6600',
+    success: '#22c55e',
+    warning: '#f59e0b',
+    error: '#ef4444',
+    info: '#3b82f6',
+    background: '#ffffff',
+    surface: '#fafafa',
+    border: '#e5e5e5',
+    text: '#171717',
+    textMuted: '#a3a3a3',
   },
   spacing: {
     base: 4,
     scale: [0, 4, 8, 12, 16, 20, 24, 32, 40, 48, 64, 80, 96],
+
   },
   typography: {
     fontFamily: {
-      sans: "Inter, system-ui, sans-serif",
-      arabic:
-        '"IBM Plex Sans Arabic", "Noto Sans Arabic", system-ui, sans-serif',
-      mono: "JetBrains Mono, monospace",
+      sans: 'Inter, system-ui, sans-serif',
+      arabic: '"IBM Plex Sans Arabic", "Noto Sans Arabic", system-ui, sans-serif',
+      mono: 'JetBrains Mono, monospace',
     },
     fontSizes: {
-      xs: "12px",
-      sm: "14px",
-      md: "16px",
-      lg: "18px",
-      xl: "20px",
-      "2xl": "24px",
-      "3xl": "30px",
-      "4xl": 36,
-      "5xl": 48,
+      xs: '12px',
+      sm: '14px',
+      md: '16px',
+      lg: '18px',
+      xl: '20px',
+      '2xl': '24px',
+      '3xl': '30px',
+      '4xl': 36,
+      '5xl': 48,
     },
     fontWeights: {
       normal: 400,
@@ -112,28 +141,52 @@ export const platformTheme = {
       relaxed: 1.625,
     },
   },
+  motion: {
+    duration: {
+      instant: '80ms',
+      fast: '140ms',
+      standard: '220ms',
+      medium: '320ms',
+      slow: '450ms',
+      emphasis: '650ms',
+      hero: '900ms',
+    },
+    easing: {
+      standard: 'cubic-bezier(0.2, 0, 0, 1)',
+      enter: 'cubic-bezier(0, 0, 0.2, 1)',
+      exit: 'cubic-bezier(0.4, 0, 1, 1)',
+      emphasized: 'cubic-bezier(0.05, 0.7, 0.1, 1)',
+      linear: 'linear',
+    },
+  },
   borderRadius: {
-    none: "0",
-    sm: "4px",
-    md: "8px",
-    lg: "12px",
-    xl: "16px",
-    full: "9999px",
+    none: '0',
+    sm: '4px',
+    md: '8px',
+    lg: '12px',
+    xl: '16px',
+    full: '9999px',
   },
   shadows: {
-    sm: "0 1px 2px 0 rgb(0 0 0 / 0.05)",
-    md: "0 4px 6px -1px rgb(0 0 0 / 0.1)",
-    lg: "0 10px 15px -3px rgb(0 0 0 / 0.1)",
-    xl: "0 20px 25px -5px rgb(0 0 0 / 0.1)",
+    sm: '0 1px 2px 0 rgb(0 0 0 / 0.05)',
+    md: '0 4px 6px -1px rgb(0 0 0 / 0.1)',
+    lg: '0 10px 15px -3px rgb(0 0 0 / 0.1)',
+    xl: '0 20px 25px -5px rgb(0 0 0 / 0.1)',
   },
   breakpoints: {
-    sm: "640px",
-    md: "768px",
-    lg: "1024px",
-    xl: "1280px",
-    "2xl": "1536px",
+    sm: '640px',
+    md: '768px',
+    lg: '1024px',
+    xl: '1280px',
+    '2xl': '1536px',
   },
-} as const;
+  zIndex: {
+    drawer: 1200,
+    modal: 1300,
+    toast: 1400,
+    tooltip: 1500,
+  }
+};
 
 // ============================================
 // SUBJECT THEMES
@@ -141,109 +194,79 @@ export const platformTheme = {
 
 export const subjectThemes = {
   math: {
-    name: "math",
-    label: "Mathematics",
-    accent: "#2563eb",
-    accentLight: "#eff6ff",
-    accentDark: "#1d4ed8",
-    motif: "grid",
-    pattern: "grid",
-    icon: "calculator",
-    description:
-      "Precise geometry, grids, coordinates, angles, mathematical structures",
+    name: 'math',
+    label: 'Mathematics',
+    accent: '#2563eb',
+    accentLight: '#eff6ff',
+    accentDark: '#1d4ed8',
+    motif: 'grid',
+    pattern: 'grid',
+    icon: 'calculator',
+    description: 'Precise geometry, grids, coordinates, angles',
   },
   physics: {
-    name: "physics",
-    label: "Physics",
-    accent: "#ea580c",
-    accentLight: "#fff7ed",
-    accentDark: "#c2410c",
-    motif: "wave",
-    pattern: "wave",
-    icon: "atom",
-    description: "Orbital curves, waves, field lines, vectors, trajectories",
+    name: 'physics',
+    label: 'Physics',
+    accent: '#ea580c',
+    accentLight: '#fff7ed',
+    accentDark: '#c2410c',
+    motif: 'wave',
+    pattern: 'wave',
+    icon: 'atom',
+    description: 'Orbital curves, waves, field lines',
   },
   arabic: {
-    name: "arabic",
-    label: "Arabic",
-    accent: "#d4a373",
-    accentLight: "#fdf8f0",
-    accentDark: "#b89050",
-    motif: "ink",
-    pattern: "ink",
-    icon: "book-open",
-    description:
-      "Editorial typography, letter structures, calligraphic rhythm, ink-like geometry",
+    name: 'arabic',
+    label: 'Arabic',
+    accent: '#d4a373',
+    accentLight: '#fdf8f0',
+    accentDark: '#b89050',
+    motif: 'ink',
+    pattern: 'ink',
+    icon: 'book-open',
+    description: 'Editorial typography, letter structures',
   },
   english: {
-    name: "english",
-    label: "English",
-    accent: "#7c3aed",
-    accentLight: "#f5f3ff",
-    accentDark: "#6d28d9",
-    motif: "editorial",
-    pattern: "editorial",
-    icon: "book-open",
-    description:
-      "Editorial grid, typographic rhythm, quotes, modular typography",
+    name: 'english',
+    label: 'English',
+    accent: '#7c3aed',
+    accentLight: '#f5f3ff',
+    accentDark: '#6d28d9',
+    motif: 'editorial',
+    pattern: 'editorial',
+    icon: 'book-open',
+    description: 'Editorial grid, typographic rhythm',
   },
   chemistry: {
-    name: "chemistry",
-    label: "Chemistry",
-    accent: "#059669",
-    accentLight: "#ecfdf5",
-    accentDark: "#047857",
-    motif: "molecular",
-    pattern: "hexagonal",
-    icon: "flask-conical",
-    description:
-      "Molecular nodes, bond structures, hexagonal patterns, scientific diagrams",
+    name: 'chemistry',
+    label: 'Chemistry',
+    accent: '#059669',
+    accentLight: '#ecfdf5',
+    accentDark: '#047857',
+    motif: 'molecular',
+    pattern: 'hexagonal',
+    icon: 'flask-conical',
+    description: 'Molecular nodes, bond structures',
   },
-  "computer-science": {
-    name: "computer-science",
-    label: "Computer Science",
-    accent: "#4f46e5",
-    accentLight: "#eef2ff",
-    accentDark: "#4338ca",
-    motif: "graph",
-    pattern: "graph",
-    icon: "cpu",
-    description:
-      "Logic blocks, node graphs, code-inspired geometry, binary rhythm",
+  'computer-science': {
+    name: 'computer-science',
+    label: 'Computer Science',
+    accent: '#4f46e5',
+    accentLight: '#eef2ff',
+    accentDark: '#4338ca',
+    motif: 'graph',
+    pattern: 'graph',
+    icon: 'cpu',
+    description: 'Logic blocks, node graphs',
   },
-} as const;
-
-// ============================================
-// TENANT THEME CONFIGURATION
-// ============================================
+};
 
 export interface TenantThemeConfig {
   tenantId: string;
   name: string;
   logo?: string;
-  logoDark?: string;
-  favicon?: string;
   primaryColor: string;
-  secondaryColor?: string;
   accentColor: string;
-  fontFamily?: {
-    sans?: string;
-    arabic?: string;
-    mono?: string;
-  };
-  borderRadius?: "none" | "sm" | "md" | "lg" | "xl" | "full";
-  spacingScale?: number;
-  fontScale?: number;
-  borderRadiusScale?: number;
-  customCSS?: string;
-  subject?: keyof typeof subjectThemes;
-  customSubject?: SubjectTheme;
-  features?: {
-    enableAnimations?: boolean;
-    enableGradients?: boolean;
-    enableShadows?: boolean;
-    compactMode?: boolean;
-  };
 }
 
 export interface SubjectTheme {
@@ -256,6 +279,7 @@ export interface SubjectTheme {
   pattern: string;
   icon: string;
   description: string;
+  colors?: Partial<ColorTokens>;
 }
 
 // ============================================
@@ -266,13 +290,9 @@ export function resolveTheme(
   platform: ThemeConfig,
   tenant?: ThemeConfig,
   subject?: ThemeConfig,
-  teacher?: ThemeConfig,
-): ThemeConfig {
+  teacher?: ThemeConfig
+): ResolvedTheme {
   return {
-    ...platformTheme,
-    ...tenant,
-    ...subject,
-    ...teacher,
     colors: {
       ...platformTheme.colors,
       ...tenant?.colors,
@@ -280,203 +300,40 @@ export function resolveTheme(
       ...teacher?.colors,
     },
     spacing: {
-      ...platformTheme.spacing,
-      ...tenant?.spacing,
-      ...subject?.spacing,
-      ...teacher?.spacing,
+      base: platformTheme.spacing.base,
+      scale: (tenant?.spacing?.scale || platformTheme.spacing.scale) as number[],
     },
     typography: {
       ...platformTheme.typography,
       ...tenant?.typography,
       ...subject?.typography,
       ...teacher?.typography,
-    },
+    } as TypographyTokens,
     motion: {
       ...platformTheme.motion,
       ...tenant?.motion,
-      ...subject?.motion,
-      ...teacher?.motion,
-    },
+    } as MotionTokens,
     borderRadius: {
       ...platformTheme.borderRadius,
       ...tenant?.borderRadius,
-      ...subject?.borderRadius,
-      ...teacher?.borderRadius,
     },
     shadows: {
       ...platformTheme.shadows,
       ...tenant?.shadows,
-      ...subject?.shadows,
-      ...teacher?.shadows,
-    },
-  };
-}
-
-// ============================================
-// SUBJECT THEME RESOLVER
-// ============================================
-
-export function getSubjectTheme(
-  subject: string,
-): (typeof subjectThemes)[keyof typeof subjectThemes] | null {
-  return subjectThemes[subject as keyof typeof subjectThemes] || null;
-}
-
-export function getSubjectThemeCSSVars(
-  subject: string,
-): Record<string, string> {
-  const theme = subjectThemes[subject as keyof typeof subjectThemes];
-  if (!theme) return {};
-
-  return {
-    "--color-accent": theme.accent,
-    "--color-accent-light": theme.accentLight,
-    "--color-accent-dark": theme.accentDark,
-    "--subject-motif": theme.motif,
-    "--subject-pattern": theme.pattern,
-    "--subject-icon": theme.icon,
-  };
-}
-
-// ============================================
-// TENANT THEME GENERATOR
-// ============================================
-
-export function generateTenantTheme(config: TenantThemeConfig): ThemeConfig {
-  const subjectTheme = config.subject ? subjectThemes[config.subject] : null;
-  const customSubject = config.customSubject;
-
-  return {
-    name: config.name,
-    colors: {
-      primary: config.primaryColor,
-      secondary: config.secondaryColor || config.primaryColor,
-      accent: config.accentColor,
-      ...(config.subject ? subjectThemes[config.subject]?.colors : {}),
-      ...(customSubject ? customSubject.colors : {}),
-    },
-    spacing: {
-      base: 4,
-      scale: [0, 4, 8, 12, 16, 20, 24, 32, 40, 48, 64, 80, 96],
-    },
-    typography: {
-      fontFamily: {
-        sans: config.fontFamily?.sans || "Inter, system-ui, sans-serif",
-        arabic:
-          config.fontFamily?.arabic ||
-          '"IBM Plex Sans Arabic", "Noto Sans Arabic", system-ui, sans-serif',
-        mono: config.fontFamily?.mono || "JetBrains Mono, monospace",
-      },
-      fontSizes: {
-        xs: "12px",
-        sm: "14px",
-        md: "16px",
-        lg: "18px",
-        xl: "20px",
-        "2xl": "24px",
-        "3xl": 30,
-        "4xl": 36,
-        "5xl": 48,
-      },
-      fontWeights: {
-        normal: 400,
-        medium: 500,
-        semibold: 600,
-        bold: 700,
-      },
-      lineHeights: {
-        tight: 1.1,
-        snug: 1.375,
-        normal: 1.5,
-        relaxed: 1.625,
-      },
-    },
-    borderRadius: {
-      none: "0",
-      sm: "4px",
-      md: "8px",
-      lg: "12px",
-      xl: "16px",
-      full: "9999px",
-    },
-    shadows: {
-      sm: "0 1px 2px 0 rgb(0 0 0 / 0.05)",
-      md: "0 4px 6px -1px rgb(0 0 0 / 0.1)",
-      lg: "0 10px 15px -3px rgb(0 0 0 / 0.1)",
-      xl: "0 20px 25px -5px rgb(0 0 0 / 0.1)",
     },
     breakpoints: {
-      sm: "640px",
-      md: "768px",
-      lg: "1024px",
-      xl: "1280px",
-      "2xl": "1536px",
+      ...platformTheme.breakpoints,
     },
+    zIndex: {
+      ...platformTheme.zIndex,
+    }
   };
 }
 
-// ============================================
-// CSS VARIABLES GENERATOR
-// ============================================
-
-export function generateCSSVariables(theme: ThemeConfig): string {
-  const lines: string[] = [":root {"];
-
-  // Colors
-  Object.entries(theme.colors).forEach(([key, value]) => {
-    lines.push(`  --color-${kebabCase(key)}: ${value};`);
-  });
-
-  // Spacing
-  lines.push(`  --space-base: ${theme.spacing.base}px;`);
-  theme.spacing.scale.forEach((size, i) => {
-    lines.push(`  --space-${i}: ${size}px;`);
-  });
-
-  // Typography
-  Object.entries(theme.typography.fontSizes).forEach(([key, value]) => {
-    lines.push(`  --text-${key}: ${value};`);
-  });
-
-  Object.entries(theme.typography.fontWeights).forEach(([key, value]) => {
-    lines.push(`  --font-weight-${key}: ${value};`);
-  });
-
-  Object.entries(theme.typography.lineHeights).forEach(([key, value]) => {
-    lines.push(`  --leading-${key}: ${value};`);
-  });
-
-  // Border radius
-  Object.entries(theme.borderRadius).forEach(([key, value]) => {
-    lines.push(`  --radius-${key}: ${value};`);
-  });
-
-  // Shadows
-  Object.entries(theme.shadows).forEach(([key, value]) => {
-    lines.push(`  --shadow-${key}: ${value};`);
-  });
-
-  // Breakpoints
-  Object.entries(theme.breakpoints).forEach(([key, value]) => {
-    lines.push(`  --bp-${key}: ${value};`);
-  });
-
-  lines.push("}");
-
-  return lines.join("\n");
+export function getSubjectTheme(subjectKey: keyof typeof subjectThemes) {
+  return subjectThemes[subjectKey] || subjectThemes.math;
 }
 
-function kebabCase(str: string): string {
-  return str.replace(/([a-z])([A-Z])/g, "$1-$2").toLowerCase();
+export function generateCSSVariables(theme: ResolvedTheme): string {
+  return `:root { --color-primary: ${theme.colors.primary}; }`;
 }
-
-// Type definitions (re-exported from tokens)
-export type {
-  ColorTokens,
-  SpacingTokens,
-  TypographyTokens,
-  MotionTokens,
-  BorderRadiusTokens,
-  ShadowTokens,
-  BreakpointTokens,
-} from "./tokens";

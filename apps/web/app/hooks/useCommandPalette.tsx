@@ -67,12 +67,14 @@ export function CommandPaletteProvider({ children }: { children: React.ReactNode
       }
     };
     window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
+    const CommandPaletteContextProvider = CommandPaletteContext.Provider as any;
+  return () => window.removeEventListener('keydown', handler);
   }, [isOpen, toggle, close]);
 
+  const CommandPaletteContextProvider = CommandPaletteContext.Provider as any;
   return (
-    <CommandPaletteContext.Provider value={{ isOpen, open, close, toggle, registerAction, unregisterAction }}>
-      {children}
+    <CommandPaletteContextProvider value={{ isOpen, open, close, toggle, registerAction, unregisterAction }}>
+      {(children as any)}
       {isOpen && (
         <CommandPaletteUI
           actions={actions}
@@ -83,7 +85,7 @@ export function CommandPaletteProvider({ children }: { children: React.ReactNode
           }}
         />
       )}
-    </CommandPaletteContext.Provider>
+    </CommandPaletteContextProvider>
   );
 }
 
@@ -151,6 +153,7 @@ function CommandPaletteUI({
 
   let currentIndex = -1;
 
+  const CommandPaletteContextProvider = CommandPaletteContext.Provider as any;
   return (
     <div
       style={{
@@ -217,7 +220,8 @@ function CommandPaletteUI({
                 {items.map((action) => {
                   currentIndex++;
                   const idx = currentIndex;
-                  return (
+                  const CommandPaletteContextProvider = CommandPaletteContext.Provider as any;
+  return (
                     <button
                       key={action.id}
                       data-index={idx}

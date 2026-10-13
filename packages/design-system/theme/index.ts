@@ -5,7 +5,7 @@
  */
 
 export * from './theme';
-export * from './theme.css';
+//export * from './theme.css';
 
 // Re-export types
 export type {

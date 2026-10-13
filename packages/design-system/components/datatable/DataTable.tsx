@@ -1,5 +1,5 @@
 import { forwardRef, useState, useMemo } from 'react';
-import { ChevronDownIcon, ChevronUpIcon, ChevronLeftIcon, ChevronRightIcon, CheckIcon } from '../../icon/icons';
+import { ChevronDownIcon, ChevronUpIcon, ChevronLeftIcon, ChevronRightIcon, CheckIcon } from '../icon/icons';
 
 export interface Column<T> {
   key: string;
@@ -127,36 +127,14 @@ function DataTableComponent<T>({
               </tr>
             ) : (
               paginatedData.map((row) => (
-                <tr
-                  key={row[rowKey]}
-                  style={{
-                    borderBottom: '1px solid var(--color-border-main)',
-                    cursor: 'pointer',
-                    transition: 'background-color 0.1s ease',
-                    backgroundColor: 'var(--color-bg-primary)',
-                  }}
-                  onClick={() => onSelectionChange?.(new Set([String(row[rowKey])]))}
-                  onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--color-neutral-50)'; }}
-                  onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
-                >
+                <tr key={row[rowKey]} style={{ borderBottom: '1px solid var(--color-border-main)', cursor: 'pointer', transition: 'background-color 0.1s ease' }} onClick={() => onSelectionChange?.(new Set([String(row[rowKey])]))} onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--color-neutral-50)'; }} onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}>
                   {columns.map((column) => (
-                    <td
-                      key={column.key}
-                      style={{
-                        padding: '12px 16px',
-                        textAlign: column.align || 'left',
-                        borderBottom: '1px solid var(--color-border-light)',
-                        verticalAlign: 'middle',
-                        width: column.width,
-                        minWidth: column.minWidth,
-                      }}
-                    >
+                    <td key={column.key} style={{ padding: '12px 16px', textAlign: column.align || 'left', borderBottom: '1px solid var(--color-border-light)', verticalAlign: 'middle', width: column.width, minWidth: column.minWidth }}>
                       {column.render ? column.render(row[column.accessor as keyof typeof row], row) : String(row[column.accessor as keyof typeof row] ?? '')}
                     </td>
                   ))}
                 </tr>
-              ))}
-            )}
+              )))}
           </tbody>
         </table>
       </div>

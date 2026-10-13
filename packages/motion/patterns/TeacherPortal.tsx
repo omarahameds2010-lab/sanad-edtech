@@ -1,4 +1,4 @@
-import { forwardRef } from 'react';
+import { forwardRef, useEffect } from 'react';
 import { motion, AnimatePresence, HTMLMotionProps } from 'framer-motion';
 
 export interface TeacherPortalProps extends HTMLMotionProps<'div'> {
@@ -9,6 +9,8 @@ export interface TeacherPortalProps extends HTMLMotionProps<'div'> {
     avatar?: string;
     motif: 'orbit' | 'grid' | 'ink' | 'wave' | 'molecular' | 'graph';
     accentColor: string;
+    /** Position on card for traveling motif origin */
+    cardPosition?: { x: number; y: number };
   };
   /** Callback when portal opens */
   onEnter?: () => void;
@@ -18,10 +20,21 @@ export interface TeacherPortalProps extends HTMLMotionProps<'div'> {
   isOpen: boolean;
   /** Close callback */
   onClose: () => void;
+  /** Whether to show the traveling motif from card → space */
+  showTravelingMotif?: boolean;
 }
 
 export const TeacherPortal = forwardRef<HTMLDivElement, TeacherPortalProps>(
-  ({ teacher, isOpen, onEnter, onExit, onClose, children, ...props }, ref) => {
+  ({ 
+    teacher, 
+    isOpen, 
+    onEnter, 
+    onExit, 
+    onClose, 
+    children, 
+    showTravelingMotif = true,
+    ...props 
+  }, ref) => {
     const motifVariants = {
       orbit: {
         initial: { scale: 0.8, rotate: -180 },
@@ -56,11 +69,79 @@ export const TeacherPortal = forwardRef<HTMLDivElement, TeacherPortalProps>(
     };
 
     const motif = teacher.motif || 'grid';
-    const variants = motifVariants[motif] || motifVariants.grid;
-
+    const color = motifColors[motif] || '#047857';
+    const char = motifChars[motif] || '⟳';
+    
+    // Shared values for traveling motif animation
+    const motifProgress = useSharedValue(0);
+    const travelComplete = useSharedValue(false);
+    
+    // Animated style for traveling motif
+    const travelingMotifStyle = useAnimatedStyle(() => {
+      const t = motifProgress.value;
+      // Ease out for natural motion
+      const eased = 1 - Math.pow(1 - t, 3);
+      
+      return {
+        opacity: eased,
+        transform: [
+          `translate(${eased * teacher.cardPosition?.x || 200}px, ${eased * teacher.cardPosition?.y || -100}px)`,
+          `scale(${1 - eased * 0.5})`,
+        ],
+      };
+    }, [motifProgress, teacher.cardPosition]);
+    
+    // Trigger travel animation when portal opens
+    const onOpen = () => {
+      if (showTravelingMotif && teacher.cardPosition) {
+        // Start at card position (progress = 0)
+        motifProgress.value = 0;
+        
+        // Animate to space (progress = 1) with natural motion
+        motifProgress.value = withTiming(1, { duration: 800, easing: [0.2, 1, 0.3, 1] });
+      } else {
+        travelComplete.value = true;
+      }
+    };
+    
+    const onCloseHandler = () => {
+      travelComplete.value = true;
+      onClose();
+    };
+    
+    // Auto-trigger travel animation when portal opens
+    useEffect(() => {
+      if (isOpen) {
+        onOpen();
+      }
+    }, [isOpen, showTravelingMotif, teacher.cardPosition]);
+    
     return (
       <AnimatePresence mode="wait">
         {isOpen && (
+          <>
+          {showTravelingMotif && teacher.cardPosition && (
+            <motion.div
+              style={{ position: 'fixed', zIndex: 998 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.001 }}
+            >
+              <svg
+                width="48"
+                height="48"
+                viewBox="0 0 48 48"
+                fill="none"
+                style={{
+                  color: color,
+                  fontSize: 48,
+                  opacity: 0,
+                  transition: 'opacity 0.001s ease',
+                }}
+              >
+                {char}
+              </svg>
+            </motion.div>
+          )}
           <motion.div
             ref={ref}
             initial="initial"
@@ -144,6 +225,24 @@ export const TeacherPortal = forwardRef<HTMLDivElement, TeacherPortalProps>(
                 alignItems: 'center',
                 gap: '16px',
               }}>
+                {/* Traveling motif arrives at space */}
+                {showTravelingMotif && teacher.cardPosition && motifProgress.value >= 1 && (
+                  <div style={{
+                    width: '48px',
+                    height: '48px',
+                    borderRadius: '50%',
+                    background: `rgba(${hexToRgb(color)}, 0.1)`,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '24px',
+                    color: color,
+                    marginBottom: '-24px',
+                  }}>
+                    {char}
+                  </div>
+                )}
+                
                 <div className="teacher-avatar" style={{
                   width: '64px',
                   height: '64px',
@@ -200,6 +299,7 @@ export const TeacherPortal = forwardRef<HTMLDivElement, TeacherPortalProps>(
               </div>
             </motion.div>
           </motion.div>
+          </>
         )}
       </AnimatePresence>
     );
@@ -209,3 +309,10 @@ export const TeacherPortal = forwardRef<HTMLDivElement, TeacherPortalProps>(
 TeacherPortal.displayName = 'TeacherPortal';
 
 export default TeacherPortal;
+
+/** Convert hex to RGB string for CSS */
+function hexToRgb(hex: string): string {
+  const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+  if (!result) return '0, 0, 0';
+  return `${parseInt(result[1], 16)}, ${parseInt(result[2], 16)}, ${parseInt(result[3], 16)}`;
+}

@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useCallback, ReactNode } from 'react';
+import { createContext, useContext, useState, useCallback, ReactNode, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { XIcon } from '../icon/icons';
 
@@ -15,7 +15,7 @@ export interface Toast {
   dismissible?: boolean;
 }
 
-interface ToastContextValue {
+export interface ToastContextValue {
   toasts: Toast[];
   addToast: (toast: Omit<Toast, 'id'>) => string;
   removeToast: (id: string) => void;
@@ -66,10 +66,10 @@ const positionStyles = {
   'bottom-left': { bottom: '20px', left: '20px', top: 'auto', right: 'auto' },
   'top-center': { top: '20px', left: '50%', transform: 'translateX(-50%)', right: 'auto', bottom: 'auto' },
   'bottom-center': { bottom: '20px', left: '50%', transform: 'translateX(-50%)', top: 'auto', right: 'auto' },
-};
+} as const;
 
-const ToastContainer = ({ position = 'top-right', gap = 8, maxToasts = 5 }: ToastContainerProps) => {
-  const { toasts } = useContext(ToastContext);
+export const ToastContainer = ({ position = 'top-right', gap = 8, maxToasts = 5 }: ToastContainerProps) => {
+  const { toasts, removeToast } = useContext(ToastContext);
   const visibleToasts = toasts.slice(-maxToasts);
 
   return (
@@ -89,7 +89,7 @@ const ToastContainer = ({ position = 'top-right', gap = 8, maxToasts = 5 }: Toas
     >
       <AnimatePresence>
         {visibleToasts.map(toast => (
-          <Toast key={toast.id} toast={toast} />
+          <Toast key={toast.id} toast={toast} onRemove={removeToast} />
         ))}
       </AnimatePresence>
     </div>
@@ -102,11 +102,36 @@ const typeStyles = {
   warning: { bg: 'var(--color-warning-bg)', border: 'var(--color-warning-border)', iconColor: 'var(--color-warning)', icon: '⚠' },
   info: { bg: 'var(--color-info-bg)', border: 'var(--color-info-border)', iconColor: 'var(--color-info)', icon: 'ℹ' },
   default: { bg: 'var(--color-surface-primary)', border: 'var(--color-border-main)', iconColor: 'var(--color-text-primary)', icon: 'ℹ' },
-};
+} as const;
 
-const Toast = ({ toast, onRemove }: { toast: Toast; onRemove: (id: string) => void }) => {
+interface ToastItemProps {
+  toast: Toast;
+  onRemove: (id: string) => void;
+}
+
+const ToastItem = ({ toast, onRemove }: ToastItemProps) => {
   const style = typeStyles[toast.type] || typeStyles.default;
   const duration = toast.duration ?? 5000;
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    if (duration > 0) {
+      timeoutRef.current = setTimeout(() => onRemove(toast.id), duration);
+    }
+    return () => {
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    };
+  }, [toast.id, duration, onRemove]);
+
+  const handleMouseEnter = () => {
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+  };
+
+  const handleMouseLeave = () => {
+    if (duration > 0) {
+      timeoutRef.current = setTimeout(() => onRemove(toast.id), duration);
+    }
+  };
 
   return (
     <motion.div
@@ -126,18 +151,9 @@ const Toast = ({ toast, onRemove }: { toast: Toast; onRemove: (id: string) => vo
         minWidth: '300px',
         maxWidth: '420px',
         width: '100%',
-      }
-      onMouseEnter={() => clearTimeout(timeoutRef.current)}
-      onMouseLeave={() => {
-        if (duration > 0) {
-          timeoutRef.current = setTimeout(() => onRemove(toast.id), duration);
-        }
       }}
-      onAnimationComplete={() => {
-        if (duration > 0) {
-          timeoutRef.current = setTimeout(() => onRemove(toast.id), duration);
-        }
-      }}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
     >
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '24px', height: '24px', borderRadius: '50%', background: 'rgba(0,0,0,0.1)', color: style.iconColor, fontSize: '16px', fontWeight: 'bold', flexShrink: 0 }}>
         {style.icon}
@@ -197,3 +213,7 @@ const Toast = ({ toast, onRemove }: { toast: Toast; onRemove: (id: string) => vo
       )}
     </motion.div>
   );
+};
+
+export { ToastProvider, useToast, ToastContainer };
+export type { Toast, ToastContextValue };
