@@ -4,6 +4,7 @@ import {
   Get,
   Headers,
   Param,
+  Patch,
   Post,
   Query,
   Request,
@@ -37,6 +38,55 @@ export class ExamsController {
       req.tenantId,
       req.user.sub,
       lessonId,
+      dto,
+    );
+    return { data: result };
+  }
+
+  @Patch(":examId")
+  @RequirePermission({
+    action: "update",
+    resourceType: "exam",
+    resourceIdParam: "examId",
+  })
+  async update(
+    @Request() req,
+    @Param("examId") examId: string,
+    @Body() dto: any,
+  ) {
+    const result = await this.examsService.updateExam(
+      req.tenantId,
+      examId,
+      dto,
+    );
+    return { data: result };
+  }
+
+  @Post(":examId/publish")
+  @RequirePermission({
+    action: "publish",
+    resourceType: "exam",
+    resourceIdParam: "examId",
+  })
+  async publish(@Request() req, @Param("examId") examId: string) {
+    const result = await this.examsService.publishExam(req.tenantId, examId);
+    return { data: result };
+  }
+
+  @Post(":examId/questions")
+  @RequirePermission({
+    action: "update",
+    resourceType: "exam",
+    resourceIdParam: "examId",
+  })
+  async addQuestion(
+    @Request() req,
+    @Param("examId") examId: string,
+    @Body() dto: any,
+  ) {
+    const result = await this.examsService.addQuestion(
+      req.tenantId,
+      examId,
       dto,
     );
     return { data: result };

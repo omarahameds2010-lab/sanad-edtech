@@ -4,6 +4,7 @@ import {
   Get,
   Headers,
   Param,
+  Patch,
   Post,
   Query,
   Request,
@@ -38,6 +39,42 @@ export class AssignmentsController {
       req.user.sub,
       lessonId,
       dto,
+    );
+    return { data: result };
+  }
+
+  @Patch(":assignmentId")
+  @RequirePermission({
+    action: "update",
+    resourceType: "assignment",
+    resourceIdParam: "assignmentId",
+  })
+  async update(
+    @Request() req,
+    @Param("assignmentId") assignmentId: string,
+    @Body() dto: any,
+  ) {
+    const result = await this.assignmentsService.updateAssignment(
+      req.tenantId,
+      assignmentId,
+      dto,
+    );
+    return { data: result };
+  }
+
+  @Post(":assignmentId/publish")
+  @RequirePermission({
+    action: "publish",
+    resourceType: "assignment",
+    resourceIdParam: "assignmentId",
+  })
+  async publish(
+    @Request() req,
+    @Param("assignmentId") assignmentId: string,
+  ) {
+    const result = await this.assignmentsService.publishAssignment(
+      req.tenantId,
+      assignmentId,
     );
     return { data: result };
   }

@@ -11,8 +11,10 @@ import {
   StudentCoursesController,
 } from "./modules/courses/courses.controller";
 import { ExamsController } from "./modules/courses/exams/exams.controller";
+import { AssignmentsController } from "./modules/courses/assignments/assignments.controller";
 import { ProgressionController } from "./modules/courses/progression/progression.controller";
 import { UsersController } from "./modules/users/users.controller";
+import { VideoController } from "./modules/video/video.controller";
 
 /**
  * Locks the public HTTP contract of the Path-2 loop
@@ -146,6 +148,45 @@ describe("Path-2 HTTP contract", () => {
       "getStudentDetail",
       RequestMethod.GET,
       "/api/users/:id",
+    );
+  });
+
+  it("exposes teacher authoring routes", () => {
+    expectRoute(
+      ExamsController,
+      "update",
+      RequestMethod.PATCH,
+      "/api/v1/exams/:examId",
+    );
+    expectRoute(
+      ExamsController,
+      "publish",
+      RequestMethod.POST,
+      "/api/v1/exams/:examId/publish",
+    );
+    expectRoute(
+      ExamsController,
+      "addQuestion",
+      RequestMethod.POST,
+      "/api/v1/exams/:examId/questions",
+    );
+    expectRoute(
+      AssignmentsController,
+      "update",
+      RequestMethod.PATCH,
+      "/api/v1/assignments/:assignmentId",
+    );
+    expectRoute(
+      AssignmentsController,
+      "publish",
+      RequestMethod.POST,
+      "/api/v1/assignments/:assignmentId/publish",
+    );
+    expectRoute(
+      VideoController,
+      "attachYouTube",
+      RequestMethod.POST,
+      "/api/video/youtube",
     );
   });
 });

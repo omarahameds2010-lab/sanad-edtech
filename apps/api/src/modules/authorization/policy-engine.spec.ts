@@ -83,6 +83,16 @@ describe("PolicyEngine (student loop)", () => {
     expect(decision.allowed).toBe(true);
   });
 
+  it("allows a teacher to publish an assignment", async () => {
+    const decision = await engine.can(
+      { ...student, role: "TEACHER" },
+      "publish",
+      "assignment",
+      { id: "a-1" },
+    );
+    expect(decision.allowed).toBe(true);
+  });
+
   it("allows a student to self-evaluate an assignment answer", async () => {
     const decision = await engine.can(student, "evaluate", "assignment", {
       id: "a-1",

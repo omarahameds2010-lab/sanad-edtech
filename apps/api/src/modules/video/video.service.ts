@@ -1,6 +1,7 @@
 import {
   Injectable,
   BadRequestException,
+  ConflictException,
   NotFoundException,
   ForbiddenException,
   Inject,
@@ -23,6 +24,13 @@ export interface CreateVideoInput {
   fileName: string;
   mimeType: string;
   fileSize: number;
+}
+
+export interface AttachYouTubeInput {
+  lessonId: string;
+  title: string;
+  providerVideoId: string;
+  description?: string;
 }
 
 export interface VideoQuotaResult {
@@ -436,6 +444,70 @@ export class VideoService {
       where: { lessonId, tenantId },
       orderBy: { createdAt: "asc" },
     });
+  }
+
+  /**
+   * Attach a YouTube UNLISTED video to a lesson. This is the urgent path
+   * for teachers: no upload pipeline, no provider keys — the student
+   * player already embeds providerVideoId. Only one active YouTube
+   * video per lesson (re-attach = delete + attach).
+   */
+  async attachYouTubeVideo(
+    tenantId: string,
+    userId: string,
+    input: AttachYouTubeInput,
+  ) {
+    const lesson = await this.prisma.lesson.findFirst({
+      where: { id: input.lessonId, tenantId },
+    });
+    if (!lesson) {
+      throw new NotFoundException("Lesson not found");
+    }
+
+    const videoId = input.providerVideoId.trim();
+    if (!/^[A-Za-z0-9_-]{6,20}$/.test(videoId)) {
+      throw new BadRequestException("Invalid YouTube video id");
+    }
+
+    const existing = await this.prisma.video.findFirst({
+      where: {
+        tenantId,
+        lessonId: input.lessonId,
+        provider: "youtube",
+        status: { in: [VideoStatus.READY, VideoStatus.PUBLISHED] },
+      },
+    });
+    if (existing) {
+      throw new ConflictException(
+        "Lesson already has a YouTube video (delete it first to replace)",
+      );
+    }
+
+    const video = await this.prisma.video.create({
+      data: {
+        tenantId,
+        lessonId: input.lessonId,
+        title: input.title,
+        description: input.description,
+        status: VideoStatus.READY,
+        provider: "youtube",
+        providerVideoId: videoId,
+        uploadedBy: userId,
+        uploadedAt: new Date(),
+        publishedAt: new Date(),
+      },
+    });
+
+    await this.auditService.log({
+      tenantId,
+      actorUserId: userId,
+      action: "VIDEO_YOUTUBE_ATTACHED",
+      resourceType: "video",
+      resourceId: video.id,
+      metadata: { lessonId: input.lessonId, providerVideoId: videoId },
+    });
+
+    return video;
   }
 
   /**

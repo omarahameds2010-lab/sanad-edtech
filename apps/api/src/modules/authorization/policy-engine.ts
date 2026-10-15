@@ -292,7 +292,7 @@ export class PolicyEngine {
         user: ["read"],
         tenant: ["read"],
         certificate: ["create", "read"],
-        assignment: ["create", "read", "update", "grade", "evaluate"],
+        assignment: ["create", "read", "update", "publish", "grade", "evaluate"],
         question: ["create", "read", "update", "delete"],
         questionBank: ["create", "read", "update", "delete"],
         video: ["create", "read", "update", "delete"],

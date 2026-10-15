@@ -6,7 +6,13 @@ import {
   ForbiddenException,
 } from "@nestjs/common";
 import { PrismaService } from "../../tenants/prisma.service";
-import { Prisma, ExamStatus, AttemptStatus, LessonType } from "@prisma/client";
+import {
+  Prisma,
+  ExamStatus,
+  AttemptStatus,
+  LessonType,
+  ExamQuestionType,
+} from "@prisma/client";
 import { IdempotencyService } from "../../payments/security/idempotency.service";
 import { ProgressionService } from "../progression/progression.service";
 
@@ -184,6 +190,56 @@ export class ExamsService {
     });
 
     return updated;
+  }
+
+  /**
+   * Add a question to an exam. There is intentionally no other way to
+   * create questions — this is the single writer (teacher-only route).
+   */
+  async addQuestion(
+    tenantId: string,
+    examId: string,
+    dto: {
+      type: ExamQuestionType;
+      text: string;
+      explanation?: string;
+      points?: number;
+      position?: number;
+      options?: any[];
+      correctAnswer?: any;
+    },
+  ) {
+    const exam = await this.prisma.exam.findFirst({
+      where: { id: examId, tenantId },
+    });
+    if (!exam) {
+      throw new NotFoundException("Exam not found");
+    }
+
+    if (!Object.values(ExamQuestionType).includes(dto.type)) {
+      throw new BadRequestException("Invalid question type");
+    }
+    if (!dto.text || dto.text.trim() === "") {
+      throw new BadRequestException("Question text is required");
+    }
+
+    const position =
+      dto.position ??
+      (await this.prisma.examQuestion.count({ where: { examId } }));
+
+    return this.prisma.examQuestion.create({
+      data: {
+        tenantId,
+        examId,
+        type: dto.type,
+        text: dto.text,
+        explanation: dto.explanation,
+        points: dto.points ?? 1,
+        position,
+        options: (dto.options ?? null) as any,
+        correctAnswer: (dto.correctAnswer ?? null) as any,
+      },
+    });
   }
 
   async publishExam(tenantId: string, examId: string) {

@@ -343,4 +343,57 @@ describe("ExamsService", () => {
       expect(prisma.exam.update).not.toHaveBeenCalled();
     });
   });
+
+  describe("addQuestion", () => {
+    beforeEach(() => {
+      prisma.examQuestion = {
+        count: jest.fn().mockResolvedValue(2),
+        create: jest.fn(({ data }: any) =>
+          Promise.resolve({ id: "q3", ...data }),
+        ),
+      };
+    });
+
+    it("throws NotFoundException for unknown exams", async () => {
+      prisma.exam.findFirst.mockResolvedValue(null);
+      await expect(
+        service.addQuestion(tenantId, "nope", { type: "MCQ", text: "Q?" }),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it("rejects invalid question types and empty text", async () => {
+      prisma.exam.findFirst.mockResolvedValue({ id: "e1" });
+      await expect(
+        service.addQuestion(tenantId, "e1", {
+          type: "NOPE" as any,
+          text: "Q?",
+        }),
+      ).rejects.toThrow(BadRequestException);
+      await expect(
+        service.addQuestion(tenantId, "e1", { type: "MCQ", text: "  " }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it("creates the question with server-side defaults", async () => {
+      prisma.exam.findFirst.mockResolvedValue({ id: "e1" });
+      const result = await service.addQuestion(tenantId, "e1", {
+        type: "MCQ",
+        text: "2+2?",
+        options: [{ id: "a", text: "4" }],
+        correctAnswer: { correctOptionId: "a" },
+      });
+      expect(prisma.examQuestion.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            tenantId,
+            examId: "e1",
+            type: "MCQ",
+            points: 1,
+            position: 2,
+          }),
+        }),
+      );
+      expect(result.id).toBe("q3");
+    });
+  });
 });
