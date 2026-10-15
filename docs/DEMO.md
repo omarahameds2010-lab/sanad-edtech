@@ -72,6 +72,30 @@ pnpm dev
 2. Open the student attempt, review answers, set score 0–100 + feedback → "حفظ الدرجة".
 3. Back as student: result screen shows الدرجة + ناجح/راسب (passing 60%).
 
+## 7) Teacher authoring (UI, no DB console needed)
+
+All flows below are clickable in `/teacher/lessons/<lessonId>` after login
+as teacher. Lesson shells themselves still come from seed/API for now —
+lesson CREATE UI is the next slice, not this one.
+
+1. **YouTube video**: open the VIDEO lesson → paste the UNLISTED video id
+   → "ربط فيديو يوتيوب". Verifies via `POST /api/video/youtube`
+   `{ lessonId, title, providerVideoId }` (READY immediately, one active
+   video per lesson — delete to replace).
+2. **Exam**: open the EXAM lesson → fill settings + add questions
+   (MCQ with options + correct radio, True/False preset, short/essay)
+   → "حفظ ونشر الاختبار". Uses `POST /api/v1/exams/lessons/:lessonId/exams`,
+   then `POST /api/v1/exams/:examId/questions` per question,
+   then `POST /api/v1/exams/:examId/publish`.
+3. **Assignment**: open the ASSIGNMENT lesson → fill + "حفظ ونشر الواجب".
+   Uses `POST /api/v1/assignments/lessons/:lessonId/assignments`
+   then `POST /api/v1/assignments/:assignmentId/publish`.
+4. **Exam after every lecture**: set the next lesson row
+   `unlockType=ENTER_EXAM, unlockTargetId=<examId>, lockStatus=LOCKED`
+   (one Prisma/API update) — entering the exam unlocks it automatically.
+5. **Students + phones**: `/teacher/students` lists every student enrolled
+   in your courses with phone numbers (no submission needed).
+
 ## Verification already done in CI/local
 
 - `pnpm --filter api run build` + full jest suite (86+ tests incl. `route-paths.spec.ts` locking every URL below).
