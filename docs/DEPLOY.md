@@ -35,16 +35,16 @@ repeat after the domains are known.
    healthcheck = `/api/health`.
 3. **Variables** tab — set exactly these (no more, no less to start):
 
-| Variable | Value |
-|---|---|
-| `DATABASE_URL` | Reference: `${{Postgres.DATABASE_URL}}` (use the real service name) |
-| `NODE_ENV` | `production` |
-| `JWT_SECRET` | generated (see below — never reuse demo value) |
-| `VIDEO_TOKEN_SECRET` | generated |
-| `VIDEO_WATERMARK_HMAC_SECRET` | generated |
-| `STORAGE_SIGNING_SECRET` | generated |
-| `ALLOWED_ORIGINS` | `https://<your-vercel-domain>` (step 3; update after) |
-| `REDIS_URL` | Railway Redis reference (add Redis addon if boot fails on BullMQ connect) |
+| Variable                      | Value                                                                     |
+| ----------------------------- | ------------------------------------------------------------------------- |
+| `DATABASE_URL`                | Reference: `${{Postgres.DATABASE_URL}}` (use the real service name)       |
+| `NODE_ENV`                    | `production`                                                              |
+| `JWT_SECRET`                  | generated (see below — never reuse demo value)                            |
+| `VIDEO_TOKEN_SECRET`          | generated                                                                 |
+| `VIDEO_WATERMARK_HMAC_SECRET` | generated                                                                 |
+| `STORAGE_SIGNING_SECRET`      | generated                                                                 |
+| `ALLOWED_ORIGINS`             | `https://<your-vercel-domain>` (step 3; update after)                     |
+| `REDIS_URL`                   | Railway Redis reference (add Redis addon if boot fails on BullMQ connect) |
 
 Generate each secret **on your own machine, never send them to anyone**:
 
@@ -77,14 +77,14 @@ node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 
 ## Troubleshooting (symptom → cause → fix)
 
-| Symptom | Cause | Fix |
-|---|---|---|
-| `P1001` anywhere | Postgres paused/unreachable | Railway → Resume Postgres; re-run migrate |
-| `404 Tenant not found` (API JSON) | cloud Host not in `tenant_domains` | re-run seed with `PROD_TENANT_DOMAINS` set |
-| Browser CORS errors, API fine via curl | web domain missing from `ALLOWED_ORIGINS` | set it on API service, redeploy |
-| API crashes on boot, "SECURITY ERROR" log | default secrets + `NODE_ENV=production` | set real generated secrets |
-| Railway build fails on `tsup`/design-system | root `pnpm build` pulls broken packages | our `railway.json` builds **api only** (`--filter api`) — do not switch to root build |
-| Login `401 Invalid credentials` on live | seed never ran on Railway DB | run `pnpm seed:path2` against Railway URL |
+| Symptom                                     | Cause                                     | Fix                                                                                   |
+| ------------------------------------------- | ----------------------------------------- | ------------------------------------------------------------------------------------- |
+| `P1001` anywhere                            | Postgres paused/unreachable               | Railway → Resume Postgres; re-run migrate                                             |
+| `404 Tenant not found` (API JSON)           | cloud Host not in `tenant_domains`        | re-run seed with `PROD_TENANT_DOMAINS` set                                            |
+| Browser CORS errors, API fine via curl      | web domain missing from `ALLOWED_ORIGINS` | set it on API service, redeploy                                                       |
+| API crashes on boot, "SECURITY ERROR" log   | default secrets + `NODE_ENV=production`   | set real generated secrets                                                            |
+| Railway build fails on `tsup`/design-system | root `pnpm build` pulls broken packages   | our `railway.json` builds **api only** (`--filter api`) — do not switch to root build |
+| Login `401 Invalid credentials` on live     | seed never ran on Railway DB              | run `pnpm seed:path2` against Railway URL                                             |
 
 ## What NOT to send in chat, ever
 

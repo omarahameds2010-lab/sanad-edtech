@@ -88,7 +88,10 @@ async function main() {
   });
   if (course) {
     const exam = await prisma.exam.findFirst({
-      where: { tenantId: tenant.id, lesson: { section: { courseId: course.id } } },
+      where: {
+        tenantId: tenant.id,
+        lesson: { section: { courseId: course.id } },
+      },
       include: { lesson: true },
     });
     console.log("Demo course already exists — reusing:");
@@ -321,9 +324,13 @@ async function main() {
   console.log(`  courseId: ${course.id}`);
   console.log(`  lessonId (video): ${lesson1.id}`);
   console.log(`  examId:   ${exam.id}  (lesson ${examLesson.id})`);
-  console.log(`  assignmentId: ${assignment.id}  (lesson ${assignmentLesson.id})`);
+  console.log(
+    `  assignmentId: ${assignment.id}  (lesson ${assignmentLesson.id})`,
+  );
   console.log(`  nextLesson (locked): ${nextLesson.id}`);
-  console.log("Flow: login → /student/exams → enter → submit → lesson → teacher grades.");
+  console.log(
+    "Flow: login → /student/exams → enter → submit → lesson → teacher grades.",
+  );
 }
 
 main()
