@@ -675,8 +675,19 @@ export interface CourseProgression {
   progression: ProgressionItem[];
 }
 
-export interface StudentFile {
-  user: {
+export interface TeacherStudent {
+  id: string;
+  name: string;
+  phone: string | null;
+  grade: string | null;
+  status: string;
+  enrollments: Array<{
+    status: string;
+    course: { id: string; title: string };
+  }>;
+}
+
+export interface StudentFile {  user: {
     id: string;
     name: string;
     role: string;
@@ -1029,6 +1040,9 @@ export const api = {
 
   getStudentFile: (token: string, studentId: string) =>
     apiFetch<StudentFile>(`/api/users/${studentId}`, { token }),
+
+  listStudents: (token: string) =>
+    apiFetch<TeacherStudent[]>("/api/users/students", { token }),
 
   getStudentProgression: (token: string, courseId: string) =>
     apiFetch<CourseProgression>(`/api/v1/progression/courses/${courseId}`, {

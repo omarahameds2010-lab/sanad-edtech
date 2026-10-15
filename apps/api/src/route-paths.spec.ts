@@ -149,10 +149,15 @@ describe("Path-2 HTTP contract", () => {
       RequestMethod.GET,
       "/api/users/:id",
     );
+    expectRoute(
+      UsersController,
+      "listStudents",
+      RequestMethod.GET,
+      "/api/users/students",
+    );
   });
 
-  it("exposes teacher authoring routes", () => {
-    expectRoute(
+  it("exposes teacher authoring routes", () => {    expectRoute(
       ExamsController,
       "update",
       RequestMethod.PATCH,

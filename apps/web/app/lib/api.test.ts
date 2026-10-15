@@ -303,6 +303,16 @@ describe("five new pages endpoints", () => {
     expect(url).toBe(`${API_BASE_URL}/api/users/u1`);
   });
 
+  it("listStudents hits users/students", async () => {
+    const { fetchMock } = mockFetchOnce({
+      data: [{ id: "u1", name: "طالب", phone: "01000000002" }],
+    });
+    const result = await api.listStudents("t");
+    expect(result).toHaveLength(1);
+    const [url] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe(`${API_BASE_URL}/api/users/students`);
+  });
+
   it("getStudentProgression hits the progression endpoint", async () => {
     const { fetchMock } = mockFetchOnce({
       data: { courseId: "c1", userId: "u1", progression: [] },

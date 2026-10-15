@@ -28,6 +28,38 @@ export class UsersService {
   }
 
   /**
+   * Students enrolled in the requesting teacher's courses.
+   * Single query via the enrollment relation — no N+1.
+   */
+  async listStudentsForTeacher(tenantId: string, teacherId: string) {
+    const students = await this.prisma.user.findMany({
+      where: {
+        tenantId,
+        role: "STUDENT",
+        enrollments: {
+          some: { course: { teacherId } },
+        },
+      },
+      select: {
+        id: true,
+        name: true,
+        phone: true,
+        grade: true,
+        status: true,
+        enrollments: {
+          select: {
+            status: true,
+            course: { select: { id: true, title: true } },
+          },
+        },
+      },
+      orderBy: { name: "asc" },
+      take: 100,
+    });
+    return students;
+  }
+
+  /**
    * Teacher-facing student file: safe profile fields plus enrollments,
    * exam attempts and assignment submissions (latest 20 each).
    * Always scoped by tenantId — never trust the id param alone.
