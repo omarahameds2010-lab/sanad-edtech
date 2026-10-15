@@ -326,6 +326,105 @@ describe("five new pages endpoints", () => {
   });
 });
 
+describe("teacher authoring endpoints", () => {
+  it("createExam posts to the lesson exam endpoint", async () => {
+    const { fetchMock } = mockFetchOnce({
+      data: { id: "e1", lessonId: "l1", title: "T", status: "DRAFT" },
+    });
+    const result = await api.createExam("t", "l1", {
+      title: "T",
+      timerMinutes: 70,
+    });
+    expect(result.id).toBe("e1");
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe(`${API_BASE_URL}/api/v1/exams/lessons/l1/exams`);
+    expect(init.method).toBe("POST");
+    expect(JSON.parse(init.body as string).timerMinutes).toBe(70);
+  });
+
+  it("updateExam patches the exam", async () => {
+    const { fetchMock } = mockFetchOnce({
+      data: { id: "e1", title: "T2" },
+    });
+    await api.updateExam("t", "e1", { title: "T2" });
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe(`${API_BASE_URL}/api/v1/exams/e1`);
+    expect(init.method).toBe("PATCH");
+  });
+
+  it("publishExam posts to publish", async () => {
+    const { fetchMock } = mockFetchOnce({
+      data: { id: "e1", status: "PUBLISHED" },
+    });
+    const result = await api.publishExam("t", "e1");
+    expect(result.status).toBe("PUBLISHED");
+    const [url] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe(`${API_BASE_URL}/api/v1/exams/e1/publish`);
+  });
+
+  it("addExamQuestion posts the question payload", async () => {
+    const { fetchMock } = mockFetchOnce({
+      data: { id: "q1", examId: "e1", type: "MCQ" },
+    });
+    const result = await api.addExamQuestion("t", "e1", {
+      type: "MCQ",
+      text: "2+2?",
+      options: [{ id: "a", text: "4" }],
+      correctAnswer: { correctOptionId: "a" },
+    });
+    expect(result.id).toBe("q1");
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe(`${API_BASE_URL}/api/v1/exams/e1/questions`);
+    expect(JSON.parse(init.body as string).type).toBe("MCQ");
+  });
+
+  it("createAssignment posts to the lesson endpoint", async () => {
+    const { fetchMock } = mockFetchOnce({
+      data: { id: "a1", lessonId: "l1", title: "W", status: "DRAFT" },
+    });
+    const result = await api.createAssignment("t", "l1", {
+      title: "W",
+      timerMinutes: 300,
+    });
+    expect(result.id).toBe("a1");
+    const [url] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe(
+      `${API_BASE_URL}/api/v1/assignments/lessons/l1/assignments`,
+    );
+  });
+
+  it("publishAssignment posts to publish", async () => {
+    const { fetchMock } = mockFetchOnce({
+      data: { id: "a1", status: "PUBLISHED" },
+    });
+    await api.publishAssignment("t", "a1");
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe(`${API_BASE_URL}/api/v1/assignments/a1/publish`);
+    expect(init.method).toBe("POST");
+  });
+
+  it("attachYouTube posts lesson video data", async () => {
+    const { fetchMock } = mockFetchOnce({
+      data: {
+        id: "v1",
+        lessonId: "l1",
+        provider: "youtube",
+        providerVideoId: "dQw4w9WgXcQ",
+        status: "READY",
+      },
+    });
+    const result = await api.attachYouTube("t", {
+      lessonId: "l1",
+      title: "Intro",
+      providerVideoId: "dQw4w9WgXcQ",
+    });
+    expect(result.provider).toBe("youtube");
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe(`${API_BASE_URL}/api/video/youtube`);
+    expect(init.method).toBe("POST");
+  });
+});
+
 describe("signup helpers", () => {
   it("register posts to /api/auth/register", async () => {
     const { fetchMock } = mockFetchOnce({

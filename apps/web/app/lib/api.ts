@@ -429,6 +429,99 @@ export interface CreatedCourse {
   status: string;
 }
 
+export interface CreateExamInput {
+  title: string;
+  description?: string;
+  instructions?: string;
+  timerMinutes?: number;
+  passingScore?: number;
+  maxAttempts?: number;
+  shuffleQuestions?: boolean;
+  shuffleOptions?: boolean;
+  showResults?: boolean;
+  showCorrectAnswers?: boolean;
+}
+
+export interface CreatedExam {
+  id: string;
+  lessonId: string;
+  title: string;
+  status: string;
+}
+
+export interface UpdateExamInput {
+  title?: string;
+  description?: string;
+  instructions?: string;
+  timerMinutes?: number;
+  passingScore?: number;
+  maxAttempts?: number;
+  shuffleQuestions?: boolean;
+  shuffleOptions?: boolean;
+  showResults?: boolean;
+  showCorrectAnswers?: boolean;
+  status?: string;
+}
+
+export interface CreateExamQuestionInput {
+  type: ExamQuestionType;
+  text: string;
+  explanation?: string;
+  points?: number;
+  position?: number;
+  options?: Array<{ id: string; text: string }>;
+  correctAnswer?: unknown;
+}
+
+export interface CreatedExamQuestion {
+  id: string;
+  examId: string;
+  type: string;
+}
+
+export interface CreateAssignmentInput {
+  title: string;
+  description?: string;
+  instructions?: string;
+  timerMinutes?: number;
+  passingScore?: number;
+  maxAttempts?: number;
+  allowLateSubmission?: boolean;
+}
+
+export interface CreatedAssignment {
+  id: string;
+  lessonId: string;
+  title: string;
+  status: string;
+}
+
+export interface UpdateAssignmentInput {
+  title?: string;
+  description?: string;
+  instructions?: string;
+  timerMinutes?: number;
+  passingScore?: number;
+  maxAttempts?: number;
+  allowLateSubmission?: boolean;
+  status?: string;
+}
+
+export interface AttachYouTubeInput {
+  lessonId: string;
+  title: string;
+  providerVideoId: string;
+  description?: string;
+}
+
+export interface AttachedVideo {
+  id: string;
+  lessonId: string;
+  provider: string;
+  providerVideoId: string;
+  status: string;
+}
+
 export interface StructureLesson {
   id: string;
   title: string;
@@ -940,5 +1033,72 @@ export const api = {
   getStudentProgression: (token: string, courseId: string) =>
     apiFetch<CourseProgression>(`/api/v1/progression/courses/${courseId}`, {
       token,
+    }),
+
+  createExam: (token: string, lessonId: string, input: CreateExamInput) =>
+    apiFetch<CreatedExam>(`/api/v1/exams/lessons/${lessonId}/exams`, {
+      token,
+      method: "POST",
+      body: input,
+    }),
+
+  updateExam: (token: string, examId: string, input: UpdateExamInput) =>
+    apiFetch<CreatedExam>(`/api/v1/exams/${examId}`, {
+      token,
+      method: "PATCH",
+      body: input,
+    }),
+
+  publishExam: (token: string, examId: string) =>
+    apiFetch<CreatedExam>(`/api/v1/exams/${examId}/publish`, {
+      token,
+      method: "POST",
+      body: {},
+    }),
+
+  addExamQuestion: (
+    token: string,
+    examId: string,
+    input: CreateExamQuestionInput,
+  ) =>
+    apiFetch<CreatedExamQuestion>(`/api/v1/exams/${examId}/questions`, {
+      token,
+      method: "POST",
+      body: input,
+    }),
+
+  createAssignment: (
+    token: string,
+    lessonId: string,
+    input: CreateAssignmentInput,
+  ) =>
+    apiFetch<CreatedAssignment>(
+      `/api/v1/assignments/lessons/${lessonId}/assignments`,
+      { token, method: "POST", body: input },
+    ),
+
+  updateAssignment: (
+    token: string,
+    assignmentId: string,
+    input: UpdateAssignmentInput,
+  ) =>
+    apiFetch<CreatedAssignment>(`/api/v1/assignments/${assignmentId}`, {
+      token,
+      method: "PATCH",
+      body: input,
+    }),
+
+  publishAssignment: (token: string, assignmentId: string) =>
+    apiFetch<CreatedAssignment>(`/api/v1/assignments/${assignmentId}/publish`, {
+      token,
+      method: "POST",
+      body: {},
+    }),
+
+  attachYouTube: (token: string, input: AttachYouTubeInput) =>
+    apiFetch<AttachedVideo>("/api/video/youtube", {
+      token,
+      method: "POST",
+      body: input,
     }),
 };
