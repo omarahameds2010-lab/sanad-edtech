@@ -39,6 +39,21 @@ async function main() {
     create: { tenantId: tenant.id, domain: "localhost", isPrimary: true },
   });
 
+  // Production domains (Vercel web + Railway API hosts). Without these,
+  // Host-based tenant resolution answers 404 for every cloud request.
+  // Example: PROD_TENANT_DOMAINS="sanad-edtech.vercel.app,api-sanad.railway.app"
+  const prodDomains = (process.env.PROD_TENANT_DOMAINS ?? "")
+    .split(",")
+    .map((d) => d.trim().toLowerCase())
+    .filter((d) => d.length > 0);
+  for (const domain of prodDomains) {
+    await prisma.tenantDomain.upsert({
+      where: { domain },
+      update: { tenantId: tenant.id },
+      create: { tenantId: tenant.id, domain, isPrimary: false },
+    });
+  }
+
   const teacherPasswordHash = await argon2.hash(TEACHER_PASSWORD);
   const studentPasswordHash = await argon2.hash(STUDENT_PASSWORD);
 
