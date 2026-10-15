@@ -61,7 +61,7 @@ export default function Panel({
           } as React.CSSProperties
         }
       />
-      {children}
+      {children as any}
     </Tag>
   );
 }

@@ -1,6 +1,6 @@
 /**
  * Z-Index & Layer Tokens
- * 
+ *
  * Consistent z-index layering system.
  */
 
@@ -232,9 +232,9 @@ export const rtlZIndex = {
 
 export const focusRing = {
   zIndex: 1000,
-  width: '2px',
-  offset: '2px',
-  color: 'border.focus',
+  width: "2px",
+  offset: "2px",
+  color: "border.focus",
 } as const;
 
 // ============================================
@@ -242,11 +242,11 @@ export const focusRing = {
 // ============================================
 
 export const overlayOpacity = {
-  none: '0',
-  light: '0.1',
-  medium: '0.3',
-  heavy: '0.5',
-  full: '0.8',
+  none: "0",
+  light: "0.1",
+  medium: "0.3",
+  heavy: "0.5",
+  full: "0.8",
 } as const;
 
 // ============================================
@@ -254,13 +254,13 @@ export const overlayOpacity = {
 // ============================================
 
 export const backdropBlur = {
-  none: '0',
-  sm: '4px',
-  md: '8px',
-  lg: '16px',
-  xl: '24px',
-  '2xl': '40px',
-  '3xl': '64px',
+  none: "0",
+  sm: "4px",
+  md: "8px",
+  lg: "16px",
+  xl: "24px",
+  "2xl": "40px",
+  "3xl": "64px",
 } as const;
 
 // ============================================
@@ -268,23 +268,23 @@ export const backdropBlur = {
 // ============================================
 
 export const backdropFilter = {
-  none: 'none',
-  blur: 'blur(8px)',
-  blurSm: 'blur(4px)',
-  blurMd: 'blur(8px)',
-  blurLg: 'blur(16px)',
-  blurXl: 'blur(24px)',
-  blur2xl: 'blur(40px)',
-  blur3xl: 'blur(64px)',
-  saturate: 'saturate(1.8)',
-  saturate150: 'saturate(1.5)',
-  saturate200: 'saturate(2)',
-  brightness: 'brightness(0.5)',
-  brightness50: 'brightness(0.5)',
-  brightness75: 'brightness(0.75)',
-  grayscale: 'grayscale(1)',
-  sepia: 'sepia(1)',
-  invert: 'invert(1)',
+  none: "none",
+  blur: "blur(8px)",
+  blurSm: "blur(4px)",
+  blurMd: "blur(8px)",
+  blurLg: "blur(16px)",
+  blurXl: "blur(24px)",
+  blur2xl: "blur(40px)",
+  blur3xl: "blur(64px)",
+  saturate: "saturate(1.8)",
+  saturate150: "saturate(1.5)",
+  saturate200: "saturate(2)",
+  brightness: "brightness(0.5)",
+  brightness50: "brightness(0.5)",
+  brightness75: "brightness(0.75)",
+  grayscale: "grayscale(1)",
+  sepia: "sepia(1)",
+  invert: "invert(1)",
 } as const;
 
 // Type exports

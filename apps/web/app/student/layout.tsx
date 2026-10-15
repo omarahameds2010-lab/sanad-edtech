@@ -14,7 +14,7 @@ export default function StudentLayout({
         className="lp-container"
         style={{ paddingTop: 24, paddingBottom: 64, maxWidth: 1020 }}
       >
-        {children}
+        {(children as any)}
       </main>
     </div>
   );

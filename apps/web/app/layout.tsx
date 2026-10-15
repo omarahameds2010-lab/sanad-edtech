@@ -16,7 +16,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body>
         <CommandPaletteProvider>
           <AuthProvider>
-            <LangProvider>{children}</LangProvider>
+            <LangProvider>{(children as any)}</LangProvider>
           </AuthProvider>
         </CommandPaletteProvider>
       </body>

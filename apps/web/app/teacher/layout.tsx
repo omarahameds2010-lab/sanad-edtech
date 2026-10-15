@@ -180,7 +180,7 @@ export default function TeacherLayout({
         </Link>
       </nav>
 
-      <main className="tc-inner">{children}</main>
+      <main className="tc-inner">{children as any}</main>
     </div>
   );
 }

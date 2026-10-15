@@ -45,7 +45,7 @@ function GlowCard({
       }
     >
       <div aria-hidden className="lp-bento-glow" />
-      <div style={{ position: "relative" }}>{children}</div>
+      <div style={{ position: "relative" }}>{(children as any)}</div>
     </article>
   );
 }
