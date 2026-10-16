@@ -396,4 +396,67 @@ describe("ExamsService", () => {
       expect(result.id).toBe("q3");
     });
   });
+
+  describe("getStudentExamView", () => {
+    // Security regression (leak fix 2026-10-16): the student view used to
+    // spread the full exam, including EVERY attempt's answers, score and
+    // gradingData. It must query only the caller's attempts.
+    const examRow = {
+      id: "e1",
+      lessonId: "l1",
+      timerMinutes: 70,
+      maxAttempts: 2,
+      questions: [],
+      // Deliberately no `attempts` key: the view must not depend on it.
+    };
+
+    beforeEach(() => {
+      prisma.exam.findFirst.mockResolvedValue({ ...examRow });
+      prisma.lesson.findUnique.mockResolvedValue({
+        id: "l1",
+        section: { courseId: "c1" },
+      });
+      prisma.enrollment.findFirst.mockResolvedValue({ id: "en1" });
+    });
+
+    it("queries ONLY the calling student's attempts", async () => {
+      prisma.examAttempt.findMany.mockResolvedValue([]);
+
+      const result = await service.getStudentExamView(tenantId, userId, "e1");
+
+      expect(prisma.examAttempt.findMany).toHaveBeenCalledWith({
+        where: { tenantId, examId: "e1", studentId: userId },
+        orderBy: { attemptNumber: "desc" },
+      });
+      expect(result).not.toHaveProperty("attempts");
+      expect(result.studentAttemptCount).toBe(0);
+    });
+
+    it("never requests attempts via the exam include", async () => {
+      prisma.examAttempt.findMany.mockResolvedValue([]);
+
+      await service.getStudentExamView(tenantId, userId, "e1");
+
+      expect(prisma.exam.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({
+          include: expect.objectContaining({ attempts: false }),
+        }),
+      );
+    });
+
+    it("computes remaining time from the student's own IN_PROGRESS attempt", async () => {
+      const startedAt = new Date();
+      startedAt.setMinutes(startedAt.getMinutes() - 5);
+      prisma.examAttempt.findMany.mockResolvedValue([
+        { id: "at1", studentId: userId, status: "IN_PROGRESS", startedAt },
+      ]);
+
+      const result = await service.getStudentExamView(tenantId, userId, "e1");
+
+      expect(result.activeAttempt).toEqual(
+        expect.objectContaining({ id: "at1" }),
+      );
+      expect(result.timeRemainingSeconds).toBeGreaterThan(64 * 60);
+    });
+  });
 });

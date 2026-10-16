@@ -490,4 +490,81 @@ describe("AssignmentsService", () => {
       expect(prisma.assignmentSubmission.update).not.toHaveBeenCalled();
     });
   });
+
+  describe("getStudentAssignmentView", () => {
+    // Security regression (leak fix 2026-10-16): the student view used to
+    // spread the full assignment, including EVERY student's submissions
+    // (content, score, feedback). It must query only the caller's rows.
+    const assignmentRow = {
+      id: "a1",
+      lessonId: "l1",
+      timerMinutes: 300,
+      maxAttempts: 1,
+      // Deliberately no `submissions` key: the view must not depend on it.
+    };
+
+    beforeEach(() => {
+      prisma.assignment.findFirst.mockResolvedValue({ ...assignmentRow });
+      prisma.lesson.findUnique.mockResolvedValue({
+        id: "l1",
+        section: { courseId: "c1" },
+      });
+      prisma.enrollment.findFirst.mockResolvedValue({ id: "en1" });
+    });
+
+    it("queries ONLY the calling student's submissions", async () => {
+      prisma.assignmentSubmission.findMany.mockResolvedValue([]);
+
+      const result = await service.getStudentAssignmentView(
+        tenantId,
+        userId,
+        "a1",
+      );
+
+      expect(prisma.assignmentSubmission.findMany).toHaveBeenCalledWith({
+        where: { tenantId, assignmentId: "a1", studentId: userId },
+        orderBy: { submittedAt: "desc" },
+      });
+      expect(result).not.toHaveProperty("submissions");
+      expect(result.studentAttemptCount).toBe(0);
+    });
+
+    it("never requests submissions via the assignment include", async () => {
+      prisma.assignmentSubmission.findMany.mockResolvedValue([]);
+
+      await service.getStudentAssignmentView(tenantId, userId, "a1");
+
+      expect(prisma.assignment.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({
+          include: expect.objectContaining({ submissions: false }),
+        }),
+      );
+    });
+
+    it("computes remaining time from the student's own active submission", async () => {
+      const submittedAt = new Date();
+      submittedAt.setMinutes(submittedAt.getMinutes() - 10);
+      prisma.assignmentSubmission.findMany.mockResolvedValue([
+        {
+          id: "s1",
+          studentId: userId,
+          status: "SUBMITTED",
+          submittedAt,
+          content: "my answer",
+          attachments: null,
+        },
+      ]);
+
+      const result = await service.getStudentAssignmentView(
+        tenantId,
+        userId,
+        "a1",
+      );
+
+      expect(result.activeSubmission).toEqual(
+        expect.objectContaining({ id: "s1", content: "my answer" }),
+      );
+      expect(result.timeRemainingSeconds).toBeGreaterThan(280 * 60);
+    });
+  });
 });

@@ -260,7 +260,9 @@ export class AssignmentsService {
     userId: string,
     assignmentId: string,
   ) {
-    const assignment = await this.getAssignment(tenantId, assignmentId, true);
+    // Student view: never load other students' submissions. Fetch the
+    // assignment alone, then query ONLY this student's rows (leak fix 2026-10-16).
+    const assignment = await this.getAssignment(tenantId, assignmentId);
 
     // Check enrollment
     const lesson = await this.prisma.lesson.findUnique({
@@ -280,10 +282,12 @@ export class AssignmentsService {
       throw new ForbiddenException("Not enrolled in this course");
     }
 
-    // Get student's submissions
-    const submissions = assignment.submissions.filter(
-      (s) => s.studentId === userId,
-    );
+    // ONLY this student's submissions — previously every student's content,
+    // score and feedback leaked into the response via `...assignment`.
+    const submissions = await this.prisma.assignmentSubmission.findMany({
+      where: { tenantId, assignmentId, studentId: userId },
+      orderBy: { submittedAt: "desc" },
+    });
     const attemptCount = submissions.length;
 
     // Check if can attempt

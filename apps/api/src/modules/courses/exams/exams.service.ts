@@ -315,7 +315,9 @@ export class ExamsService {
   // ==================== STUDENT METHODS ====================
 
   async getStudentExamView(tenantId: string, userId: string, examId: string) {
-    const exam = await this.getExam(tenantId, examId, true, true);
+    // Student view: questions only — never load the class's attempts.
+    // Fetch ONLY this student's attempts below (leak fix 2026-10-16).
+    const exam = await this.getExam(tenantId, examId, true);
 
     // Check enrollment
     const lesson = await this.prisma.lesson.findUnique({
@@ -335,8 +337,12 @@ export class ExamsService {
       throw new ForbiddenException("Not enrolled in this course");
     }
 
-    // Get student's attempts
-    const attempts = exam.attempts.filter((a) => a.studentId === userId);
+    // ONLY this student's attempts — previously every attempt's answers,
+    // score and gradingData leaked into the response via `...exam`.
+    const attempts = await this.prisma.examAttempt.findMany({
+      where: { tenantId, examId, studentId: userId },
+      orderBy: { attemptNumber: "desc" },
+    });
     const attemptCount = attempts.length;
 
     // Check if can attempt
