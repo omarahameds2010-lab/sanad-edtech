@@ -20,6 +20,7 @@ describe("LessonsService", () => {
         delete: jest.fn(),
       },
       enrollment: { findFirst: jest.fn() },
+      studentLessonUnlock: { findFirst: jest.fn() },
       $transaction: jest.fn((ops: any) => Promise.all(ops)),
     };
     service = new LessonsService(prisma);
@@ -126,6 +127,31 @@ describe("LessonsService", () => {
       expect(result.access.isLocked).toBe(true);
       expect(result.access.unlockType).toBe("ENTER_ASSIGNMENT");
       expect(result.lesson.title).toBe("L1");
+    });
+
+    it("honours a per-student unlock grant even when the lesson is authored LOCKED", async () => {
+      prisma.lesson.findFirst.mockResolvedValue({
+        id: "l1",
+        title: "L1",
+        type: "VIDEO",
+        isFree: false,
+        section: { courseId: "c1" },
+        assignment: null,
+        exam: null,
+        lockStatus: "LOCKED",
+        unlockType: "ENTER_ASSIGNMENT",
+        description: null,
+        duration: 600,
+        orderIndex: 1,
+        status: "PUBLISHED",
+      });
+      prisma.enrollment.findFirst.mockResolvedValue({ id: "e1" });
+      prisma.studentLessonUnlock.findFirst.mockResolvedValue({ id: "u1" });
+
+      const result = await service.getStudentLesson(tenantId, userId, "l1");
+
+      expect(result.access.isLocked).toBe(false);
+      expect(result.access.lockStatus).toBe("UNLOCKED");
     });
 
     it("allows access to free lesson without enrollment", async () => {

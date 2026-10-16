@@ -12,6 +12,7 @@ import {
 } from "@prisma/client";
 import { IdempotencyService } from "../../payments/security/idempotency.service";
 import { AuditService } from "../../audit/audit.service";
+import { applyTenantContext } from "../../../common/prisma/tenant-context";
 
 @Injectable()
 export class ProgressionService {
@@ -24,6 +25,7 @@ export class ProgressionService {
   /**
    * Handle ENTER_ASSIGNMENT progression event
    * When a student starts an assignment attempt, unlock the linked exam
+   * lesson FOR THIS STUDENT (audit 2026-10-16 §6.1 — was tenant-wide).
    */
   async handleEnterAssignment(
     tenantId: string,
@@ -55,68 +57,18 @@ export class ProgressionService {
       },
       include: {
         section: {
-          include: {
-            course: true,
-          },
+          select: { courseId: true },
         },
       },
     });
 
-    if (lessonsToUnlock.length === 0) {
-      // No lessons to unlock - this is normal
-      const response = { unlocked: 0, lessonIds: [] };
-      await this.idempotencyService.markCompleted(
-        tenantId,
-        idempotencyKey,
-        response,
-      );
-      return response;
-    }
-
-    // Unlock each lesson in a transaction
-    const unlockedLessonIds: string[] = [];
-
-    for (const lesson of lessonsToUnlock) {
-      // Verify student is enrolled in the course
-      const enrollment = await this.prisma.enrollment.findFirst({
-        where: {
-          userId,
-          courseId: lesson.section.courseId,
-          status: "ACTIVE",
-        },
-      });
-
-      if (!enrollment) {
-        continue; // Skip if not enrolled
-      }
-
-      // Unlock the lesson
-      await this.prisma.lesson.update({
-        where: { id: lesson.id },
-        data: { lockStatus: ContentLockStatus.UNLOCKED },
-      });
-
-      unlockedLessonIds.push(lesson.id);
-
-      // Audit log
-      await this.auditService.log({
-        tenantId,
-        actorUserId: userId,
-        action: "CONTENT_UNLOCKED",
-        resourceType: "lesson",
-        resourceId: lesson.id,
-        metadata: {
-          unlockType: ContentUnlockType.ENTER_ASSIGNMENT,
-          unlockTargetId: assignmentId,
-          courseId: lesson.section.courseId,
-        },
-      });
-    }
-
-    const response = {
-      unlocked: unlockedLessonIds.length,
-      lessonIds: unlockedLessonIds,
-    };
+    const response = await this.grantUnlocks(
+      tenantId,
+      userId,
+      lessonsToUnlock,
+      ContentUnlockType.ENTER_ASSIGNMENT,
+      assignmentId,
+    );
 
     await this.idempotencyService.markCompleted(
       tenantId,
@@ -129,6 +81,7 @@ export class ProgressionService {
   /**
    * Handle ENTER_EXAM progression event
    * When a student starts an exam attempt, unlock the next lesson
+   * FOR THIS STUDENT (audit 2026-10-16 §6.1 — was tenant-wide).
    */
   async handleEnterExam(
     tenantId: string,
@@ -160,68 +113,18 @@ export class ProgressionService {
       },
       include: {
         section: {
-          include: {
-            course: true,
-          },
+          select: { courseId: true },
         },
       },
     });
 
-    if (lessonsToUnlock.length === 0) {
-      // No lessons to unlock - this is normal
-      const response = { unlocked: 0, lessonIds: [] };
-      await this.idempotencyService.markCompleted(
-        tenantId,
-        idempotencyKey,
-        response,
-      );
-      return response;
-    }
-
-    // Unlock each lesson in a transaction
-    const unlockedLessonIds: string[] = [];
-
-    for (const lesson of lessonsToUnlock) {
-      // Verify student is enrolled in the course
-      const enrollment = await this.prisma.enrollment.findFirst({
-        where: {
-          userId,
-          courseId: lesson.section.courseId,
-          status: "ACTIVE",
-        },
-      });
-
-      if (!enrollment) {
-        continue; // Skip if not enrolled
-      }
-
-      // Unlock the lesson
-      await this.prisma.lesson.update({
-        where: { id: lesson.id },
-        data: { lockStatus: ContentLockStatus.UNLOCKED },
-      });
-
-      unlockedLessonIds.push(lesson.id);
-
-      // Audit log
-      await this.auditService.log({
-        tenantId,
-        actorUserId: userId,
-        action: "CONTENT_UNLOCKED",
-        resourceType: "lesson",
-        resourceId: lesson.id,
-        metadata: {
-          unlockType: ContentUnlockType.ENTER_EXAM,
-          unlockTargetId: examId,
-          courseId: lesson.section.courseId,
-        },
-      });
-    }
-
-    const response = {
-      unlocked: unlockedLessonIds.length,
-      lessonIds: unlockedLessonIds,
-    };
+    const response = await this.grantUnlocks(
+      tenantId,
+      userId,
+      lessonsToUnlock,
+      ContentUnlockType.ENTER_EXAM,
+      examId,
+    );
 
     await this.idempotencyService.markCompleted(
       tenantId,
@@ -236,8 +139,8 @@ export class ProgressionService {
    * Used to determine which lesson to unlock after ENTER_EXAM
    */
   async getNextLesson(tenantId: string, currentLessonId: string) {
-    const currentLesson = await this.prisma.lesson.findUnique({
-      where: { id: currentLessonId },
+    const currentLesson = await this.prisma.lesson.findFirst({
+      where: { id: currentLessonId, tenantId },
       include: { section: true },
     });
 
@@ -331,6 +234,10 @@ export class ProgressionService {
 
   /**
    * Get student's lesson progression status
+   *
+   * Per-student since the §6.1 fix: an unlock grant for THIS student wins
+   * over the authored lock state; authored UNLOCKED/AVAILABLE still apply to
+   * everyone (teacher-wide states).
    */
   async getStudentProgression(
     tenantId: string,
@@ -339,6 +246,7 @@ export class ProgressionService {
   ) {
     const enrollment = await this.prisma.enrollment.findFirst({
       where: {
+        tenantId,
         userId,
         courseId,
         status: "ACTIVE",
@@ -362,14 +270,46 @@ export class ProgressionService {
       orderBy: { orderIndex: "asc" },
     });
 
+    const grants = await this.prisma.studentLessonUnlock.findMany({
+      where: {
+        tenantId,
+        userId,
+        lessonId: { in: lessons.map((lesson) => lesson.id) },
+      },
+      select: {
+        lessonId: true,
+        unlockType: true,
+        sourceId: true,
+        unlockedAt: true,
+      },
+    });
+    const grantByLesson = new Map(
+      grants.map((grant) => [grant.lessonId, grant]),
+    );
+
     const progression = lessons.map((lesson) => {
-      const isLocked = lesson.lockStatus === ContentLockStatus.LOCKED;
-      const isUnlocked = lesson.lockStatus === ContentLockStatus.UNLOCKED;
-      const isAvailable = lesson.lockStatus === ContentLockStatus.AVAILABLE;
+      const grant = grantByLesson.get(lesson.id);
+      const effectiveLockStatus = grant
+        ? ContentLockStatus.UNLOCKED
+        : lesson.lockStatus;
+
+      const isLocked = effectiveLockStatus === ContentLockStatus.LOCKED;
+      const isUnlocked = effectiveLockStatus === ContentLockStatus.UNLOCKED;
+      const isAvailable = effectiveLockStatus === ContentLockStatus.AVAILABLE;
 
       let unlockInfo: any = null;
 
-      if (isLocked && lesson.unlockType && lesson.unlockTargetId) {
+      if (grant) {
+        unlockInfo = {
+          unlockType: grant.unlockType,
+          unlockTargetId: grant.sourceId,
+          unlockedAt: grant.unlockedAt,
+          description: this.getUnlockDescription(
+            grant.unlockType,
+            grant.sourceId ?? "",
+          ),
+        };
+      } else if (isLocked && lesson.unlockType && lesson.unlockTargetId) {
         unlockInfo = {
           unlockType: lesson.unlockType,
           unlockTargetId: lesson.unlockTargetId,
@@ -385,7 +325,7 @@ export class ProgressionService {
         title: lesson.title,
         type: lesson.type,
         orderIndex: lesson.orderIndex,
-        lockStatus: lesson.lockStatus,
+        lockStatus: effectiveLockStatus,
         isLocked,
         isUnlocked,
         isAvailable,
@@ -436,7 +376,10 @@ export class ProgressionService {
   }
 
   /**
-   * Reset lesson lock status (for TEACHER use)
+   * Reset lesson lock status (for TEACHER use).
+   *
+   * Also revokes every per-student unlock for the lesson — otherwise the
+   * "reset" would leave granted students unlocked (audit 2026-10-16 §6.1).
    */
   async resetLessonLock(tenantId: string, userId: string, lessonId: string) {
     const lesson = await this.prisma.lesson.findFirst({
@@ -447,13 +390,21 @@ export class ProgressionService {
       throw new NotFoundException("Lesson not found");
     }
 
-    const updated = await this.prisma.lesson.update({
-      where: { id: lessonId },
-      data: {
-        lockStatus: ContentLockStatus.LOCKED,
-        unlockType: ContentUnlockType.NONE,
-        unlockTargetId: null,
-      },
+    const updated = await this.prisma.$transaction(async (tx) => {
+      await applyTenantContext(tx, tenantId);
+
+      await tx.studentLessonUnlock.deleteMany({
+        where: { tenantId, lessonId },
+      });
+
+      return tx.lesson.update({
+        where: { id: lessonId },
+        data: {
+          lockStatus: ContentLockStatus.LOCKED,
+          unlockType: ContentUnlockType.NONE,
+          unlockTargetId: null,
+        },
+      });
     });
 
     // Audit log
@@ -470,6 +421,89 @@ export class ProgressionService {
   }
 
   // ==================== HELPER METHODS ====================
+
+  /**
+   * Grant per-student unlocks for a batch of lessons inside ONE transaction.
+   *
+   * Idempotency comes from the database itself: the unique index
+   * (tenantId, userId, lessonId) + `skipDuplicates` make the ENTER flow safe
+   * under retries and concurrent requests — a repeated grant is a no-op
+   * instead of a duplicate row or an error (audit 2026-10-16 §6.1).
+   */
+  private async grantUnlocks(
+    tenantId: string,
+    userId: string,
+    lessons: Array<{ id: string; section: { courseId: string } }>,
+    unlockType: ContentUnlockType,
+    sourceId: string,
+  ): Promise<{ unlocked: number; lessonIds: string[] }> {
+    if (lessons.length === 0) {
+      return { unlocked: 0, lessonIds: [] };
+    }
+
+    const granted: Array<{ lessonId: string; courseId: string }> = [];
+
+    await this.prisma.$transaction(async (tx) => {
+      await applyTenantContext(tx, tenantId);
+
+      for (const lesson of lessons) {
+        // Verify the student is enrolled in the lesson's course
+        const enrollment = await tx.enrollment.findFirst({
+          where: {
+            tenantId,
+            userId,
+            courseId: lesson.section.courseId,
+            status: "ACTIVE",
+          },
+        });
+
+        if (!enrollment) {
+          continue; // Skip if not enrolled
+        }
+
+        const created = await tx.studentLessonUnlock.createMany({
+          data: [
+            {
+              tenantId,
+              userId,
+              lessonId: lesson.id,
+              unlockType,
+              sourceId,
+            },
+          ],
+          skipDuplicates: true,
+        });
+
+        if (created.count > 0) {
+          granted.push({
+            lessonId: lesson.id,
+            courseId: lesson.section.courseId,
+          });
+        }
+      }
+    });
+
+    for (const item of granted) {
+      // Audit after commit (best-effort: the grant rows are the source of truth)
+      await this.auditService.log({
+        tenantId,
+        actorUserId: userId,
+        action: "CONTENT_UNLOCKED",
+        resourceType: "lesson",
+        resourceId: item.lessonId,
+        metadata: {
+          unlockType,
+          unlockTargetId: sourceId,
+          courseId: item.courseId,
+        },
+      });
+    }
+
+    return {
+      unlocked: granted.length,
+      lessonIds: granted.map((item) => item.lessonId),
+    };
+  }
 
   private getUnlockDescription(
     unlockType: ContentUnlockType,

@@ -213,7 +213,14 @@ export class LessonsService {
       throw new ForbiddenException("Not enrolled in this course");
     }
 
-    const isLocked = lesson.lockStatus === "LOCKED";
+    // Per-student unlock overlay (audit 2026-10-16 §6.1): a grant created by
+    // the ENTER flow overrides the authored lock state for THIS student.
+    const grant = await this.prisma.studentLessonUnlock.findFirst({
+      where: { tenantId, userId, lessonId },
+      select: { id: true },
+    });
+    const effectiveLockStatus = grant ? "UNLOCKED" : lesson.lockStatus;
+    const isLocked = effectiveLockStatus === "LOCKED";
 
     return {
       lesson: {
@@ -228,7 +235,7 @@ export class LessonsService {
       access: {
         isLocked,
         unlockType: lesson.unlockType,
-        lockStatus: lesson.lockStatus,
+        lockStatus: effectiveLockStatus,
       },
       assignment: lesson.assignment ?? null,
       exam: lesson.exam ?? null,

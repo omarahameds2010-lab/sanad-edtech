@@ -11,17 +11,13 @@ import {
   UseGuards,
 } from "@nestjs/common";
 import { AssignmentsService } from "./assignments.service";
-import { ProgressionService } from "../progression/progression.service";
 import { JwtAuthGuard } from "../../auth/guards/jwt-auth.guard";
 import { RequirePermission } from "../../authorization/authorization.decorators";
 
 @Controller("v1/assignments")
 @UseGuards(JwtAuthGuard)
 export class AssignmentsController {
-  constructor(
-    private assignmentsService: AssignmentsService,
-    private progressionService: ProgressionService,
-  ) {}
+  constructor(private assignmentsService: AssignmentsService) {}
 
   @Post("lessons/:lessonId/assignments")
   @RequirePermission({
@@ -129,23 +125,26 @@ export class AssignmentsController {
   async enter(
     @Request() req,
     @Param("assignmentId") assignmentId: string,
-    @Body() body: { lessonId: string },
     @Headers("idempotency-key") idempotencyKey: string,
   ) {
-    const attempt = await this.assignmentsService.startAssignmentAttempt(
+    const result = await this.assignmentsService.startAssignmentAttempt(
       req.tenantId,
       req.user.sub,
       assignmentId,
       idempotencyKey,
     );
-    // ENTER_ASSIGNMENT → unlock linked exam (idempotent progression event)
-    const unlocked = await this.progressionService.handleEnterAssignment(
-      req.tenantId,
-      req.user.sub,
-      assignmentId,
-      body.lessonId,
-      idempotencyKey,
-    );
+    // Progression runs ONCE inside the service (audit 2026-10-16 §6.1 — the
+    // controller used to call it a second time and always got 0 unlocks).
+    // The ?? guard keeps pre-fix cached responses from breaking the web shape.
+    const unlocked = result.unlocked ?? { unlocked: 0, lessonIds: [] };
+    const attempt = {
+      attemptId: result.attemptId,
+      assignmentId: result.assignmentId,
+      startedAt: result.startedAt,
+      expiresAt: result.expiresAt,
+      timeRemainingSeconds: result.timeRemainingSeconds,
+      timerMinutes: result.timerMinutes,
+    };
     return { data: { attempt, unlocked } };
   }
 

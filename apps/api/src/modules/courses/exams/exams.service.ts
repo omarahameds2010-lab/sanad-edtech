@@ -508,6 +508,18 @@ export class ExamsService {
       },
     });
 
+    // Trigger progression ONCE: ENTER_EXAM → unlock the next lesson for THIS
+    // student (audit 2026-10-16 §6.1 — this used to be a tenant-wide flip AND
+    // the controller called it a second time). It runs before the idempotent
+    // response is stored so retries return the same unlock data.
+    const unlocked = await this.progressionService.handleEnterExam(
+      tenantId,
+      userId,
+      examId,
+      lesson.id,
+      `${idempotencyKey}:progression`,
+    );
+
     const response = {
       attemptId: attempt.id,
       examId,
@@ -525,6 +537,7 @@ export class ExamsService {
         options: q.options,
         // correctAnswer intentionally omitted
       })),
+      unlocked,
     };
 
     // Store idempotency response
@@ -532,15 +545,6 @@ export class ExamsService {
       tenantId,
       idempotencyKey,
       response,
-    );
-
-    // Trigger progression: ENTER_EXAM → unlock next lesson
-    await this.progressionService.handleEnterExam(
-      tenantId,
-      userId,
-      examId,
-      lesson.id,
-      `${idempotencyKey}:progression`,
     );
 
     return response;

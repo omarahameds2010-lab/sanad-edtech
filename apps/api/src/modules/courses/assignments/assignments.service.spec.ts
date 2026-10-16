@@ -51,7 +51,9 @@ describe("AssignmentsService", () => {
       getStatus: jest.fn().mockResolvedValue(null),
     };
     progressionService = {
-      handleEnterAssignment: jest.fn().mockResolvedValue({ unlocked: 1 }),
+      handleEnterAssignment: jest
+        .fn()
+        .mockResolvedValue({ unlocked: 1, lessonIds: ["lessonExam"] }),
     };
 
     service = new AssignmentsService(
@@ -136,6 +138,7 @@ describe("AssignmentsService", () => {
       );
       expect(result).toEqual(cached);
       expect(prisma.assignment.findFirst).not.toHaveBeenCalled();
+      expect(progressionService.handleEnterAssignment).not.toHaveBeenCalled();
     });
 
     it("throws BadRequestException when assignment is not published", async () => {
@@ -246,6 +249,19 @@ describe("AssignmentsService", () => {
         "a1",
         "l1",
         "key1:progression",
+      );
+      // Single progression call: the unlock result travels inside the SAME
+      // idempotent response (audit 2026-10-16 §6.1 — the controller used to
+      // call progression a second time and always reported 0 unlocks).
+      expect(result.unlocked).toEqual({
+        unlocked: 1,
+        lessonIds: ["lessonExam"],
+      });
+      // Unlocks are computed BEFORE the response is cached
+      expect(
+        progressionService.handleEnterAssignment.mock.invocationCallOrder[0],
+      ).toBeLessThan(
+        idempotencyService.markCompleted.mock.invocationCallOrder[0],
       );
       expect(idempotencyService.markCompleted).toHaveBeenCalled();
       expect(result.startedAt.getTime()).toBeGreaterThanOrEqual(before);
