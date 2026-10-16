@@ -15,6 +15,7 @@ import {
 } from "@prisma/client";
 import { IdempotencyService } from "../../payments/security/idempotency.service";
 import { ProgressionService } from "../progression/progression.service";
+import { SanadClient, SanadError, SanadGrading } from "./sanad.client";
 
 @Injectable()
 export class AssignmentsService {
@@ -25,6 +26,10 @@ export class AssignmentsService {
     private prisma: PrismaService,
     private idempotencyService: IdempotencyService,
     private progressionService: ProgressionService,
+    // Optional for backward-compatible unit construction; the NestJS module
+    // always provides SanadClient. evaluateAssignmentWithAI throws honestly
+    // when it is absent instead of fabricating a score.
+    private sanad?: SanadClient,
   ) {}
 
   // ==================== TEACHER METHODS ====================
@@ -612,6 +617,8 @@ export class AssignmentsService {
     assignmentId: string,
     answer: string,
     question?: string,
+    grading?: SanadGrading,
+    sourceIds?: string[],
   ) {
     // Build idempotency key to cache AI evaluation results
     // Use answer directly as part of key (no hashCode needed - strings work as keys)
@@ -622,41 +629,74 @@ export class AssignmentsService {
       tenantId,
       studentId,
       idempotencyKey,
-      'assignment:ai-eval',
+      "assignment:ai-eval",
       { answer, question },
     );
 
     // Return cached result if available
-    if (idempotencyResult.isNew === false && idempotencyResult.response !== undefined) {
+    if (
+      idempotencyResult.isNew === false &&
+      idempotencyResult.response !== undefined
+    ) {
       return {
         success: true,
         data: idempotencyResult.response,
-        message: 'Answer evaluated successfully by AI (cached)',
+        message: "Answer evaluated successfully by AI (cached)",
       };
     }
 
-    // Dev mode: Use HashEmbedding + FakeLLM (no API keys needed)
-    // In production, this would call the real SANAD AI service with proper auth
+    // Real SANAD call — no fake defaults. The teacher dashboard must send
+    // the rubric + reference answer + knowledge sources with the request
+    // (SANAD returns 422 when rubric sum != max_score or sourceIds empty).
+    if (!grading || !sourceIds?.length) {
+      throw new BadRequestException(
+        "AI evaluation requires grading {reference_answer, max_score, rubric_version, criteria[]} and non-empty sourceIds",
+      );
+    }
+    if (!this.sanad) {
+      throw new InternalServerErrorException(
+        "AI evaluation service is not configured",
+      );
+    }
+
+    let result;
+    try {
+      result = await this.sanad.evaluateSubmission({
+        tenantId,
+        questionText: question ?? "",
+        studentAnswer: answer,
+        grading,
+        sourceIds,
+      });
+    } catch (e) {
+      if (e instanceof SanadError && (e.status === 401 || e.status === 422)) {
+        throw new BadRequestException(`SANAD rejected evaluation: ${e.detail}`);
+      }
+      throw new InternalServerErrorException(
+        "AI evaluation service temporarily unavailable, please retry",
+      );
+    }
+
+    // Suggested score only — the official grade is set exclusively by
+    // POST submissions/:submissionId/grade after teacher review.
     const evaluation = {
-      score: Math.floor(Math.random() * 30) + 70, // Random 70-100 for dev
-      feedback:
-        'AI evaluation would be performed here in production. Student answer analyzed for strengths, knowledge gaps, and suggested next steps.',
-      knowledgeGap: question ? ['pending AI analysis'] : [],
-      strengths: question ? ['attempted question'] : [],
-      suggestedNextStep:
-        'Review the relevant material and try again, or proceed to the next lesson',
-      model: 'HashEmbedding + FakeLLM (dev mode)',
-      tokensUsed: 0,
+      score: result.suggested_score,
+      maxScore: result.max_score,
+      feedback: result.feedback_ar,
+      criteria: result.criteria,
+      knowledgeGap: result.knowledge_gaps,
+      needsTeacherReview: result.needs_teacher_review,
+      reviewSignal: result.review_signal,
+      sanadRequestId: result.request_id,
+      sanadSubmissionId: result.sanad_submission_id,
+      model: result.provenance,
       evaluatedAt: new Date(),
     };
 
-    // Store result via checkAndStore's completed path
-    // We already cached via checkAndStore, so the result should be available
-    // If not, we'll still return the evaluation
     return {
       success: true,
       data: evaluation,
-      message: 'Answer evaluated successfully by AI',
+      message: "Answer evaluated successfully by AI",
     };
   }
 

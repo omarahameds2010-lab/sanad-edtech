@@ -6,6 +6,27 @@ export class PrismaService
   extends PrismaClient
   implements OnModuleInit, OnModuleDestroy
 {
+  constructor() {
+    // Connection comes from the environment (never hardcode credentials:
+    // a live superuser password in source is a secret leak AND, written as
+    // a bare identifier, a compile error). MIGRATION_DATABASE_URL is the
+    // superuser connection string per apps/api/.env.example.
+    const url = process.env.MIGRATION_DATABASE_URL || process.env.DATABASE_URL;
+    if (!url) {
+      throw new Error(
+        "Missing MIGRATION_DATABASE_URL (or DATABASE_URL) environment variable",
+      );
+    }
+
+    super({
+      datasources: {
+        db: {
+          url,
+        },
+      },
+    });
+  }
+
   async onModuleInit() {
     // Railway's public proxy intermittently refuses the first handshake(s).
     // Retry with backoff instead of crashing the boot on a transient P1001.

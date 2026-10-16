@@ -6,6 +6,7 @@ import {
   ForbiddenException,
 } from "@nestjs/common";
 import { AssignmentsService } from "./assignments.service";
+import { SanadClient } from "./sanad.client";
 import { PrismaService } from "../../tenants/prisma.service";
 import { IdempotencyService } from "../../payments/security/idempotency.service";
 import { ProgressionService } from "../progression/progression.service";
@@ -418,6 +419,75 @@ describe("AssignmentsService", () => {
           data: expect.objectContaining({ status: "PUBLISHED" }),
         }),
       );
+    });
+  });
+
+  describe("evaluateAssignmentWithAI", () => {
+    const grading = {
+      reference_answer: "ref",
+      max_score: 10,
+      rubric_version: "v1",
+      criteria: [{ id: "c1", description: "d1", max_score: 10 }],
+    };
+
+    it("throws BadRequestException when rubric or sources are missing", async () => {
+      const svc: any = new AssignmentsService(
+        prisma,
+        idempotencyService,
+        progressionService,
+        { evaluateSubmission: jest.fn() } as unknown as SanadClient,
+      );
+      await expect(
+        svc.evaluateAssignmentWithAI(tenantId, userId, "a1", "ans"),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it("maps SANAD suggestion without setting the official grade", async () => {
+      const sanadResult = {
+        evaluation_id: "e1",
+        request_id: "r1",
+        sanad_submission_id: "s1",
+        status: "COMPLETED",
+        suggested_score: 7,
+        max_score: 10,
+        criteria: [],
+        feedback_ar: "good",
+        review_signal: 0.9,
+        needs_teacher_review: true,
+        knowledge_gaps: [],
+        provenance: {},
+        usage: {},
+      };
+      const sanad = {
+        evaluateSubmission: jest.fn().mockResolvedValue(sanadResult),
+      };
+      const svc: any = new AssignmentsService(
+        prisma,
+        idempotencyService,
+        progressionService,
+        sanad as unknown as SanadClient,
+      );
+      const result = await svc.evaluateAssignmentWithAI(
+        tenantId,
+        userId,
+        "a1",
+        "ans",
+        "q?",
+        grading,
+        ["gen_fixed_irab_v1"],
+      );
+      expect(sanad.evaluateSubmission).toHaveBeenCalledWith(
+        expect.objectContaining({
+          tenantId,
+          grading,
+          sourceIds: ["gen_fixed_irab_v1"],
+        }),
+      );
+      expect(result.data.score).toBe(7);
+      expect(result.data.needsTeacherReview).toBe(true);
+      expect(result.data.sanadSubmissionId).toBe("s1");
+      // Official grade stays untouched: no submission update here.
+      expect(prisma.assignmentSubmission.update).not.toHaveBeenCalled();
     });
   });
 });

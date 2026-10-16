@@ -68,10 +68,7 @@ export class AssignmentsController {
     resourceType: "assignment",
     resourceIdParam: "assignmentId",
   })
-  async publish(
-    @Request() req,
-    @Param("assignmentId") assignmentId: string,
-  ) {
+  async publish(@Request() req, @Param("assignmentId") assignmentId: string) {
     const result = await this.assignmentsService.publishAssignment(
       req.tenantId,
       assignmentId,
@@ -82,15 +79,12 @@ export class AssignmentsController {
   @Get()
   @RequirePermission({ action: "read", resourceType: "assignment" })
   async list(@Request() req, @Query() query: any) {
-    const result = await this.assignmentsService.listAssignments(
-      req.tenantId,
-      {
-        lessonId: query.lessonId,
-        status: query.status,
-        cursor: query.cursor,
-        limit: query.limit ? Number(query.limit) : undefined,
-      },
-    );
+    const result = await this.assignmentsService.listAssignments(req.tenantId, {
+      lessonId: query.lessonId,
+      status: query.status,
+      cursor: query.cursor,
+      limit: query.limit ? Number(query.limit) : undefined,
+    });
     return { data: result };
   }
 
@@ -100,10 +94,7 @@ export class AssignmentsController {
     resourceType: "assignment",
     resourceIdParam: "assignmentId",
   })
-  async get(
-    @Request() req,
-    @Param("assignmentId") assignmentId: string,
-  ) {
+  async get(@Request() req, @Param("assignmentId") assignmentId: string) {
     const result = await this.assignmentsService.getAssignment(
       req.tenantId,
       assignmentId,
@@ -164,10 +155,7 @@ export class AssignmentsController {
     resourceType: "assignment",
     resourceIdParam: "assignmentId",
   })
-  async timer(
-    @Request() req,
-    @Param("assignmentId") assignmentId: string,
-  ) {
+  async timer(@Request() req, @Param("assignmentId") assignmentId: string) {
     const result = await this.assignmentsService.getAssignmentTimer(
       req.tenantId,
       req.user.sub,
@@ -203,7 +191,8 @@ export class AssignmentsController {
   async submit(
     @Request() req,
     @Param("assignmentId") assignmentId: string,
-    @Body() body: { content?: string; attachments?: any[]; idempotencyKey?: string },
+    @Body()
+    body: { content?: string; attachments?: any[]; idempotencyKey?: string },
     @Headers("idempotency-key") headerKey: string,
   ) {
     const result = await this.assignmentsService.submitAssignment(
@@ -263,17 +252,30 @@ export class AssignmentsController {
   async evaluateWithAI(
     @Request() req,
     @Param("assignmentId") assignmentId: string,
-    @Body() dto: { answer: string; question?: string },
+    @Body()
+    dto: {
+      answer: string;
+      question?: string;
+      grading?: {
+        reference_answer: string;
+        max_score: number;
+        rubric_version: string;
+        criteria: { id: string; description: string; max_score: number }[];
+      };
+      sourceIds?: string[];
+    },
   ) {
-    // Call SANAD AI engine for evaluation
-    // In dev mode (no API keys), uses HashEmbedding + FakeLLM
-    // In production, uses real embedding model + Gemini/Anthropic
+    // Teacher dashboard sends the rubric + knowledge sources it displays.
+    // SANAD grades against them; the official grade stays with
+    // POST submissions/:submissionId/grade after teacher review.
     const result = await this.assignmentsService.evaluateAssignmentWithAI(
       req.tenantId,
       req.user.sub,
       assignmentId,
       dto.answer,
       dto.question,
+      dto.grading,
+      dto.sourceIds,
     );
     return { data: result };
   }
