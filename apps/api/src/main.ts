@@ -6,6 +6,7 @@ import { AppModule } from "./app.module";
 import { Logger } from "nestjs-pino";
 import { CsrfOriginGuard } from "./common/guards/csrf-origin.guard";
 import { COOKIE_NAMES } from "./modules/auth/cookies";
+import { patchBigIntSerialization } from "./common/serialization/json";
 
 /** esModuleInterop is on, so the default import is the callable middleware. */
 const cookieParser = (cookieParserNs as any).default ?? cookieParserNs;
@@ -65,6 +66,10 @@ function resolveCorsOrigin():
 
 async function bootstrap() {
   validateSecrets();
+
+  // Every `*Minor` column is a JS BigInt; without this any response carrying
+  // one makes the serializer throw → 500 (audit 2026-10-17 review, bundle A).
+  patchBigIntSerialization();
 
   const app = await NestFactory.create(AppModule, {
     bufferLogs: true,

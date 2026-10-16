@@ -47,7 +47,9 @@ export class PaymentsController {
         resourceId: string;
         name: string;
         quantity: number;
-        unitPriceMinor: bigint;
+        // HTTP JSON cannot carry a BigInt — clients send a number or a digit
+        // string; the orchestrator canonicalizes before comparing.
+        unitPriceMinor: number | string;
         metadata?: any;
       }[];
       currency?: string;

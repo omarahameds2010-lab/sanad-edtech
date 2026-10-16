@@ -3,6 +3,7 @@ import {
   BadRequestException,
   NotFoundException,
   ForbiddenException,
+  ConflictException,
   Inject,
   forwardRef,
 } from "@nestjs/common";
@@ -29,6 +30,7 @@ import {
   Prisma,
 } from "@prisma/client";
 import * as crypto from "crypto";
+import { toBigIntMinor } from "../../common/money/minor-units";
 
 export interface CreateOrderInput {
   tenantId: string;
@@ -38,7 +40,8 @@ export interface CreateOrderInput {
     resourceId: string;
     name: string;
     quantity: number;
-    unitPriceMinor: bigint;
+    // Accept whatever HTTP JSON can actually carry; canonicalized server-side.
+    unitPriceMinor: bigint | number | string;
     metadata?: Record<string, any>;
   }[];
   currency?: string;
@@ -106,7 +109,8 @@ export class PaymentOrchestratorService {
     let subtotalMinor = 0n;
     const validatedItems = [];
 
-    for (const item of items) {
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
       // Verify resource exists and get actual price
       const { priceMinor, name: actualName } = await this.getResourcePrice(
         tenantId,
@@ -114,18 +118,34 @@ export class PaymentOrchestratorService {
         item.resourceId,
       );
 
-      if (priceMinor !== item.unitPriceMinor) {
+      // `1 !== 1n` is always true in JS: the price from Prisma is a BigInt
+      // while HTTP JSON can only send a number or a string. Canonicalize both
+      // sides — otherwise every POST /payments/orders dies here with
+      // "Price mismatch" (audit 2026-10-17 review, bundle A).
+      const clientPriceMinor = toBigIntMinor(
+        item.unitPriceMinor,
+        `items[${i}].unitPriceMinor`,
+      );
+      if (priceMinor !== clientPriceMinor) {
         throw new BadRequestException(
           `Price mismatch for ${item.resourceType} ${item.resourceId}`,
         );
       }
 
-      subtotalMinor += priceMinor * BigInt(item.quantity);
+      const quantity = toBigIntMinor(item.quantity, `items[${i}].quantity`);
+      if (quantity <= 0n) {
+        throw new BadRequestException(
+          `Quantity must be a positive integer for ${item.resourceId}`,
+        );
+      }
+
+      subtotalMinor += priceMinor * quantity;
       validatedItems.push({
         ...item,
+        quantity: Number(quantity),
         unitPriceMinor: priceMinor,
         name: actualName || item.name,
-        totalMinor: priceMinor * BigInt(item.quantity),
+        totalMinor: priceMinor * quantity,
       });
     }
 
@@ -194,16 +214,43 @@ export class PaymentOrchestratorService {
       "payment_intent_create",
       input,
     );
-    if (!idempotent.isNew) {
-      const existing = await this.prisma.paymentIntent.findUnique({
-        where: { id: idempotent.existingId },
-      });
-      if (existing) return this.mapIntentToResult(existing);
+
+    // Replay: a finished attempt stored its result — return it verbatim.
+    if (!idempotent.isNew && idempotent.response !== undefined) {
+      return idempotent.response as PaymentResult;
     }
 
-    // Verify order
+    // The (tenantId, idempotencyKey) unique index is the real dedup guard. The
+    // old code searched `payment_intent` by the *idempotency-key row's* id,
+    // always missed, then inserted a second intent and died on P2002 (audit
+    // 2026-10-17 review, bundle A). Reuse the previous attempt's row instead.
+    const priorIntent = await this.prisma.paymentIntent.findUnique({
+      where: { tenantId_idempotencyKey: { tenantId, idempotencyKey } },
+    });
+
+    // A retry against an intent that is already settled — or is talking to the
+    // provider right now — must never start a second provider payment.
+    if (
+      priorIntent &&
+      (priorIntent.status === "PROCESSING" ||
+        priorIntent.status === "SUCCEEDED" ||
+        priorIntent.status === "REQUIRES_ACTION")
+    ) {
+      const replay = this.mapIntentToResult(priorIntent);
+      // A renewed key lost the stored response; stamp it again so the next
+      // retry takes the plain replay path.
+      if (idempotent.isNew) {
+        await this.idempotency.markCompleted(tenantId, idempotencyKey, replay);
+      }
+      return replay;
+    }
+
+    // Verify order (items included: the voucher flow needs the course id;
+    // without the include, `order.items[0]` threw at runtime — live smoke
+    // caught what the mocks hid)
     const order = await this.prisma.order.findFirst({
       where: { id: orderId, tenantId, userId },
+      include: { items: true },
     });
     if (!order) throw new NotFoundException("Order not found");
     if (order.status !== "PENDING")
@@ -255,22 +302,57 @@ export class PaymentOrchestratorService {
       }
     }
 
-    // Create payment intent
-    const intent = await this.prisma.paymentIntent.create({
-      data: {
-        tenantId,
-        orderId,
-        userId,
-        amountMinor: order.totalMinor,
-        currency: order.currency,
-        requestedMethod: paymentMethod,
-        provider: provider.name,
-        status: "CREATED",
-        idempotencyKey,
-        expiresAt: new Date(Date.now() + 30 * 60 * 1000), // 30 min
-        metadata: { ...metadata, returnUrl, webhookUrl, riskScore },
-      },
-    });
+    // Create — or resume — the payment intent. A retry after a crash or an
+    // explicit failure must reuse its row: a second insert would violate
+    // @@unique([tenantId, idempotencyKey]).
+    let intent: any;
+    if (priorIntent) {
+      if (
+        priorIntent.status === "EXPIRED" ||
+        priorIntent.status === "CANCELLED"
+      ) {
+        throw new ConflictException(
+          "This idempotency key belongs to a cancelled or expired intent — start a new checkout",
+        );
+      }
+      // CREATED (attempt died before reaching the provider) or FAILED (explicit
+      // refusal): reset the same row and initialize again.
+      intent = await this.prisma.paymentIntent.update({
+        where: { id: priorIntent.id },
+        data: {
+          status: "CREATED",
+          amountMinor: order.totalMinor,
+          currency: order.currency,
+          requestedMethod: paymentMethod,
+          provider: provider.name,
+          externalIntentId: null,
+          expiresAt: new Date(Date.now() + 30 * 60 * 1000), // 30 min
+          metadata: {
+            ...metadata,
+            returnUrl,
+            webhookUrl,
+            riskScore,
+            resumedFrom: priorIntent.status,
+          },
+        },
+      });
+    } else {
+      intent = await this.prisma.paymentIntent.create({
+        data: {
+          tenantId,
+          orderId,
+          userId,
+          amountMinor: order.totalMinor,
+          currency: order.currency,
+          requestedMethod: paymentMethod,
+          provider: provider.name,
+          status: "CREATED",
+          idempotencyKey,
+          expiresAt: new Date(Date.now() + 30 * 60 * 1000), // 30 min
+          metadata: { ...metadata, returnUrl, webhookUrl, riskScore },
+        },
+      });
+    }
 
     // If voucher, handle directly
     if (paymentMethod === "VOUCHER") {
@@ -295,6 +377,9 @@ export class PaymentOrchestratorService {
           metadata: { ...metadata, providerError: providerResult.errorMessage },
         },
       });
+      // Release the key: an explicit provider refusal is retryable, and the
+      // renew path in checkAndStore reuses the key row instead of a P2002.
+      await this.idempotency.markFailed(tenantId, idempotencyKey);
       throw new BadRequestException(
         providerResult.errorMessage || "Payment initialization failed",
       );
@@ -310,7 +395,7 @@ export class PaymentOrchestratorService {
       },
     });
 
-    return {
+    const result: PaymentResult = {
       success: true,
       paymentIntentId: intent.id,
       providerPaymentId: providerResult.providerPaymentId,
@@ -319,6 +404,12 @@ export class PaymentOrchestratorService {
       clientToken: providerResult.clientToken,
       expiresAt: providerResult.expiresAt,
     };
+
+    // Store the response so any retry with this key replays it verbatim
+    // instead of initializing a second provider payment.
+    await this.idempotency.markCompleted(tenantId, idempotencyKey, result);
+
+    return result;
   }
 
   /**
@@ -338,7 +429,7 @@ export class PaymentOrchestratorService {
     }
 
     // Check if course matches
-    const courseId = order.items[0]?.resourceId;
+    const courseId = order.items?.[0]?.resourceId;
 
     const result = await this.voucherProvider.redeemVoucher(
       tenantId,
@@ -352,6 +443,29 @@ export class PaymentOrchestratorService {
     );
 
     if (!result.success) {
+      // Crash-window guard: a previous attempt may have already paid for this
+      // intent and died before completing the idempotency key. Never report a
+      // paid intent as failed.
+      const alreadyPaid = await this.prisma.payment.findFirst({
+        where: { paymentIntentId: intent.id, status: "PAID" },
+      });
+      if (alreadyPaid) {
+        const replay: PaymentResult = {
+          success: true,
+          paymentIntentId: intent.id,
+          paymentId: alreadyPaid.id,
+          providerTransactionId: alreadyPaid.providerTransactionId ?? undefined,
+        };
+        if (intent.idempotencyKey) {
+          await this.idempotency.markCompleted(
+            tenantId,
+            intent.idempotencyKey,
+            replay,
+          );
+        }
+        return replay;
+      }
+
       await this.prisma.paymentIntent.update({
         where: { id: intent.id },
         data: {
@@ -359,6 +473,9 @@ export class PaymentOrchestratorService {
           metadata: { ...metadata, voucherError: result.errorMessage },
         },
       });
+      if (intent.idempotencyKey) {
+        await this.idempotency.markFailed(tenantId, intent.idempotencyKey);
+      }
       throw new BadRequestException(result.errorMessage);
     }
 
@@ -392,12 +509,22 @@ export class PaymentOrchestratorService {
       "voucher",
     );
 
-    return {
+    const voucherResult: PaymentResult = {
       success: true,
       paymentIntentId: intent.id,
       paymentId: payment.id,
-      providerTransactionId: payment.providerTransactionId,
+      providerTransactionId: payment.providerTransactionId ?? undefined,
     };
+
+    if (intent.idempotencyKey) {
+      await this.idempotency.markCompleted(
+        tenantId,
+        intent.idempotencyKey,
+        voucherResult,
+      );
+    }
+
+    return voucherResult;
   }
 
   /**
@@ -505,6 +632,18 @@ export class PaymentOrchestratorService {
       // Create ledger entries
       const payment = await tx.payment.findUnique({ where: { id: paymentId } });
       await this.ledger.recordPayment(tx, tenantId, payment!, providerName);
+
+      // Settle the intent in the same transaction so later retries observe
+      // SUCCEEDED instead of CREATED/PROCESSING (bundle A).
+      if (payment?.paymentIntentId) {
+        await tx.paymentIntent.updateMany({
+          where: {
+            id: payment.paymentIntentId,
+            status: { in: ["CREATED", "PROCESSING"] },
+          },
+          data: { status: "SUCCEEDED" },
+        });
+      }
 
       // Grant entitlements for course items
       const order = await tx.order.findUnique({
@@ -757,7 +896,12 @@ export class PaymentOrchestratorService {
 
   private mapIntentToResult(intent: any): PaymentResult {
     return {
-      success: intent.status === "PAID" || intent.status === "PROCESSING",
+      // "PAID" is not a PaymentIntentStatus — a settled intent is SUCCEEDED
+      // (the old check made every completed-intent replay look failed).
+      success:
+        intent.status === "PROCESSING" ||
+        intent.status === "SUCCEEDED" ||
+        intent.status === "REQUIRES_ACTION",
       paymentIntentId: intent.id,
       providerPaymentId: intent.externalIntentId,
       providerTransactionId: intent.providerTransactionId,
