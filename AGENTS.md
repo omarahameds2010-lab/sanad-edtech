@@ -35,11 +35,12 @@
 - **JWT `tenantId` vs request Host — FIXED (`f1aaa58`).** `passReqToCallback` rejects tokens whose `tenantId` mismatches the host-resolved tenant, or when host context is absent; 5 regression tests.
 - **Feature flags — FIXED (`e9227bc`).** `checkFeatureFlags` accepts both raw booleans and `{enabled,value}` objects. Regression tests cover both shapes.
 - **Payment webhooks — revived 2026-10-17 (`d22379b`).** `rawBody: true` + `rawPayload` column (migration #6) + dedup keyed on the provider event id + Buffer body parsing + Paymob field-concatenation HMAC + `timingSafeEqual` length guards + paymob/fawry registered from env credentials. Live HTTP smoke **11/11**; api **224/224**. Remaining: refund/callback routes, video webhook.
+- **Per-student progression — landed 2026-10-17 (`e0ab627`).** New table `student_lesson_unlocks` (43rd) + UNIQUE (tenantId,userId,lessonId) + its own 4-policy RLS set + grants (migration `20261017000001`; totals now **138 policies / 43 tables**); ENTER_ASSIGNMENT/ENTER_EXAM write grants for the acting student inside ONE `$transaction` (`createMany`+`skipDuplicates` → idempotent under retries); progression runs once and the enter response carries the real `unlocked`; student views overlay the grant; `getNextLesson` is tenant-scoped. Live: DB checks **15/15** as `app_user` (direct duplicate → 23505), RLS e2e **5/5**, fresh chain **7/7**, api **229/229**, build **4/4**.
 - ⚠️ **RLS enforcement is still INACTIVE wherever the runtime connects as a superuser/table owner** (FORCE RLS never applies to superusers) — it activates when the runtime URL points at `app_user` (pending on Railway; rotate the DB password first). Until then: **every query must still carry `tenantId`.**
 
 **Still not true in runtime code (despite this file):**
 
-- **Progression unlocks are GLOBAL per tenant** (`Lesson.lockStatus`), not per-student, not transactional. No `UnlockRule` table exists.
+- **Progression unlock types beyond ENTER_*** (COMPLETE_*/PASS_EXAM/SCORE_THRESHOLD/TIME_ELAPSED, per-student MANUAL) are still future extension points; locked lessons still return content in student views (the lock is advisory in presentation — audit §6.2).
 - **Transactional outbox has no dispatcher** — events are written and never sent.
 - **Payment webhooks work now** (`d22379b`: `rawBody: true` + `rawPayload` column + dedup keyed on the provider event id + Paymob field-HMAC + providers registered from env credentials; live HTTP smoke **11/11**). Still absent: refund/callback HTTP routes and the video webhook route.
 - Canonical ports: **web :3001, api :3002** (older docs still say `:3000` in places).
@@ -48,7 +49,7 @@
 **Rules that follow:**
 
 1. P0 is closed; P1 isolation core has landed and is verified locally. Remaining P1 = **activate on Railway**: rotate the DB password by hand → apply migrations (`migrate resolve --applied` for the 3 pre-baseline histories, then `migrate deploy`) → point the runtime URL at `app_user` → flip the env preference in `prisma.service.ts`.
-2. Claims about RLS / flags / outbox / webhooks must cite working code — not intent.
+2. Claims about RLS / flags / outbox / webhooks / progression must cite working code — not intent.
 3. Secrets live only in `.env` (gitignored). Never paste credentials into source, logs, or chat.
 
 ## Environment Rules (Windows + PowerShell + pnpm ONLY)
@@ -238,19 +239,19 @@ learning-platform/
 
 ## Key Files to Know
 
-| File                                                                 | Purpose                                                                                                                                             |
-| -------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `apps/api/prisma/schema.prisma`                                      | All Prisma models + enums                                                                                                                           |
-| `apps/api/prisma/migrations/`                                        | 6 migrations: baseline `0_init` (42 tables) + `lms_rls` + `auth_cookie_sessions` + `rls_hardening` + `tenant_resolution_fn` + `webhook_raw_payload` |
-| `apps/api/src/common/prisma/tenant-context.ts`                       | AsyncLocalStorage tenant scope + `applyTenantContext()` for interactive transactions                                                                |
-| `apps/api/src/modules/tenants/prisma.service.ts`                     | Prisma `$extends` proxy — injects `app.tenant_id` per operation inside a request scope                                                              |
-| `apps/api/src/modules/tenants/tenant-resolver.middleware.ts`         | Resolves Host → tenant (SECURITY DEFINER fn) and runs the request in the tenant scope                                                               |
-| `apps/api/test/rls-isolation.e2e-spec.ts`                            | Isolation proof of record — runs with `RLS_ADMIN_URL` + `RLS_APP_URL` (5/5 green live)                                                              |
-| `apps/api/src/modules/authorization/policy-engine.ts`                | Central `can(user, action, resource)`                                                                                                               |
-| `apps/api/src/modules/entitlements/entitlements.service.ts`          | Entitlement grants/checks                                                                                                                           |
-| `apps/api/src/modules/video-protection/services/watermark-engine.ts` | Deterministic watermark positions                                                                                                                   |
-| `apps/api/src/modules/payments/payment-orchestrator.service.ts`      | Order → Intent → Provider → Ledger flow                                                                                                             |
-| `docs/AUDIT-2026-10-16.md`                                           | Latest verified reality (2026-10-16) — read before trusting any other doc                                                                           |
+| File                                                                 | Purpose                                                                                                                                                                        |
+| -------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `apps/api/prisma/schema.prisma`                                      | All Prisma models + enums                                                                                                                                                      |
+| `apps/api/prisma/migrations/`                                        | 7 migrations: baseline `0_init` (42 tables) + `lms_rls` + `auth_cookie_sessions` + `rls_hardening` + `tenant_resolution_fn` + `webhook_raw_payload` + `student_lesson_unlocks` |
+| `apps/api/src/common/prisma/tenant-context.ts`                       | AsyncLocalStorage tenant scope + `applyTenantContext()` for interactive transactions                                                                                           |
+| `apps/api/src/modules/tenants/prisma.service.ts`                     | Prisma `$extends` proxy — injects `app.tenant_id` per operation inside a request scope                                                                                         |
+| `apps/api/src/modules/tenants/tenant-resolver.middleware.ts`         | Resolves Host → tenant (SECURITY DEFINER fn) and runs the request in the tenant scope                                                                                          |
+| `apps/api/test/rls-isolation.e2e-spec.ts`                            | Isolation proof of record — runs with `RLS_ADMIN_URL` + `RLS_APP_URL` (5/5 green live)                                                                                         |
+| `apps/api/src/modules/authorization/policy-engine.ts`                | Central `can(user, action, resource)`                                                                                                                                          |
+| `apps/api/src/modules/entitlements/entitlements.service.ts`          | Entitlement grants/checks                                                                                                                                                      |
+| `apps/api/src/modules/video-protection/services/watermark-engine.ts` | Deterministic watermark positions                                                                                                                                              |
+| `apps/api/src/modules/payments/payment-orchestrator.service.ts`      | Order → Intent → Provider → Ledger flow                                                                                                                                        |
+| `docs/AUDIT-2026-10-16.md`                                           | Latest verified reality (2026-10-16) — read before trusting any other doc                                                                                                      |
 
 ---
 
