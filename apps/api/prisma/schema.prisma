@@ -1223,6 +1223,7 @@ model WebhookEvent {
   eventType             String
   signatureVerified     Boolean            @default(false)
   payloadHash           String
+  rawPayload            Json?
   receivedAt            DateTime           @default(now())
   processedAt           DateTime?
   processingStatus      WebhookProcessingStatus @default(PENDING)

@@ -68,6 +68,10 @@ async function bootstrap() {
 
   const app = await NestFactory.create(AppModule, {
     bufferLogs: true,
+    // Provider webhooks are HMAC-verified against the exact bytes the provider
+    // sent. Without `rawBody: true` Nest never populates `req.rawBody`, so
+    // every Paymob/Fawry webhook died at the first hash (audit 2026-10-16 §5.1).
+    rawBody: true,
   });
 
   app.useLogger(app.get(Logger));

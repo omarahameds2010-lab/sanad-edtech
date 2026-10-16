@@ -186,10 +186,12 @@ export class FawryProvider implements PaymentProvider {
   async verifyWebhook(
     input: VerifyWebhookInput,
   ): Promise<VerifiedWebhookResult> {
-    const payload =
-      typeof input.rawBody === "string"
-        ? JSON.parse(input.rawBody)
-        : input.rawBody;
+    let payload: any;
+    try {
+      payload = this.parsePayload(input.rawBody);
+    } catch {
+      return { valid: false, errorCode: "INVALID_PAYLOAD" };
+    }
 
     // Fawry webhook verification uses a different approach
     // The notification contains a signature we need to verify
@@ -197,11 +199,15 @@ export class FawryProvider implements PaymentProvider {
       input.headers["signature"] || input.headers["x-fawry-signature"] || "";
     const expectedSignature = this.generateWebhookSignature(payload);
 
+    const receivedBuffer = Buffer.from(receivedSignature);
+    const expectedBuffer = Buffer.from(expectedSignature);
+
+    // Length guard first: timingSafeEqual throws RangeError on unequal
+    // lengths, turning a malformed signature into a 500 instead of a 401
+    // (audit 2026-10-16 §5.3).
     if (
-      !crypto.timingSafeEqual(
-        Buffer.from(receivedSignature),
-        Buffer.from(expectedSignature),
-      )
+      receivedBuffer.length !== expectedBuffer.length ||
+      !crypto.timingSafeEqual(receivedBuffer, expectedBuffer)
     ) {
       return { valid: false, errorCode: "INVALID_SIGNATURE" };
     }
@@ -277,6 +283,18 @@ export class FawryProvider implements PaymentProvider {
     // Fawry webhook signature format
     const str = `${this.merchantCode}${payload.referenceNumber}${payload.merchantRefNumber}${payload.customerProfileId}${payload.paymentAmount}${payload.orderAmount}${payload.orderStatus}${payload.paymentMethod}${this.secureHashKey}`;
     return crypto.createHash("sha256").update(str).digest("hex");
+  }
+
+  /**
+   * Nest hands the controller the body as a Buffer (`rawBody: true`); a plain
+   * string only ever appears in tests. Parsing must accept both — the old code
+   * passed the Buffer straight through as the "payload", so the computed
+   * signature could never match a real Fawry callback (audit §5.1).
+   */
+  private parsePayload(rawBody: string | Buffer): any {
+    const text =
+      typeof rawBody === "string" ? rawBody : rawBody.toString("utf8");
+    return JSON.parse(text);
   }
 
   private mapFawryStatus(data: FawryStatusResponse): ProviderPaymentStatus {

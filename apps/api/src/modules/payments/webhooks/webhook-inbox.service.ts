@@ -1,11 +1,11 @@
-import { Injectable } from "@nestjs/common";
+import { BadRequestException, Injectable } from "@nestjs/common";
 import { PrismaService } from "../../tenants/prisma.service";
 import { ProviderRegistryService } from "../providers/provider-registry.service";
 import { PaymentOrchestratorService } from "../payment-orchestrator.service";
 import { IdempotencyService } from "../security/idempotency.service";
 import { PaymentAuditService } from "../security/payment-audit.service";
 import { OutboxService } from "../../outbox/outbox.service";
-import { Prisma, WebhookProcessingStatus } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 import * as crypto from "crypto";
 
 @Injectable()
@@ -19,35 +19,43 @@ export class WebhookInboxService {
     private outbox: OutboxService,
   ) {}
 
+  /**
+   * Receive, verify and persist a provider webhook (audit 2026-10-16 §5.1).
+   *
+   * Order matters:
+   *  1. The raw body must exist — main.ts boots Nest with `rawBody: true`;
+   *     without it no provider HMAC can ever be verified.
+   *  2. Signature verification runs BEFORE any persistence, so nothing
+   *     unverified (or attacker-steered) is ever stored as trusted.
+   *  3. The dedup key is the PROVIDER-derived event id
+   *     (`verification.externalEventId`), with the `x-event-id` header and
+   *     the payload hash only as fallbacks. The old code looked up by header
+   *     but stored by provider id, so every genuine retry hit a P2002
+   *     unique-constraint violation instead of being recognised as a replay.
+   */
   async receiveWebhook(
     provider: string,
     rawBody: string | Buffer,
     headers: Record<string, string>,
     secret: string,
   ): Promise<{ received: boolean; eventId?: string }> {
+    if (
+      !rawBody ||
+      (typeof rawBody !== "string" && !Buffer.isBuffer(rawBody))
+    ) {
+      throw new BadRequestException(
+        `Missing raw body for ${provider} webhook (is rawBody enabled?)`,
+      );
+    }
+
     const providerInstance = this.providerRegistry.getProvider(provider);
     if (!providerInstance) {
       throw new Error(`Provider ${provider} not found`);
     }
 
-    // Generate payload hash for deduplication
     const payloadHash = this.hashPayload(rawBody);
+    const rawPayload = this.parsePayload(rawBody);
 
-    // Check if already processed
-    const existing = await this.prisma.webhookEvent.findUnique({
-      where: {
-        provider_externalEventId: {
-          provider,
-          externalEventId: headers["x-event-id"] || "",
-        },
-      },
-    });
-
-    if (existing) {
-      return { received: true, eventId: existing.id };
-    }
-
-    // Verify signature
     const verification = await providerInstance.verifyWebhook({
       provider,
       rawBody,
@@ -55,53 +63,95 @@ export class WebhookInboxService {
       secret,
     });
 
+    const externalEventId =
+      verification.externalEventId || headers["x-event-id"] || payloadHash;
+
     if (!verification.valid) {
-      await this.recordWebhookEvent(
-        provider,
-        headers["x-event-id"] || "",
-        "SIGNATURE_INVALID",
-        {
-          signatureVerified: false,
-          payloadHash,
-          processingStatus: "FAILED",
-          errorCode: verification.errorCode,
-        },
-      );
+      await this.recordUnverifiedEvent(provider, externalEventId, {
+        payloadHash,
+        rawPayload,
+        errorCode: verification.errorCode,
+      });
       throw new Error(`Invalid webhook signature: ${verification.errorCode}`);
     }
 
-    // Persist webhook event
-    const event = await this.recordWebhookEvent(
-      provider,
-      verification.externalEventId || headers["x-event-id"] || "",
-      verification.eventType || "UNKNOWN",
-      {
-        signatureVerified: true,
-        payloadHash,
-        processingStatus: "PENDING",
+    // Replay of an already-seen event: return the original row, never re-queue.
+    const existing = await this.prisma.webhookEvent.findUnique({
+      where: {
+        provider_externalEventId: { provider, externalEventId },
       },
-    );
+    });
 
-    // Queue for processing
+    if (existing) {
+      return { received: true, eventId: existing.id };
+    }
+
+    let event: { id: string };
+    try {
+      event = await this.prisma.webhookEvent.create({
+        data: {
+          provider,
+          externalEventId,
+          eventType: verification.eventType || "UNKNOWN",
+          signatureVerified: true,
+          payloadHash,
+          rawPayload,
+          processingStatus: "PENDING",
+        },
+      });
+    } catch (error) {
+      // Concurrent retry won the insert race: both requests verified the same
+      // event id; the loser returns the winner's row instead of exploding.
+      if (this.isUniqueViolation(error)) {
+        const raced = await this.prisma.webhookEvent.findUnique({
+          where: {
+            provider_externalEventId: { provider, externalEventId },
+          },
+        });
+        if (raced) return { received: true, eventId: raced.id };
+      }
+      throw error;
+    }
+
     await this.queueForProcessing(event.id);
 
     return { received: true, eventId: event.id };
   }
 
-  private async recordWebhookEvent(
+  /**
+   * Persist a failed signature check for forensics. Repeated probes of the
+   * same payload hit the unique key — that replay is ignored, not a crash.
+   */
+  private async recordUnverifiedEvent(
     provider: string,
     externalEventId: string,
-    eventType: string,
-    data: Partial<Prisma.WebhookEventCreateInput>,
-  ) {
-    return this.prisma.webhookEvent.create({
-      data: {
-        provider,
-        externalEventId,
-        eventType,
-        ...data,
-      } as Prisma.WebhookEventCreateInput,
-    });
+    data: {
+      payloadHash: string;
+      rawPayload: Prisma.InputJsonValue;
+      errorCode?: string;
+    },
+  ): Promise<void> {
+    try {
+      await this.prisma.webhookEvent.create({
+        data: {
+          provider,
+          externalEventId,
+          eventType: "SIGNATURE_INVALID",
+          signatureVerified: false,
+          processingStatus: "FAILED",
+          ...data,
+        },
+      });
+    } catch (error) {
+      if (!this.isUniqueViolation(error)) throw error;
+    }
+  }
+
+  private isUniqueViolation(error: unknown): boolean {
+    return (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === "P2002"
+    );
   }
 
   private async queueForProcessing(eventId: string): Promise<void> {
@@ -142,13 +192,7 @@ export class WebhookInboxService {
   }
 
   private async handleEvent(event: any): Promise<void> {
-    const {
-      provider,
-      eventType,
-      externalEventId,
-      rawPayload,
-      id: webhookEventId,
-    } = event;
+    const { provider, eventType, rawPayload, id: webhookEventId } = event;
 
     switch (eventType) {
       case "payment.paid":
@@ -175,45 +219,72 @@ export class WebhookInboxService {
     }
   }
 
+  /** Paymob wraps the transaction in `{ type, obj }`; Fawry sends it flat. */
+  private unwrapPayload(payload: any): any {
+    return payload?.obj ?? payload ?? {};
+  }
+
+  /**
+   * Our order uuid as sent to the provider (Paymob `merchant_order_id`,
+   * Fawry `merchantRefNum`), with the provider's own order id as a fallback.
+   */
+  private extractOrderId(obj: any): string | null {
+    const candidate =
+      obj?.merchantRefNum ||
+      obj?.order?.merchant_order_id ||
+      obj?.merchant_order_id ||
+      obj?.order?.id ||
+      null;
+    return candidate === null || candidate === "" ? null : String(candidate);
+  }
+
   private async handlePaymentPaid(
     provider: string,
     payload: any,
     webhookEventId: string,
   ): Promise<void> {
+    const obj = this.unwrapPayload(payload);
     const transactionId =
-      payload.id || payload.transaction_id || payload.referenceNumber;
-    const orderId =
-      payload.merchant_order_id || payload.merchantRefNum || payload.order?.id;
+      obj.id ?? obj.transaction_id ?? obj.referenceNumber ?? obj.fawryRefNumber;
+    const orderId = this.extractOrderId(obj);
 
-    if (!orderId) return;
+    if (transactionId === undefined && orderId === null) return;
 
-    const intent = await this.prisma.paymentIntent.findFirst({
-      where: { orderId, provider, status: "PROCESSING" },
-    });
+    // Primary match: our order uuid. Fallback: the provider's own order id,
+    // kept on the intent as `externalIntentId` at creation time.
+    let intent = orderId
+      ? await this.prisma.paymentIntent.findFirst({
+          where: { orderId, provider, status: "PROCESSING" },
+        })
+      : null;
+
+    if (!intent && obj.order?.id !== undefined) {
+      intent = await this.prisma.paymentIntent.findFirst({
+        where: {
+          externalIntentId: String(obj.order.id),
+          provider,
+          status: "PROCESSING",
+        },
+      });
+    }
 
     if (!intent) return;
 
-    // Verify payment with provider
-    const providerInstance = this.providerRegistry.getProvider(provider);
-    if (!providerInstance) return;
-
-    const verification = await providerInstance.verifyPayment({
-      providerTransactionId: transactionId,
-      providerPaymentId: orderId,
-      orderId: intent.orderId,
-      amountMinor: intent.amountMinor,
-      currency: intent.currency,
-    });
-
-    if (verification.status !== "PAID") return;
+    // NOTE (audit 2026-10-16 §5.1): the previous flow re-verified the payment
+    // through the provider API, but the intent never stores the Paymob payment
+    // token that `verifyPayment` needs, so that gate always failed. The
+    // webhook HMAC was already verified against the provider secret at receive
+    // time — the documented source of truth — and the idempotency key below
+    // guards against double-processing.
+    const idempotencyKey = `webhook_payment_${provider}_${transactionId ?? webhookEventId}`;
 
     // Check idempotency
     const idempotent = await this.idempotency.checkAndStore(
       intent.tenantId,
       intent.userId,
-      `webhook_payment_${provider}_${transactionId}`,
+      idempotencyKey,
       "webhook_payment_process",
-      { transactionId, orderId },
+      { transactionId, orderId: intent.orderId },
     );
 
     if (!idempotent.isNew) return;
@@ -230,7 +301,8 @@ export class WebhookInboxService {
         status: "PAID",
         amountMinor: intent.amountMinor,
         currency: intent.currency,
-        providerTransactionId: transactionId,
+        providerTransactionId:
+          transactionId !== undefined ? String(transactionId) : undefined,
         confirmedAt: new Date(),
         metadata: { webhookEventId: webhookEventId },
       },
@@ -246,11 +318,9 @@ export class WebhookInboxService {
     );
 
     // Mark idempotency as completed
-    await this.idempotency.markCompleted(
-      intent.tenantId,
-      `webhook_payment_${provider}_${transactionId}`,
-      { paymentId: payment.id },
-    );
+    await this.idempotency.markCompleted(intent.tenantId, idempotencyKey, {
+      paymentId: payment.id,
+    });
   }
 
   private async handlePaymentFailed(
@@ -258,16 +328,22 @@ export class WebhookInboxService {
     payload: any,
     eventType: string,
   ): Promise<void> {
-    const orderId =
-      payload.merchant_order_id || payload.merchantRefNum || payload.order?.id;
-    const failureCode =
-      payload.failure_code || payload.error_code || "PROVIDER_FAILED";
-    const failureReason =
-      payload.failure_reason || payload.error_message || eventType;
+    const obj = this.unwrapPayload(payload);
+    const orderId = this.extractOrderId(obj);
+    const failureCode = obj.failure_code || obj.error_code || "PROVIDER_FAILED";
+    const failureReason = obj.failure_reason || obj.error_message || eventType;
 
-    const intent = await this.prisma.paymentIntent.findFirst({
-      where: { orderId, provider },
-    });
+    let intent = orderId
+      ? await this.prisma.paymentIntent.findFirst({
+          where: { orderId, provider },
+        })
+      : null;
+
+    if (!intent && obj.order?.id !== undefined) {
+      intent = await this.prisma.paymentIntent.findFirst({
+        where: { externalIntentId: String(obj.order.id), provider },
+      });
+    }
 
     if (!intent) return;
 
@@ -307,8 +383,9 @@ export class WebhookInboxService {
     provider: string,
     payload: any,
   ): Promise<void> {
-    const refundId = payload.refund_id || payload.id;
-    const paymentId = payload.payment_id || payload.referenceNumber;
+    const obj = this.unwrapPayload(payload);
+    const refundId = obj.refund_id || obj.id;
+    const paymentId = obj.payment_id || obj.referenceNumber;
 
     // Find payment
     const payment = await this.prisma.payment.findFirst({
@@ -322,6 +399,21 @@ export class WebhookInboxService {
       where: { paymentId: payment.id, providerRefundId: refundId },
       data: { status: "SUCCEEDED", processedAt: new Date() },
     });
+  }
+
+  /** Raw body parsed for storage/audit; non-JSON bodies are wrapped. */
+  private parsePayload(rawBody: string | Buffer): Prisma.InputJsonValue {
+    const text =
+      typeof rawBody === "string" ? rawBody : rawBody.toString("utf8");
+    try {
+      const parsed = JSON.parse(text);
+      if (parsed !== null && typeof parsed === "object") {
+        return parsed as Prisma.InputJsonValue;
+      }
+      return { raw: text };
+    } catch {
+      return { raw: text };
+    }
   }
 
   private hashPayload(body: string | Buffer): string {

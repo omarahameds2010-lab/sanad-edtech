@@ -160,10 +160,7 @@ export class PaymobProvider implements PaymentProvider {
       return { valid: false, errorCode: "INVALID_SIGNATURE" };
     }
 
-    const payload =
-      typeof input.rawBody === "string"
-        ? JSON.parse(input.rawBody)
-        : input.rawBody;
+    const payload = this.parsePayload(input.rawBody);
     const obj = payload.obj || payload;
 
     return {
@@ -327,18 +324,73 @@ export class PaymobProvider implements PaymentProvider {
     return "payment.unknown";
   }
 
+  /**
+   * Paymob signs transaction callbacks with HMAC-SHA512 over a CONCATENATION
+   * OF SPECIFIC FIELDS — not over the raw body (audit 2026-10-16 §5.3). The
+   * field order below follows Paymob's documented callback-verification
+   * snippet (Transaction processed callback, docs.paymob.com); missing values
+   * are treated as empty strings and booleans stringify to true/false.
+   */
   private verifyHmac(body: string | Buffer, receivedHmac: string): boolean {
     if (!receivedHmac || !this.hmacSecret) return false;
 
+    let obj: any;
+    try {
+      const parsed = this.parsePayload(body);
+      obj = parsed?.obj ?? parsed;
+    } catch {
+      return false;
+    }
+
+    const concatenated = [
+      obj.amount_cents,
+      obj.created_at,
+      obj.currency,
+      obj.error_occured,
+      obj.has_parent_transaction,
+      obj.id,
+      obj.integration_id,
+      obj.is_3d_secure,
+      obj.is_auth,
+      obj.is_capture,
+      obj.is_refunded,
+      obj.is_standalone_payment,
+      obj.is_voided,
+      obj.order?.id,
+      obj.owner,
+      obj.pending,
+      obj.source_data?.pan,
+      obj.source_data?.sub_type,
+      obj.source_data?.type,
+      obj.success,
+    ]
+      .map((value) =>
+        value === undefined || value === null ? "" : String(value),
+      )
+      .join("");
+
     const expectedHmac = crypto
       .createHmac("sha512", this.hmacSecret)
-      .update(typeof body === "string" ? body : body.toString())
+      .update(concatenated)
       .digest("hex");
 
-    return crypto.timingSafeEqual(
-      Buffer.from(receivedHmac, "hex"),
-      Buffer.from(expectedHmac, "hex"),
-    );
+    const received = Buffer.from(receivedHmac.toLowerCase(), "hex");
+    const expected = Buffer.from(expectedHmac, "hex");
+    // Length guard: timingSafeEqual throws RangeError on unequal lengths.
+    if (received.length !== expected.length) return false;
+    return crypto.timingSafeEqual(received, expected);
+  }
+
+  /**
+   * Nest hands the controller the body as a Buffer (`rawBody: true`); a plain
+   * string only ever appears in tests. Parsing must accept both — the old code
+   * passed the Buffer straight through as the "payload", so every real
+   * callback mapped to `payment.unknown` (audit 2026-10-16 §5.1).
+   */
+  private parsePayload(rawBody: string | Buffer): any {
+    const text =
+      typeof rawBody === "string" ? rawBody : rawBody.toString("utf8");
+    return JSON.parse(text);
   }
 
   async refund(input: ProviderRefundInput): Promise<ProviderRefundResult> {
