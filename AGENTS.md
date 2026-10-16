@@ -6,20 +6,20 @@
 
 ## Stack
 
-| Layer       | Technology                                                                                                                                   |
-| ----------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
-| Web         | Next.js 15 (pinned `^15.0.0`) + App Router + TypeScript                                                                                      |
-| API         | NestJS 10 (modular monolith)                                                                                                                 |
-| DB          | PostgreSQL + Prisma ORM                                                                                                                      |
-| Auth        | JWT (short access) + rotating refresh tokens (HttpOnly cookies)                                                                              |
-| Isolation   | Shared DB + `tenant_id` + **PostgreSQL RLS (FORCE ROW LEVEL SECURITY)** — ⚠️ designed, NOT wired at runtime yet (see Verified Reality below) |
-| Cache/Queue | Redis + BullMQ (⚠️ deps installed; no processors/relay wired)                                                                                |
-| Storage     | Cloudflare R2 / S3                                                                                                                           |
-| Video       | Bunny Stream / VdoCipher (initial)                                                                                                           |
-| Payments    | Paymob, Fawry, Vouchers                                                                                                                      |
-| Monorepo    | pnpm + Turborepo                                                                                                                             |
-| CI/CD       | GitHub Actions                                                                                                                               |
-| Infra       | Docker + Terraform (later)                                                                                                                   |
+| Layer       | Technology                                                                                                                                                                                   |
+| ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Web         | Next.js 15 (pinned `^15.0.0`) + App Router + TypeScript                                                                                                                                      |
+| API         | NestJS 10 (modular monolith)                                                                                                                                                                 |
+| DB          | PostgreSQL + Prisma ORM                                                                                                                                                                      |
+| Auth        | JWT (short access) + rotating refresh tokens (HttpOnly cookies)                                                                                                                              |
+| Isolation   | Shared DB + `tenant_id` + **PostgreSQL RLS (FORCE ROW LEVEL SECURITY)** — ✅ DB-side complete + runtime injection landed; activation = runtime connects as `app_user` (see Verified Reality) |
+| Cache/Queue | Redis + BullMQ (⚠️ deps installed; no processors/relay wired)                                                                                                                                |
+| Storage     | Cloudflare R2 / S3                                                                                                                                                                           |
+| Video       | Bunny Stream / VdoCipher (initial)                                                                                                                                                           |
+| Payments    | Paymob, Fawry, Vouchers                                                                                                                                                                      |
+| Monorepo    | pnpm + Turborepo                                                                                                                                                                             |
+| CI/CD       | GitHub Actions                                                                                                                                                                               |
+| Infra       | Docker + Terraform (later)                                                                                                                                                                   |
 
 ## ⚠️ Verified Reality (2026-10-16 Audit) — Read Before Building
 
@@ -27,21 +27,26 @@
 
 **Credential incident — resolved; rotation pending (2026-10-16 evening).** Commit `78b9d69` (pushed) fixed `apps/api/src/modules/tenants/prisma.service.ts` to read `MIGRATION_DATABASE_URL` / `DATABASE_URL` from env. Same day: the working-tree leak in `apps/api/prisma/seed-path2.ts` was reverted and `apps/api/srv.txt` deleted — `git status` clean, git history never contained the secret. **By hand only:** rotate the Railway DB password in the dashboard. Never paste credentials into source, logs, or chat.
 
-**Not true in runtime code yet (despite this file):**
+**Migrations + RLS + token binding — landed 2026-10-16 evening:**
 
-- **RLS is NOT enforced.** `setTenantContext` has zero call sites; `TenantContextInterceptor` is a no-op; migrations FORCE only 6 tables; `init_rls.sql` is a loose file Prisma ignores. Tenant isolation today = every query must carry `tenantId`. Never write a query without it.
-- **Feature flags — FIXED 2026-10-16 (`e9227bc`).** `checkFeatureFlags` accepts both raw booleans and `{enabled,value}` objects (regression was `=== true` → every gated action 403 `FEATURE_DISABLED`). Regression tests cover both shapes.
+- **`prisma migrate deploy` on a fresh DB — FIXED (`618aa0a`).** Real baseline `0_init` (42 tables) + `migration_lock.toml` committed; verified 5/5 migrations on a clean PostgreSQL 17.
+- **RLS — DB-side complete + runtime injection wired (`cb23a97`, `95020fe`).** `20261016000000_rls_hardening` installs camelCase policies on all 42 application tables + FORCE (only `_prisma_migrations` exempt) + creates the `app_user` role behind a superuser check; the broken loose `init_rls.sql` was deleted (never applied — wrong column names). `20261016000001_tenant_resolution_fn` adds `app_resolve_tenant_by_domain` (SECURITY DEFINER) used by the pre-auth middleware. Runtime: `TenantResolverMiddleware` wraps each request in AsyncLocalStorage; `PrismaService` returns a `$extends` proxy that executes every op in a short transaction right after `set_config('app.tenant_id', <id>, true)`; interactive `$transaction` sites call `applyTenantContext(tx)` explicitly.
+- **Live proof (local PostgreSQL 17, as `app_user`):** repo's own `test/rls-isolation.e2e-spec.ts` green **5/5** (scoped SELECT; cross-tenant UPDATE/DELETE = 0 rows; cross-tenant INSERT rejected; empty context = 0 rows) after fixing the spec's stale Prisma array-args form; 134 policies / FORCE on 42 tables verified via SQL; compiled-service E2E 7/7; api suite **187/187**.
+- **JWT `tenantId` vs request Host — FIXED (`f1aaa58`).** `passReqToCallback` rejects tokens whose `tenantId` mismatches the host-resolved tenant, or when host context is absent; 5 regression tests.
+- **Feature flags — FIXED (`e9227bc`).** `checkFeatureFlags` accepts both raw booleans and `{enabled,value}` objects. Regression tests cover both shapes.
+- ⚠️ **RLS enforcement is still INACTIVE wherever the runtime connects as a superuser/table owner** (FORCE RLS never applies to superusers) — it activates when the runtime URL points at `app_user` (pending on Railway; rotate the DB password first). Until then: **every query must still carry `tenantId`.**
+
+**Still not true in runtime code (despite this file):**
+
 - **Progression unlocks are GLOBAL per tenant** (`Lesson.lockStatus`), not per-student, not transactional. No `UnlockRule` table exists.
 - **Transactional outbox has no dispatcher** — events are written and never sent.
 - **Payment webhooks cannot work** (no `rawBody: true`; payload never stored). No refund/callback HTTP routes exist.
-- **`prisma migrate deploy` fails on a fresh DB** — no baseline migration exists.
-- **JWT `tenantId` is never matched against the request Host** — cross-tenant token use is possible until RLS/token binding land.
 - Canonical ports: **web :3001, api :3002** (older docs still say `:3000` in places).
 - Dual jest configs: run API tests as `jest --config jest.config.js` inside `apps/api`.
 
 **Rules that follow:**
 
-1. Fix the P0 blockers (audit §10) before any new feature work.
+1. P0 is closed; P1 isolation core has landed and is verified locally. Remaining P1 = **activate on Railway**: rotate the DB password by hand → apply migrations (`migrate resolve --applied` for the 3 pre-baseline histories, then `migrate deploy`) → point the runtime URL at `app_user` → flip the env preference in `prisma.service.ts`.
 2. Claims about RLS / flags / outbox / webhooks must cite working code — not intent.
 3. Secrets live only in `.env` (gitignored). Never paste credentials into source, logs, or chat.
 
@@ -232,17 +237,19 @@ learning-platform/
 
 ## Key Files to Know
 
-| File                                                                 | Purpose                                                                   |
-| -------------------------------------------------------------------- | ------------------------------------------------------------------------- |
-| `apps/api/prisma/schema.prisma`                                      | All Prisma models + enums                                                 |
-| `apps/api/prisma/migrations/20240101000000_init_rls.sql`             | ⚠️ RLS policies — loose file Prisma ignores; not applied (audit §3.3)     |
-| `apps/api/src/modules/tenants/prisma.service.ts`                     | `setTenantContext()` helper — ⚠️ zero call sites today                    |
-| `apps/api/src/common/interceptors/tenant-context.interceptor.ts`     | ⚠️ no-op today — tenant context is never actually set                     |
-| `apps/api/src/modules/authorization/policy-engine.ts`                | Central `can(user, action, resource)`                                     |
-| `apps/api/src/modules/entitlements/entitlements.service.ts`          | Entitlement grants/checks                                                 |
-| `apps/api/src/modules/video-protection/services/watermark-engine.ts` | Deterministic watermark positions                                         |
-| `apps/api/src/modules/payments/payment-orchestrator.service.ts`      | Order → Intent → Provider → Ledger flow                                   |
-| `docs/AUDIT-2026-10-16.md`                                           | Latest verified reality (2026-10-16) — read before trusting any other doc |
+| File                                                                 | Purpose                                                                                                                     |
+| -------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| `apps/api/prisma/schema.prisma`                                      | All Prisma models + enums                                                                                                   |
+| `apps/api/prisma/migrations/`                                        | 5 migrations: baseline `0_init` (42 tables) + `lms_rls` + `auth_cookie_sessions` + `rls_hardening` + `tenant_resolution_fn` |
+| `apps/api/src/common/prisma/tenant-context.ts`                       | AsyncLocalStorage tenant scope + `applyTenantContext()` for interactive transactions                                        |
+| `apps/api/src/modules/tenants/prisma.service.ts`                     | Prisma `$extends` proxy — injects `app.tenant_id` per operation inside a request scope                                      |
+| `apps/api/src/modules/tenants/tenant-resolver.middleware.ts`         | Resolves Host → tenant (SECURITY DEFINER fn) and runs the request in the tenant scope                                       |
+| `apps/api/test/rls-isolation.e2e-spec.ts`                            | Isolation proof of record — runs with `RLS_ADMIN_URL` + `RLS_APP_URL` (5/5 green live)                                      |
+| `apps/api/src/modules/authorization/policy-engine.ts`                | Central `can(user, action, resource)`                                                                                       |
+| `apps/api/src/modules/entitlements/entitlements.service.ts`          | Entitlement grants/checks                                                                                                   |
+| `apps/api/src/modules/video-protection/services/watermark-engine.ts` | Deterministic watermark positions                                                                                           |
+| `apps/api/src/modules/payments/payment-orchestrator.service.ts`      | Order → Intent → Provider → Ledger flow                                                                                     |
+| `docs/AUDIT-2026-10-16.md`                                           | Latest verified reality (2026-10-16) — read before trusting any other doc                                                   |
 
 ---
 

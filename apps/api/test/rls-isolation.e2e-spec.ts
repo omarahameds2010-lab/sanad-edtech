@@ -75,7 +75,7 @@ describeRls("RLS tenant isolation (real DB)", () => {
     const rows = await app.$transaction(async (tx) => {
       await tx.$executeRawUnsafe(
         `SELECT set_config('app.tenant_id', $1, true)`,
-        [TENANT_A],
+        TENANT_A,
       );
       return tx.course.findMany();
     });
@@ -88,7 +88,7 @@ describeRls("RLS tenant isolation (real DB)", () => {
     const updated = await app.$transaction(async (tx) => {
       await tx.$executeRawUnsafe(
         `SELECT set_config('app.tenant_id', $1, true)`,
-        [TENANT_A],
+        TENANT_A,
       );
       return tx.course.updateMany({
         where: { id: "course_b" },
@@ -106,7 +106,7 @@ describeRls("RLS tenant isolation (real DB)", () => {
     const deleted = await app.$transaction(async (tx) => {
       await tx.$executeRawUnsafe(
         `SELECT set_config('app.tenant_id', $1, true)`,
-        [TENANT_A],
+        TENANT_A,
       );
       return tx.course.deleteMany({ where: { id: "course_b" } });
     });
@@ -122,7 +122,7 @@ describeRls("RLS tenant isolation (real DB)", () => {
       app.$transaction(async (tx) => {
         await tx.$executeRawUnsafe(
           `SELECT set_config('app.tenant_id', $1, true)`,
-          [TENANT_A],
+          TENANT_A,
         );
         return tx.course.create({
           data: {
@@ -142,7 +142,7 @@ describeRls("RLS tenant isolation (real DB)", () => {
     const rows = await app.$transaction(async (tx) => {
       await tx.$executeRawUnsafe(
         `SELECT set_config('app.tenant_id', $1, true)`,
-        [""],
+        "",
       );
       return tx.course.findMany();
     });
