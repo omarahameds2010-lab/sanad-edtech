@@ -56,6 +56,49 @@ describe("PolicyEngine (student loop)", () => {
     expect(decision.allowed).toBe(true);
   });
 
+  it("allows when the flag is an { enabled, value } object (audit §3.2 regression)", async () => {
+    const decision = await engine.can(
+      {
+        ...student,
+        featureFlags: { assignments: { enabled: true, value: true } },
+        entitlements: [
+          {
+            resourceType: "assignment",
+            resourceId: "a-1",
+            status: "ACTIVE",
+            source: "admin_grant",
+          },
+        ],
+      } as any,
+      "submit",
+      "assignment",
+      { id: "a-1" },
+    );
+    expect(decision.allowed).toBe(true);
+  });
+
+  it("denies with FEATURE_DISABLED when the object has enabled: false", async () => {
+    const decision = await engine.can(
+      {
+        ...student,
+        featureFlags: { assignments: { enabled: false, value: false } },
+        entitlements: [
+          {
+            resourceType: "assignment",
+            resourceId: "a-1",
+            status: "ACTIVE",
+            source: "admin_grant",
+          },
+        ],
+      } as any,
+      "submit",
+      "assignment",
+      { id: "a-1" },
+    );
+    expect(decision.allowed).toBe(false);
+    expect(decision.reason).toBe("FEATURE_DISABLED");
+  });
+
   it("still forbids a student from grading", async () => {
     const decision = await engine.can(student, "grade", "exam", {
       id: "exam-1",

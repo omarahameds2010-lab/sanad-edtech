@@ -47,7 +47,7 @@ export type Action =
   | "redeem"
   | "archive"
   | "reorder"
-  | "evaluate";  // AI evaluation action
+  | "evaluate"; // AI evaluation action
 
 export interface AuthorizationContext {
   userId: string;
@@ -292,7 +292,14 @@ export class PolicyEngine {
         user: ["read"],
         tenant: ["read"],
         certificate: ["create", "read"],
-        assignment: ["create", "read", "update", "publish", "grade", "evaluate"],
+        assignment: [
+          "create",
+          "read",
+          "update",
+          "publish",
+          "grade",
+          "evaluate",
+        ],
         question: ["create", "read", "update", "delete"],
         questionBank: ["create", "read", "update", "delete"],
         video: ["create", "read", "update", "delete"],
@@ -485,7 +492,12 @@ export class PolicyEngine {
     if (!featureFlag) return { allowed: true };
 
     const flags = context.featureFlags || {};
-    const isEnabled = flags[featureFlag] === true;
+    // getTenantFlags returns FeatureFlagEvaluation objects ({ enabled, value }),
+    // while unit tests and older callers may pass raw booleans — accept both.
+    // (Field audit 2026-10-16 §3.2: comparing `=== true` alone denied every
+    // gated action at runtime with 403 FEATURE_DISABLED.)
+    const flag = flags[featureFlag];
+    const isEnabled = flag === true || flag?.enabled === true;
 
     if (!isEnabled) {
       return {
