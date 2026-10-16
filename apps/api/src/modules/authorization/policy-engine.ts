@@ -315,7 +315,7 @@ export class PolicyEngine {
         lesson: ["read", "watch"],
         exam: ["read", "attempt", "submit"],
         attempt: ["create", "read", "submit"],
-        enrollment: ["create", "read"],
+        enrollment: ["create", "read", "enroll"],
         order: ["create", "read"],
         payment: ["create", "read"],
         voucher: ["read"],

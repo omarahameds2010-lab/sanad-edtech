@@ -16,7 +16,6 @@ import {
 import { CoursesService } from "./courses.service";
 import { SectionsService } from "./sections/sections.service";
 import { LessonsService } from "./lessons/lessons.service";
-import { EnrollmentsService } from "./enrollments/enrollments.service";
 import { ResourcesService } from "./resources/resources.service";
 import {
   CreateCourseRequest,
@@ -210,10 +209,7 @@ export class StudentCoursesController {
     resourceType: "course",
     resourceIdParam: "courseId",
   })
-  async courseStructure(
-    @Request() req,
-    @Param("courseId") courseId: string,
-  ) {
+  async courseStructure(@Request() req, @Param("courseId") courseId: string) {
     const result = await this.coursesService.getCourseStructureForStudent(
       req.tenantId,
       courseId,
@@ -513,52 +509,5 @@ export class StudentResourcesController {
       id,
     );
     return { data: result };
-  }
-}
-
-@Controller("v1/student/enrollments")
-@UseGuards(JwtAuthGuard)
-export class StudentEnrollmentsController {
-  constructor(private enrollmentsService: EnrollmentsService) {}
-
-  @Post(":courseId")
-  @HttpCode(HttpStatus.CREATED)
-  async enroll(@Request() req, @Param("courseId") courseId: string) {
-    const enrollment = await this.enrollmentsService.enroll(
-      req.tenantId,
-      req.user.sub,
-      courseId,
-    );
-    return { data: enrollment };
-  }
-
-  @Get()
-  async list(@Request() req, @Query("status") status?: string) {
-    const enrollments = await this.enrollmentsService.listEnrollments(
-      req.tenantId,
-      req.user.sub,
-      status,
-    );
-    return { data: enrollments };
-  }
-
-  @Get(":id")
-  async get(@Request() req, @Param("id") id: string) {
-    const enrollment = await this.enrollmentsService.getEnrollment(
-      req.tenantId,
-      req.user.sub,
-      id,
-    );
-    return { data: enrollment };
-  }
-
-  @Post(":id/cancel")
-  async cancel(@Request() req, @Param("id") id: string) {
-    const enrollment = await this.enrollmentsService.cancelEnrollment(
-      req.tenantId,
-      req.user.sub,
-      id,
-    );
-    return { data: enrollment };
   }
 }

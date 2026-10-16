@@ -142,4 +142,35 @@ describe("PolicyEngine (student loop)", () => {
     });
     expect(decision.allowed).toBe(true);
   });
+
+  // Audit issue #8 (2026-10-16): the official enroll route
+  // (POST /v1/enrollments/courses/:courseId/enroll, @CanEnroll) requires
+  // action "enroll" on resource "enrollment" — previously granted to NO role,
+  // so every student got 403 while an unguarded duplicate route did the work.
+  it("allows a student to enroll in a course", async () => {
+    const decision = await engine.can(student, "enroll", "enrollment", {
+      id: "course-1",
+    });
+    expect(decision.allowed).toBe(true);
+  });
+
+  it("denies enroll for a teacher (self-enroll is student-only)", async () => {
+    const decision = await engine.can(
+      { ...student, role: "TEACHER" },
+      "enroll",
+      "enrollment",
+      { id: "course-1" },
+    );
+    expect(decision.allowed).toBe(false);
+  });
+
+  it("denies enroll for a parent", async () => {
+    const decision = await engine.can(
+      { ...student, role: "PARENT" },
+      "enroll",
+      "enrollment",
+      { id: "course-1" },
+    );
+    expect(decision.allowed).toBe(false);
+  });
 });
