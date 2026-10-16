@@ -5,6 +5,7 @@ import {
   ConflictException,
 } from "@nestjs/common";
 import { PrismaService } from "../../tenants/prisma.service";
+import { applyTenantContext } from "../../../common/prisma/tenant-context";
 
 @Injectable()
 export class SectionsService {
@@ -108,15 +109,17 @@ export class SectionsService {
       }
     }
 
-    // Atomic batch reorder in a transaction
-    await this.prisma.$transaction(
-      items.map((item) =>
-        this.prisma.section.update({
+    // Atomic reorder in one transaction, with the tenant context set for
+    // RLS (interactive tx clients are not auto-wrapped by PrismaService).
+    await this.prisma.$transaction(async (tx) => {
+      await applyTenantContext(tx, tenantId);
+      for (const item of items) {
+        await tx.section.update({
           where: { id: item.id },
           data: { orderIndex: item.position },
-        }),
-      ),
-    );
+        });
+      }
+    });
 
     return this.listSections(tenantId, courseId);
   }

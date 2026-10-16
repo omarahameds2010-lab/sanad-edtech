@@ -22,7 +22,15 @@ describe("SectionsService", () => {
         update: jest.fn(),
         delete: jest.fn(),
       },
-      $transaction: jest.fn((ops: any[]) => Promise.all(ops)),
+      $transaction: jest.fn(async (arg: any) => {
+        if (typeof arg === "function") {
+          return arg({
+            section: prisma.section,
+            $executeRawUnsafe: jest.fn().mockResolvedValue(1),
+          });
+        }
+        return Promise.all(arg);
+      }),
     };
     service = new SectionsService(prisma);
   });
@@ -77,7 +85,6 @@ describe("SectionsService", () => {
       prisma.section.update.mockImplementation((args: any) =>
         Promise.resolve(args),
       );
-      prisma.$transaction.mockImplementation((ops: any) => Promise.all(ops));
 
       await service.reorderSections(tenantId, "c1", [
         { id: "s1", position: 2 },

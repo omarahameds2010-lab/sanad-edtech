@@ -1,5 +1,9 @@
 import { Injectable, OnModuleInit, OnModuleDestroy } from "@nestjs/common";
 import { PrismaClient } from "@prisma/client";
+import {
+  applyTenantContext,
+  getTenantId,
+} from "../../common/prisma/tenant-context";
 
 @Injectable()
 export class PrismaService
@@ -25,6 +29,62 @@ export class PrismaService
         },
       },
     });
+
+    // ------------------------------------------------------------------
+    // Runtime row-level-security context (audit 2026-10-16 §3.3 / P1).
+    //
+    // When the request runs inside TenantResolverMiddleware's
+    // AsyncLocalStorage scope, every MODEL operation is executed inside a
+    // short transaction that first sets app.tenant_id transaction-locally —
+    // same connection, same transaction — so PostgreSQL RLS policies see
+    // the right tenant even on a reused pooled connection.
+    //
+    // Without a store (health checks, seeds, CLI scripts) operations pass
+    // through exactly as before.
+    //
+    // Interactive `$transaction(cb)` callers get a plain tx client; they
+    // set the context themselves via applyTenantContext(tx, tenantId)
+    // (done in the payment/voucher and course-reorder paths).
+    // ------------------------------------------------------------------
+    const base = this; // eslint-disable-line @typescript-eslint/no-this-alias -- per-op transactions must run on the non-extended client (avoids re-entering the extension)
+    const extended = this.$extends({
+      name: "tenant-rls-context",
+      query: {
+        $allModels: {
+          async $allOperations({ model, operation, args, query }: any) {
+            const tenantId = getTenantId();
+            if (!tenantId) {
+              return query(args);
+            }
+            return base.$transaction(async (tx: any) => {
+              await applyTenantContext(tx, tenantId);
+              return tx[model][operation](args);
+            });
+          },
+        },
+      },
+    }) as unknown as PrismaClient;
+
+    // Route every Prisma member through the extended client, while keeping
+    // the Nest lifecycle hooks on the base instance. `instanceof
+    // PrismaService` still holds — the proxy target is the real instance.
+    const serviceMembers = new Set(["onModuleInit", "onModuleDestroy"]);
+    return new Proxy(this, {
+      get(target, prop) {
+        if (typeof prop === "string" && serviceMembers.has(prop)) {
+          const member = Reflect.get(target, prop);
+          return typeof member === "function" ? member.bind(target) : member;
+        }
+        const value = (extended as any)[prop];
+        if (value !== undefined) {
+          return typeof value === "function" ? value.bind(extended) : value;
+        }
+        const fallback = Reflect.get(target, prop);
+        return typeof fallback === "function"
+          ? fallback.bind(target)
+          : fallback;
+      },
+    });
   }
 
   async onModuleInit() {
@@ -48,20 +108,5 @@ export class PrismaService
 
   async onModuleDestroy() {
     await this.$disconnect();
-  }
-
-  // Helper to set tenant context for RLS
-  async setTenantContext(tenantId: string) {
-    await this.$executeRawUnsafe(
-      `SELECT set_config('app.tenant_id', $1, true)`,
-      [tenantId],
-    );
-  }
-
-  // Helper to clear tenant context
-  async clearTenantContext() {
-    await this.$executeRawUnsafe(
-      `SELECT set_config('app.tenant_id', '', true)`,
-    );
   }
 }

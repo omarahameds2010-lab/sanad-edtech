@@ -6,6 +6,7 @@ import {
 } from "@nestjs/common";
 import { Request, Response, NextFunction } from "express";
 import { PrismaService } from "./prisma.service";
+import { runWithTenantId } from "../../common/prisma/tenant-context";
 
 declare module "express" {
   interface Request {
@@ -74,11 +75,11 @@ export class TenantResolverMiddleware implements NestMiddleware {
     // Set tenant context
     req.tenantId = tenant.id;
     req.tenant = tenant;
-
-    // Set PostgreSQL RLS context (this will be done in a transaction context)
-    // For now, we store it in the request for the interceptor to use
     req.headers["x-tenant-id"] = tenant.id;
 
-    next();
+    // Everything downstream (guards, controllers, services and the
+    // PrismaService wrapper) executes inside this AsyncLocalStorage scope:
+    // every tenant-scoped query gets app.tenant_id set transaction-locally.
+    return runWithTenantId(tenant.id, () => next());
   }
 }

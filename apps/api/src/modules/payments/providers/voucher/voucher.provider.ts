@@ -5,6 +5,7 @@ import {
   BadRequestException,
 } from "@nestjs/common";
 import { PrismaService } from "../../../tenants/prisma.service";
+import { applyTenantContext } from "../../../../common/prisma/tenant-context";
 import { EntitlementsService } from "../../../entitlements/entitlements.service";
 import { OutboxService } from "../../../outbox/outbox.service";
 import {
@@ -96,6 +97,10 @@ export class VoucherProvider implements PaymentProvider {
     }
 
     const result = await this.prisma.$transaction(async (tx) => {
+      // Interactive tx clients are not auto-wrapped: set the RLS tenant
+      // context for the whole transaction first.
+      await applyTenantContext(tx, tenantId);
+
       const updatedVoucher = await tx.voucher.update({
         where: { id: voucher.id },
         data: { usedCount: { increment: 1 } },

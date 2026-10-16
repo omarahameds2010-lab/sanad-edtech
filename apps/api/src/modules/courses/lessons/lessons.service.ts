@@ -5,6 +5,7 @@ import {
   ForbiddenException,
 } from "@nestjs/common";
 import { PrismaService } from "../../tenants/prisma.service";
+import { applyTenantContext } from "../../../common/prisma/tenant-context";
 import { LessonType, VideoStatus } from "@prisma/client";
 
 @Injectable()
@@ -152,14 +153,17 @@ export class LessonsService {
       }
     }
 
-    await this.prisma.$transaction(
-      items.map((item) =>
-        this.prisma.lesson.update({
+    // Atomic reorder in one transaction, with the tenant context set for
+    // RLS (interactive tx clients are not auto-wrapped by PrismaService).
+    await this.prisma.$transaction(async (tx) => {
+      await applyTenantContext(tx, tenantId);
+      for (const item of items) {
+        await tx.lesson.update({
           where: { id: item.id },
           data: { orderIndex: item.position },
-        }),
-      ),
-    );
+        });
+      }
+    });
 
     return this.listLessons(tenantId, sectionId);
   }

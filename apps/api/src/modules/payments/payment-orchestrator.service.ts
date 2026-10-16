@@ -7,6 +7,7 @@ import {
   forwardRef,
 } from "@nestjs/common";
 import { PrismaService } from "../tenants/prisma.service";
+import { applyTenantContext } from "../../common/prisma/tenant-context";
 import { ProviderRegistryService } from "./providers/provider-registry.service";
 import { ProviderRouterService } from "./routing/provider-router.service";
 import { VoucherProvider } from "./providers/voucher/voucher.provider";
@@ -484,6 +485,11 @@ export class PaymentOrchestratorService {
     providerName: string,
   ): Promise<void> {
     await this.prisma.$transaction(async (tx) => {
+      // Interactive tx clients are not auto-wrapped: set the RLS tenant
+      // context for the whole transaction first. (Also covers webhook-style
+      // callers that run without an AsyncLocalStorage request scope.)
+      await applyTenantContext(tx, tenantId);
+
       // Update payment
       await tx.payment.update({
         where: { id: paymentId },
