@@ -16,6 +16,7 @@ import {
 import { IdempotencyService } from "../../payments/security/idempotency.service";
 import { ProgressionService } from "../progression/progression.service";
 import { SanadClient, SanadError, SanadGrading } from "./sanad.client";
+import { resolveBranchSources } from "./sanad.scope";
 
 @Injectable()
 export class AssignmentsService {
@@ -619,6 +620,7 @@ export class AssignmentsService {
     question?: string,
     grading?: SanadGrading,
     sourceIds?: string[],
+    branches?: string[],
   ) {
     // Build idempotency key to cache AI evaluation results
     // Use answer directly as part of key (no hashCode needed - strings work as keys)
@@ -646,11 +648,16 @@ export class AssignmentsService {
     }
 
     // Real SANAD call — no fake defaults. The teacher dashboard must send
-    // the rubric + reference answer + knowledge sources with the request
-    // (SANAD returns 422 when rubric sum != max_score or sourceIds empty).
-    if (!grading || !sourceIds?.length) {
+    // the rubric + reference answer, plus either explicit knowledge sources
+    // or branch names (resolved server-side to sources; single source of
+    // truth in sanad.scope.ts). SANAD returns 422 when rubric sum !=
+    // max_score or the resolved source list is empty.
+    const resolvedSourceIds = sourceIds?.length
+      ? sourceIds
+      : [...new Set((branches ?? []).flatMap((b) => resolveBranchSources(b)))];
+    if (!grading || !resolvedSourceIds.length) {
       throw new BadRequestException(
-        "AI evaluation requires grading {reference_answer, max_score, rubric_version, criteria[]} and non-empty sourceIds",
+        "AI evaluation requires grading {reference_answer, max_score, rubric_version, criteria[]} and sourceIds or branches",
       );
     }
     if (!this.sanad) {
@@ -666,7 +673,7 @@ export class AssignmentsService {
         questionText: question ?? "",
         studentAnswer: answer,
         grading,
-        sourceIds,
+        sourceIds: resolvedSourceIds,
       });
     } catch (e) {
       if (e instanceof SanadError && (e.status === 401 || e.status === 422)) {
@@ -697,6 +704,39 @@ export class AssignmentsService {
       success: true,
       data: evaluation,
       message: "Answer evaluated successfully by AI",
+    };
+  }
+
+  /**
+   * "Ask SANAD" evidence explorer — pure extractive retrieval, no LLM.
+   * The branch sub-filter resolves server-side to explicit source_ids
+   * (sanad.scope.ts); unknown/empty scopes return [] instead of
+   * searching everything by accident.
+   */
+  async askSanad(
+    tenantId: string,
+    assignmentId: string,
+    question: string,
+    branch?: string,
+  ) {
+    // tenantId/assignmentId are accepted for signature consistency and
+    // future per-tenant source mapping; scope currently comes from branch.
+    const sourceIds = resolveBranchSources(branch);
+    if (!sourceIds.length) {
+      return { success: true, data: { passages: [], branch: branch ?? "all" } };
+    }
+    if (!this.sanad) {
+      throw new InternalServerErrorException(
+        "AI evaluation service is not configured",
+      );
+    }
+    const result = await this.sanad.queryExtract(question, {
+      topK: 5,
+      sourceIds,
+    });
+    return {
+      success: true,
+      data: { ...result, branch: branch ?? "all" },
     };
   }
 

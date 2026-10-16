@@ -687,7 +687,8 @@ export interface TeacherStudent {
   }>;
 }
 
-export interface StudentFile {  user: {
+export interface StudentFile {
+  user: {
     id: string;
     name: string;
     role: string;
@@ -838,6 +839,41 @@ export interface GradeAttemptResult {
   score: number;
   passed: boolean;
   gradedAt: string;
+}
+
+export interface AiCriterionResult {
+  criterion_id: string;
+  earned: number;
+  max: number;
+  evidence: string | null;
+  evidence_type: "SUPPORTED" | "PARTIAL" | "ABSENT";
+  feedback_ar: string;
+}
+
+export interface AiEvaluation {
+  score: number;
+  maxScore: number;
+  feedback: string;
+  criteria: AiCriterionResult[];
+  knowledgeGap: string[];
+  needsTeacherReview: boolean;
+  reviewSignal: number;
+  sanadRequestId: string;
+  sanadSubmissionId: string;
+  evaluatedAt: string;
+}
+
+export interface AskSanadPassage {
+  chunk_id: string;
+  source_id: string;
+  branch: string;
+  text: string;
+  score: number;
+}
+
+export interface AskSanadResult {
+  passages: AskSanadPassage[];
+  branch: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -1035,6 +1071,37 @@ export const api = {
   ) =>
     apiFetch<GradeSubmissionResult>(
       `/api/v1/assignments/submissions/${submissionId}/grade`,
+      { token, method: "POST", body: input },
+    ),
+
+  evaluateWithAI: (
+    token: string,
+    assignmentId: string,
+    input: {
+      answer: string;
+      question?: string;
+      grading: {
+        reference_answer: string;
+        max_score: number;
+        rubric_version: string;
+        criteria: { id: string; description: string; max_score: number }[];
+      };
+      sourceIds?: string[];
+      branches?: string[];
+    },
+  ) =>
+    apiFetch<{ success: boolean; data: AiEvaluation; message: string }>(
+      `/api/v1/assignments/${assignmentId}/evaluate-ai`,
+      { token, method: "POST", body: input },
+    ),
+
+  askSanad: (
+    token: string,
+    assignmentId: string,
+    input: { question: string; branch?: string },
+  ) =>
+    apiFetch<{ success: boolean; data: AskSanadResult }>(
+      `/api/v1/assignments/${assignmentId}/ask-sanad`,
       { token, method: "POST", body: input },
     ),
 

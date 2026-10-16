@@ -263,9 +263,10 @@ export class AssignmentsController {
         criteria: { id: string; description: string; max_score: number }[];
       };
       sourceIds?: string[];
+      branches?: string[];
     },
   ) {
-    // Teacher dashboard sends the rubric + knowledge sources it displays.
+    // Teacher dashboard sends the rubric + knowledge scope it displays.
     // SANAD grades against them; the official grade stays with
     // POST submissions/:submissionId/grade after teacher review.
     const result = await this.assignmentsService.evaluateAssignmentWithAI(
@@ -276,6 +277,25 @@ export class AssignmentsController {
       dto.question,
       dto.grading,
       dto.sourceIds,
+      dto.branches,
+    );
+    return { data: result };
+  }
+
+  @Post(":assignmentId/ask-sanad")
+  @RequirePermission({ action: "evaluate", resourceType: "assignment" })
+  async askSanad(
+    @Request() req,
+    @Param("assignmentId") assignmentId: string,
+    @Body() dto: { question: string; branch?: string },
+  ) {
+    // Evidence explorer: pure extractive retrieval scoped server-side.
+    // No LLM is called; the teacher/student gets library passages only.
+    const result = await this.assignmentsService.askSanad(
+      req.tenantId,
+      assignmentId,
+      dto.question,
+      dto.branch,
     );
     return { data: result };
   }
