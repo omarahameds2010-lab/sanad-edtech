@@ -8,11 +8,34 @@
 [![Overall](https://img.shields.io/badge/Overall-67_Percent-yellow?style=for-the-badge)](#-track-dashboard-verified-2026-10-08)
 [![Docs](https://img.shields.io/badge/Docs-World_class-blue?style=for-the-badge&logo=markdown&logoColor=white)](../README.md)
 
-**Overall: ~67% to a live v1.0** (code written ≈ 82% · verified ≈ 52% — loop + signup + dashboard + 5 pages wired; 164/165 api + 43/43 web green standalone 2026-10-10; live DB still pending)
+**Overall: ~67% to a live v1.0 — figure recorded 2026-10-10, BEFORE the 2026-10-16 audit below (today, 16 Oct: `pnpm build` green 4/4 packages; suites re-run — 177/177 api + 51/51 web — but one uncommitted seed file still leaks a live credential; see audit).** (code written ≈ 82% · verified ≈ 52% — live DB still pending)
 
 _Last inventoried: 2026-10-10 · Method: glob/grep/read + full jest runs (api 164/165 — 1 failure is teammate rotation WIP; web 43/43) + tsc green both packages · Overall = mean of 12 tracks (801/12 ≈ 67) · 🆕 = this session_
 
 </div>
+
+---
+
+## 🚨 2026-10-16 FIELD AUDIT — READ FIRST (supersedes status claims below)
+
+> Full report: [`docs/AUDIT-2026-10-16.md`](AUDIT-2026-10-16.md) · Method: full code read (5 parallel deep-dives) + `tsc --noEmit` + git history checks. Nothing re-run live (no DB). No files changed during the audit.
+
+**Verified blockers — do not demo before fixing these:**
+
+| #   | Blocker                                       | Evidence                                                                                                                                                                                                                                                                                                                                                                   |
+| --- | --------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | 🔴 Credential still on disk (build now fixed) | ✅ `prisma.service.ts` fixed & pushed in `78b9d69` (env-based, escapes fixed). ❌ `apps/api/prisma/seed-path2.ts` working-tree copy still hardcodes the live Railway credential (HEAD copy clean); `apps/api/srv.txt` holds the full connection string (5 hits). Git history is clean (`git log -S` = 0). **Revert the seed file + delete srv.txt + rotate the password.** |
+| 2   | Feature flags deny EVERYTHING                 | `policy-engine.ts:488` compares `=== true`; `feature-flags.service.ts:304` returns `{enabled,value}` objects → all gated actions 403 `FEATURE_DISABLED` (exam:attempt, assignment:submit, lesson:watch, …). Unit specs pass raw booleans, masking it.                                                                                                                      |
+| 3   | RLS not enforced at runtime                   | zero `setTenantContext` call sites; interceptor no-op; current datasource connects as `postgres` superuser; only 6 tables FORCE-migrated; `init_rls.sql` is a loose file Prisma ignores. Isolation today = per-query `tenantId` filtering only.                                                                                                                            |
+| 4   | `migrate deploy` fails on a fresh DB          | no baseline migration; only `lms_rls` + `auth_cookie_sessions` are real folders; no `migration_lock.toml`.                                                                                                                                                                                                                                                                 |
+| 5   | Payment webhooks dead                         | no `rawBody: true`; `rawPayload` never stored but dereferenced; dedup key mismatch; no refund/callback routes.                                                                                                                                                                                                                                                             |
+| 6   | Progression is global, not per-student        | unlock flips `Lesson.lockStatus` tenant-wide; no transaction; no DB constraint.                                                                                                                                                                                                                                                                                            |
+| 7   | Student data leaks                            | assignment view returns all submissions; exam view returns all attempts (answers/scores).                                                                                                                                                                                                                                                                                  |
+| 8   | Official enroll route 403s                    | no role has `enroll`; working path is an unguarded duplicate route.                                                                                                                                                                                                                                                                                                        |
+
+**Status number:** updated same day (16 Oct evening): `pnpm build` green 4/4 packages; suites re-run — **177/177 api** (18 suites) + **51/51 web**. First live boot will still surface #2 (feature flags → 403) and #3 (RLS + no tenant binding in JWT) — fix before any live demo. See audit §10 for the P0/P1/P2 plan.
+
+**Known stale claims below:** build-green statements, "RLS enforced", API port `:3000` (canonical: web `:3001` / api `:3002`), test totals.
 
 ---
 
