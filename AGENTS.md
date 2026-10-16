@@ -25,12 +25,12 @@
 
 > Full report: `docs/AUDIT-2026-10-16.md`. The claims above describe the intended architecture, not today's runtime. Everything below was verified by reading the code.
 
-**Credential incident — partially resolved (2026-10-16 evening).** Commit `78b9d69` (pushed) fixed `apps/api/src/modules/tenants/prisma.service.ts` to read `MIGRATION_DATABASE_URL` / `DATABASE_URL` from env, and `pnpm build` is green (verified: 4/4 packages — api, web, design-system, motion). **Still open:** the working tree's `apps/api/prisma/seed-path2.ts` (uncommitted) still hardcodes the live Railway credential, and `apps/api/srv.txt` on disk holds the full connection string. Do not commit them — revert the seed file, delete `srv.txt`, and rotate the Railway password. Never paste credentials into source, logs, or chat.
+**Credential incident — resolved; rotation pending (2026-10-16 evening).** Commit `78b9d69` (pushed) fixed `apps/api/src/modules/tenants/prisma.service.ts` to read `MIGRATION_DATABASE_URL` / `DATABASE_URL` from env. Same day: the working-tree leak in `apps/api/prisma/seed-path2.ts` was reverted and `apps/api/srv.txt` deleted — `git status` clean, git history never contained the secret. **By hand only:** rotate the Railway DB password in the dashboard. Never paste credentials into source, logs, or chat.
 
 **Not true in runtime code yet (despite this file):**
 
 - **RLS is NOT enforced.** `setTenantContext` has zero call sites; `TenantContextInterceptor` is a no-op; migrations FORCE only 6 tables; `init_rls.sql` is a loose file Prisma ignores. Tenant isolation today = every query must carry `tenantId`. Never write a query without it.
-- **Feature flags currently DENY every gated action** (403 `FEATURE_DISABLED`): `policy-engine.ts:488` compares `=== true` while `getTenantFlags` returns `{enabled,value}` objects. Fix before any live demo.
+- **Feature flags — FIXED 2026-10-16 (`e9227bc`).** `checkFeatureFlags` accepts both raw booleans and `{enabled,value}` objects (regression was `=== true` → every gated action 403 `FEATURE_DISABLED`). Regression tests cover both shapes.
 - **Progression unlocks are GLOBAL per tenant** (`Lesson.lockStatus`), not per-student, not transactional. No `UnlockRule` table exists.
 - **Transactional outbox has no dispatcher** — events are written and never sent.
 - **Payment webhooks cannot work** (no `rawBody: true`; payload never stored). No refund/callback HTTP routes exist.
