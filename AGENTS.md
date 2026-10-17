@@ -254,6 +254,9 @@ learning-platform/
 | `apps/api/src/modules/video-protection/services/watermark-engine.ts` | Deterministic watermark positions                                                                                                                                              |
 | `apps/api/src/modules/payments/payment-orchestrator.service.ts`      | Order → Intent → Provider → Ledger flow                                                                                                                                        |
 | `docs/AUDIT-2026-10-16.md`                                           | Latest verified reality (2026-10-16) — read before trusting any other doc                                                                                                      |
+| `apps/web/app/lib/dashboard.ts`                                      | Pure dashboard math for `/student` (progress, stats, streak, badges, agenda) — 26 unit tests in `dashboard.test.ts`                                                            |
+| `apps/web/app/student/components/command-center/widgets.tsx`         | Student Command Center widgets — every number derives from server payloads; no mock/fabricated data                                                                            |
+| `docs/COMMAND-CENTER.md`                                             | Student Command Center spec — data sources, design rules, focus mode, deferred widgets                                                                                         |
 
 ---
 
