@@ -11,34 +11,15 @@ export interface TeacherEntry {
 
 export const teachers: TeacherEntry[] = [
   {
-    slug: "ahmed-physics",
-    subject: "الفيزياء",
-    teacherName: "دكتور أحمد",
-    focusAreas: "ميكانيكا · موجات · كهرباء",
-    accent: "#0891B2",
-    accentSoft: "#ecfeff",
-    motif: "orbit",
-    tagline: "اربط المفاهيم بالقوانين، واختبر فهمك بالمسائل.",
-  },
-  {
-    slug: "mona-arabic",
+    slug: "saleh-hussein",
     subject: "اللغة العربية",
-    teacherName: "أستاذة منى",
-    focusAreas: "بلاغة · نحو · أدب",
+    teacherName: "الأستاذ صالح حسين",
+    focusAreas: "نحو · بلاغة · نصوص",
     accent: "#047857",
     accentSoft: "#ecfdf5",
     motif: "ink",
-    tagline: "الحرف هو العمل الفني: بلاغة ونحو وأدب.",
-  },
-  {
-    slug: "khaled-math",
-    subject: "الرياضيات",
-    teacherName: "مهندس خالد",
-    focusAreas: "جبر · هندسة · تفاضل",
-    accent: "#4F46E5",
-    accentSoft: "#eef2ff",
-    motif: "grid",
-    tagline: "افهم العلاقات، وتدرّب على الحل خطوة بخطوة.",
+    tagline:
+      "«جوكر اللغة العربية»: شرح يوصل القاعدة، وتدريب يكشف نقاط التحسين قبل الامتحان.",
   },
 ];
 

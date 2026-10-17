@@ -7,7 +7,7 @@ const course = {
   title: "الرياضيات - جبر وهندسة",
   description:
     "كورس شامل يغطي الجبر والهندسة للمرحلة الثانوية. يتضمن 14 درسًا مقسّمة على 3 وحدات، مع تمارين واختبارات تفاعلية.",
-  teacher: "مهندس خالد",
+  teacher: "الأستاذ صالح حسين",
   thumbnail: "https://picsum.photos/seed/math/800/450",
   price: "500 ج.م",
   students: 0,

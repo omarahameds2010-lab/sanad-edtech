@@ -9,47 +9,55 @@ import { useLang } from "./i18n";
 export default function TeacherSpaces() {
   const { t, lang } = useLang();
   const teachers = t.teacherSpaces.teachers;
-  const [activeSlug, setActiveSlug] = useState(teachers[1].slug);
+  const [activeSlug, setActiveSlug] = useState(teachers[0].slug);
   const active = teachers.find((tt) => tt.slug === activeSlug) ?? teachers[0];
 
   return (
-    <section id="teachers" aria-label="Teacher spaces" style={{ scrollMarginTop: 80 }}>
+    <section
+      id="teachers"
+      aria-label="Teacher spaces"
+      style={{ scrollMarginTop: 80 }}
+    >
       <div className="lp-container lp-section">
         <Reveal>
           <p className="lp-eyebrow">{t.teacherSpaces.eyebrow}</p>
           <h2 className="lp-h2">{t.teacherSpaces.title}</h2>
           <p className="lp-lead">{t.teacherSpaces.lead}</p>
         </Reveal>
-        <div
-          role="tablist"
-          aria-label="Teacher selector"
-          style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 24 }}
-        >
-          {teachers.map((teacher) => {
-            const selected = teacher.slug === activeSlug;
-            return (
-              <button
-                key={teacher.slug}
-                role="tab"
-                aria-selected={selected}
-                onClick={() => setActiveSlug(teacher.slug)}
-                style={{
-                  borderRadius: 999,
-                  padding: "10px 22px",
-                  fontWeight: 700,
-                  fontSize: 15,
-                  cursor: "pointer",
-                  border: selected ? `2px solid ${teacher.accent}` : "1px solid var(--paper-200)",
-                  background: selected ? teacher.accentSoft : "#ffffff",
-                  color: selected ? teacher.accent : "var(--ink-700)",
-                  transition: "all 200ms ease",
-                }}
-              >
-                {teacher.name}
-              </button>
-            );
-          })}
-        </div>
+        {teachers.length > 1 && (
+          <div
+            role="tablist"
+            aria-label="Teacher selector"
+            style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 24 }}
+          >
+            {teachers.map((teacher) => {
+              const selected = teacher.slug === activeSlug;
+              return (
+                <button
+                  key={teacher.slug}
+                  role="tab"
+                  aria-selected={selected}
+                  onClick={() => setActiveSlug(teacher.slug)}
+                  style={{
+                    borderRadius: 999,
+                    padding: "10px 22px",
+                    fontWeight: 700,
+                    fontSize: 15,
+                    cursor: "pointer",
+                    border: selected
+                      ? `2px solid ${teacher.accent}`
+                      : "1px solid var(--paper-200)",
+                    background: selected ? teacher.accentSoft : "#ffffff",
+                    color: selected ? teacher.accent : "var(--ink-700)",
+                    transition: "all 200ms ease",
+                  }}
+                >
+                  {teacher.name}
+                </button>
+              );
+            })}
+          </div>
+        )}
         <Reveal key={active.slug + lang}>
           <div
             role="tabpanel"
@@ -69,7 +77,10 @@ export default function TeacherSpaces() {
               backLabel={lang === "ar" ? "←" : "→"}
             />
             <div style={{ marginTop: 20, textAlign: "center" }}>
-              <Link href="/teachers" style={{ color: "#A7ADBA", fontWeight: 600, fontSize: 14 }}>
+              <Link
+                href="/teachers"
+                style={{ color: "#A7ADBA", fontWeight: 600, fontSize: 14 }}
+              >
                 {t.teacherSpaces.all} {lang === "ar" ? "←" : "→"}
               </Link>
             </div>

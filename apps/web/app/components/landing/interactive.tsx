@@ -55,8 +55,7 @@ export function Reveal({
         transition: `opacity 600ms ease ${delay}ms, transform 600ms ease ${delay}ms`,
       }}
     >
-      // @ts-ignore
-      {(children as any)}
+      {children as any}
     </div>
   );
 }
@@ -85,10 +84,12 @@ export function Magnetic({ children }: { children: any }) {
       ref={ref}
       onMouseMove={onMove}
       onMouseLeave={onLeave}
-      style={{ display: "inline-block", transition: "transform 180ms ease-out" }}
+      style={{
+        display: "inline-block",
+        transition: "transform 180ms ease-out",
+      }}
     >
-      // @ts-ignore
-      {(children as any)}
+      {children as any}
     </div>
   );
 }
@@ -109,7 +110,8 @@ export function Tilt({ children }: { children: any }) {
 
   function onLeave() {
     const el = ref.current;
-    if (el) el.style.transform = "perspective(800px) rotateX(0deg) rotateY(0deg)";
+    if (el)
+      el.style.transform = "perspective(800px) rotateX(0deg) rotateY(0deg)";
   }
 
   return (
@@ -119,8 +121,7 @@ export function Tilt({ children }: { children: any }) {
       onMouseLeave={onLeave}
       style={{ transition: "transform 200ms ease-out", height: "100%" }}
     >
-      // @ts-ignore
-      {(children as any)}
+      {children as any}
     </div>
   );
 }

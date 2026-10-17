@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import Link from "next/link";
 
 interface TeacherCardProps {
   slug: string;
@@ -6,14 +6,16 @@ interface TeacherCardProps {
   teacherName: string;
   focusAreas: string;
   courseCount: number;
-  studentCount: number;
-  motif: 'orbit' | 'grid' | 'ink';
+  motif: "orbit" | "grid" | "ink";
+  tagline?: string;
+  studentCount?: number;
 }
 
-const motifStyles: Record<TeacherCardProps['motif'], string> = {
-  orbit: 'radial-gradient(circle at 30% 30%, var(--tenant-accent) 0, transparent 60%)',
-  grid: 'linear-gradient(var(--tenant-accent) 1px, transparent 1px), linear-gradient(90deg, var(--tenant-accent) 1px, transparent 1px)',
-  ink: 'repeating-linear-gradient(45deg, var(--tenant-accent) 0 2px, transparent 2px 12px)',
+const motifStyles: Record<TeacherCardProps["motif"], string> = {
+  orbit:
+    "radial-gradient(circle at 30% 30%, var(--tenant-accent) 0, transparent 60%)",
+  grid: "linear-gradient(var(--tenant-accent) 1px, transparent 1px), linear-gradient(90deg, var(--tenant-accent) 1px, transparent 1px)",
+  ink: "repeating-linear-gradient(45deg, var(--tenant-accent) 0 2px, transparent 2px 12px)",
 };
 
 export default function TeacherCard({
@@ -22,40 +24,76 @@ export default function TeacherCard({
   teacherName,
   focusAreas,
   courseCount,
-  studentCount,
   motif,
+  tagline,
+  studentCount,
 }: TeacherCardProps) {
   return (
-    <article
-      className="card"
-      style={{ position: 'relative', overflow: 'hidden', minHeight: 260 }}
-    >
+    <article className="ts-teacher-card lp-lift">
       <div
         aria-hidden
         style={{
-          position: 'absolute',
+          position: "absolute",
           inset: 0,
           background: motifStyles[motif],
-          backgroundSize: motif === 'grid' ? '24px 24px' : undefined,
-          opacity: 'var(--tenant-motif-opacity)',
+          backgroundSize: motif === "grid" ? "24px 24px" : undefined,
+          opacity: "var(--tenant-motif-opacity, 0.08)",
         }}
       />
-      <div style={{ position: 'relative' }}>
-        <span className="badge">{subject}</span>
-        <h2 style={{ marginBottom: 4 }}>{teacherName}</h2>
-        <p style={{ color: 'var(--text-muted)', marginTop: 0 }}>{focusAreas}</p>
-        <p style={{ color: 'var(--text-muted)', fontSize: 13 }}>
-          {courseCount} كورس · {studentCount.toLocaleString('ar-EG')} طالب
+      <div style={{ position: "relative" }}>
+        <span
+          style={{
+            display: "inline-block",
+            borderRadius: 999,
+            padding: "5px 14px",
+            fontSize: 12.5,
+            fontWeight: 700,
+            color: "var(--color-action-strong)",
+            background: "var(--color-action-soft)",
+          }}
+        >
+          {subject}
+        </span>
+        <h2 style={{ margin: "14px 0 2px", fontSize: 22 }}>{teacherName}</h2>
+        {tagline && (
+          <p
+            style={{
+              margin: 0,
+              color: "var(--color-action-strong)",
+              fontWeight: 700,
+              fontSize: 14.5,
+            }}
+          >
+            {tagline}
+          </p>
+        )}
+        <p
+          style={{
+            color: "var(--text-muted)",
+            fontSize: 14,
+            lineHeight: 1.8,
+            margin: "10px 0 0",
+          }}
+        >
+          {focusAreas}
+        </p>
+        <p style={{ color: "var(--text-muted)", fontSize: 13, marginTop: 12 }}>
+          {courseCount} كورسات
+          {studentCount !== undefined
+            ? ` · ${studentCount.toLocaleString("ar-EG")} طالب`
+            : " · التسجيل مفتوح"}
         </p>
         <Link
           href={`/teachers/${slug}`}
           style={{
-            display: 'inline-block',
-            marginTop: 'var(--space-sm)',
-            fontWeight: 600,
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 6,
+            marginTop: 18,
+            fontWeight: 700,
           }}
         >
-          دخول المساحة ←
+          دخول المساحة <span aria-hidden>←</span>
         </Link>
       </div>
     </article>

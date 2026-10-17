@@ -1,53 +1,83 @@
-import TeacherCard from '../components/TeacherCard';
+import Link from "next/link";
+import TeacherCard from "../components/TeacherCard";
 
-const teachers = [
-  {
-    slug: 'ahmed-physics',
-    subject: 'فيزياء',
-    teacherName: 'دكتور أحمد',
-    focusAreas: 'ميكانيكا · موجات · كهرباء',
-    courseCount: 24,
-    studentCount: 1240,
-    motif: 'orbit' as const,
-  },
-  {
-    slug: 'mona-arabic',
-    subject: 'لغة عربية',
-    teacherName: 'أستاذة منى',
-    focusAreas: 'بلاغة · نحو · أدب',
-    courseCount: 18,
-    studentCount: 980,
-    motif: 'ink' as const,
-  },
-  {
-    slug: 'khaled-math',
-    subject: 'رياضيات',
-    teacherName: 'مهندس خالد',
-    focusAreas: 'جبر · هندسة · تفاضل',
-    courseCount: 31,
-    studentCount: 1870,
-    motif: 'grid' as const,
-  },
-];
+export const metadata = {
+  title: "المساحات التعليمية — سند",
+  description: "كل مدرس مساحة مستقلة داخل نفس المنصة: بهويته، كورساته، وطلابه.",
+};
 
 export default function TeachersPage() {
   return (
-    <main>
-      <h1>المساحات التعليمية</h1>
-      <p style={{ color: 'var(--text-muted)' }}>
-        كل مدرس هو مساحة داخل نفس المنصة.
+    <main className="ts-page">
+      <p className="lp-eyebrow">مساحات المدرسين</p>
+      <h1 className="lp-h2">مساحات تعليمية — لكل مدرس عالمه</h1>
+      <p className="lp-lead">
+        كل مدرس مساحة مستقلة داخل نفس المنصة: بهويته، وكورساته، وطلابه. تختار
+        مدرسك، فتدخل عالمه هو.
       </p>
+
       <div
         style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
-          gap: 'var(--space-md)',
-          marginTop: 'var(--space-lg)',
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
+          gap: 24,
+          marginTop: 40,
         }}
       >
-        {teachers.map((t) => (
-          <TeacherCard key={t.slug} {...t} />
-        ))}
+        <TeacherCard
+          slug="saleh-hussein"
+          subject="اللغة العربية"
+          teacherName="الأستاذ صالح حسين"
+          tagline="جوكر اللغة العربية"
+          focusAreas="نحو · بلاغة · نصوص"
+          courseCount={3}
+          motif="ink"
+        />
+
+        <Link href="/signup" className="ts-note-dashed">
+          <span
+            style={{
+              alignSelf: "flex-start",
+              borderRadius: 999,
+              padding: "5px 14px",
+              fontSize: 12.5,
+              fontWeight: 700,
+              color: "var(--color-action-strong)",
+              background: "var(--color-action-soft)",
+            }}
+          >
+            للمدرسين
+          </span>
+          <p
+            style={{
+              fontWeight: 800,
+              fontSize: 18,
+              margin: 0,
+              color: "var(--ink-700)",
+            }}
+          >
+            مساحتك التعليمية القادمة؟
+          </p>
+          <p
+            style={{
+              color: "var(--text-muted)",
+              fontSize: 13.5,
+              lineHeight: 1.85,
+              margin: 0,
+            }}
+          >
+            أنشئ مساحتك على سند: كورساتك وطلابك وتقييم يقف جانبك — بهويتك أنت.
+          </p>
+          <span
+            style={{
+              color: "var(--color-action-strong)",
+              fontWeight: 700,
+              fontSize: 14.5,
+            }}
+          >
+            ابدأ من هنا ←
+          </span>
+        </Link>
       </div>
     </main>
   );

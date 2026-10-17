@@ -1,7 +1,8 @@
-# Path-2 Demo Runbook — Exam Loop (Student → Exam → Lecture → Teacher Grades)
+# Demo Runbook — مساحة الأستاذ صالح حسين (جوكر اللغة العربية) + Exam Loop
 
 ## What this proves (3-minute pitch)
 
+0. المساحة العامة للمعلم (`/teachers/saleh-hussein`) تعرض هويته وكورساته الثلاثة (الأول/الثاني/الثالث الإعدادي).
 1. طالب يدخل امتحانًا بتايمر سيرفر (70 دقيقة)، يحل MCQ وصح/خطأ ومقاليًا، يتنقل بين الأسئلة، ويسلّم (يدويًا أو تلقائيًا عند انتهاء الوقت).
 2. دخول الاختبار يفتح الدرس التالي تلقائيًا (ENTER_EXAM progression).
 3. الدرس يعرض فيديو YouTube UNLISTED حقيقيًا.
@@ -32,10 +33,10 @@ pnpm seed:path2
 
 The seed prints credentials and ids. Demo accounts:
 
-| Role    | Phone       | Password    |
-| ------- | ----------- | ----------- |
-| Teacher | 01000000001 | Teacher123! |
-| Student | 01000000002 | Student123! |
+| Role    | Phone       | Password          |
+| ------- | ----------- | ----------------- |
+| Teacher | 01000000001 | Joker-Arabic#2026 |
+| Student | 01000000002 | Student123!       |
 
 It also registers the `localhost` tenant domain (required: tenant resolution is Host-based).
 
@@ -55,7 +56,7 @@ pnpm dev
 ## 4) Pitch flow (student)
 
 1. Open `http://localhost:3001/login` → login as student.
-2. Go to `/student/exams` → open "اختبار: أساسيات الجبر".
+2. Go to `/student/exams` → open "اختبار: المهارات النحوية".
 3. Intro shows question count, server timer, attempts used → "بدء الاختبار".
 4. Answer Q1 (MCQ, option `b`), Q2 (True/False), Q3 (essay — this is where Sanad AI grading plugs in later).
 5. Use السابق/التالي + palette; watch the server-anchored countdown.

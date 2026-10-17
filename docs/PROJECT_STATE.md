@@ -167,7 +167,7 @@ teacher ⇄ courses/new → courses/[id] · exams ⇄ exams/[id] ⇄ students/[i
 
 - **التايمر:** `startedAt + timerMinutes` على السيرفر (افتراضي 70 امتحان / 300 واجب). إعادة التحميل لا تصفّره (يُعاد الجلب). انتهاء → `TIMED_OUT`/`LATE` بقواعد `allowLateSubmission`.
 - **التقدم:** `ENTER_ASSIGNMENT → فتح امتحان`، `ENTER_EXAM → فتح الدرس التالي` — idempotent بمفاتيح + قيود DB.
-- **Seed الديمو** (`pnpm seed:path2` + `docs/DEMO.md`): tenant + نطاق `localhost` (إجباري — حل المستأجر من Host) + مدرس `01000000001` + طالب `01000000002` + كورس/وحدات/فيديو YouTube/امتحان 3 أسئلة/واجب + تسجيل + **entitlements لكل الموارد** (بدونها 403).
+- **Seed الديمو** (`pnpm seed:path2` + `docs/DEMO.md`): tenant + نطاق `localhost` (إجباري — حل المستأجر من Host) + مدرس `01000000001` + طالب `01000000002` + **٣ كورسات عربية إعدادية** (الأول يحمل المسار الكامل: وحدة/فيديو YouTube/امتحان نحوي ٣ أسئلة/واجب/درس يُفتح بدخول الاختبار) + تسجيل + **entitlements لكل الموارد** (بدونها 403).
 
 ---
 
