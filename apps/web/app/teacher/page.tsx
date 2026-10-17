@@ -65,6 +65,7 @@ function ActionRow({
 export default function TeacherDashboard() {
   const { token, userName } = useAuth();
   const [pending, setPending] = useState<number | null>(null);
+  const [publishedCourses, setPublishedCourses] = useState<number | null>(null);
 
   // Real data: the assignments grading queue, counted from the server.
   useEffect(() => {
@@ -91,6 +92,28 @@ export default function TeacherDashboard() {
         if (!cancelled) setPending(null);
       }
     })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [token]);
+
+  // Real data: the teacher's own course list now exists server-side.
+  useEffect(() => {
+    if (!token) return;
+    let cancelled = false;
+
+    api
+      .listTeacherCourses(token)
+      .then((list) => {
+        if (!cancelled)
+          setPublishedCourses(
+            list.filter((c) => c.status === "PUBLISHED").length,
+          );
+      })
+      .catch(() => {
+        if (!cancelled) setPublishedCourses(null);
+      });
 
     return () => {
       cancelled = true;
@@ -124,9 +147,10 @@ export default function TeacherDashboard() {
             label="طلاب نشطون"
             reason="لا يوجد endpoint لروستر طلاب المعلم بعد. تُقرأ الأرقام من المـصدر فقط، ولا تُخترق."
           />
-          <MissingMetric
+          <Metric
             label="كورسات منشورة"
-            reason="قائمة كورسات المعلم تُقرأ من GET /api/v1/teacher/courses عند توصيلها."
+            value={publishedCourses ?? 0}
+            href="/teacher/publish"
           />
           <MissingMetric
             label="نسبة الإكمال"

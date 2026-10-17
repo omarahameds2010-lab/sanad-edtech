@@ -286,7 +286,7 @@ export class PolicyEngine {
           "unpublish",
           "reorder",
         ],
-        lesson: ["create", "read", "update", "publish", "unpublish"],
+        lesson: ["create", "read", "update", "delete", "publish", "unpublish"],
         exam: ["create", "read", "update", "publish", "unpublish", "grade"],
         attempt: ["read", "grade"],
         enrollment: ["read"],

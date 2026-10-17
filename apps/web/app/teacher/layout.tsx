@@ -7,6 +7,7 @@ import TeacherCommandRegistrar from "./TeacherCommandRegistrar";
 
 const navItems = [
   { href: "/teacher", label: "نظرة عامة" },
+  { href: "/teacher/publish", label: "النشر" },
   { href: "/teacher/courses", label: "الكورسات" },
   { href: "/teacher/students", label: "الطلاب" },
   { href: "/teacher/assignments", label: "الواجبات" },

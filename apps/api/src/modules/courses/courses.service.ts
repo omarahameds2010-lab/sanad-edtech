@@ -23,6 +23,7 @@ const courseSelect = {
   language: true,
   price: true,
   currency: true,
+  grade: true,
   status: true,
   publishedAt: true,
   createdAt: true,
@@ -78,6 +79,7 @@ const courseListSelect = {
   price: true,
   currency: true,
   status: true,
+  grade: true,
   createdAt: true,
   updatedAt: true,
 } as const;
@@ -134,6 +136,7 @@ export class CoursesService {
         language: input.language,
         price: input.price ?? 0,
         currency: input.currency || "EGP",
+        grade: input.grade ?? null,
         status: CourseStatus.DRAFT,
       },
     });
@@ -160,6 +163,12 @@ export class CoursesService {
     limit = 20,
     status?: string,
   ) {
+    // The global ValidationPipe coerces a missing numeric query param to NaN
+    // (unary +undefined), so the default never fires. Normalise defensively.
+    const requested = Number(limit);
+    const effectiveLimit =
+      Number.isFinite(requested) && requested > 0 ? Math.floor(requested) : 20;
+
     const where: Prisma.CourseWhereInput = { tenantId };
     if (status) {
       where.status = status as any;
@@ -168,13 +177,13 @@ export class CoursesService {
     const courses = await this.prisma.course.findMany({
       where,
       orderBy: { createdAt: "desc" },
-      take: limit + 1,
+      take: effectiveLimit + 1,
       cursor: cursor ? { id: cursor } : undefined,
       select: courseListSelect,
     });
 
     let nextCursor: string | null = null;
-    if (courses.length > limit) {
+    if (courses.length > effectiveLimit) {
       const nextCourse = courses.pop();
       nextCursor = nextCourse!.id;
     }
@@ -225,6 +234,7 @@ export class CoursesService {
         language: input.language,
         price: input.price,
         currency: input.currency,
+        grade: input.grade,
       },
     });
 
@@ -361,6 +371,12 @@ export class CoursesService {
     limit = 20,
     search?: string,
   ) {
+    // The global ValidationPipe coerces a missing numeric query param to NaN
+    // (unary +undefined), so the default never fires. Normalise defensively.
+    const requested = Number(limit);
+    const effectiveLimit =
+      Number.isFinite(requested) && requested > 0 ? Math.floor(requested) : 20;
+
     const where: any = {
       tenantId,
       status: "PUBLISHED",
@@ -377,7 +393,7 @@ export class CoursesService {
     const courses = await this.prisma.course.findMany({
       where,
       orderBy: { createdAt: "desc" },
-      take: limit + 1,
+      take: effectiveLimit + 1,
       cursor: cursor ? { id: cursor } : undefined,
       select: {
         id: true,
@@ -398,7 +414,7 @@ export class CoursesService {
     });
 
     let nextCursor: string | null = null;
-    if (courses.length > limit) {
+    if (courses.length > effectiveLimit) {
       const nextCourse = courses.pop();
       nextCursor = nextCourse!.id;
     }

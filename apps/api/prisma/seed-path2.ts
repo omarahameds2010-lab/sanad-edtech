@@ -46,18 +46,21 @@ const COURSES = [
   {
     slug: "arabic-1-prep",
     title: "اللغة العربية — الأول الإعدادي",
+    grade: "prep-1",
     description:
       "تأسيس قوي من أقسام الكلمة للجملة والمفعول المطلق — بأمثلة من الامتحانات وتدريبات مصححة.",
   },
   {
     slug: "arabic-2-prep",
     title: "اللغة العربية — الثاني الإعدادي",
+    grade: "prep-2",
     description:
       "توسّع في النحو والصرف مع تحليل النصوص وتذوقها، وتدريب على صيغ أسئلة الامتحان.",
   },
   {
     slug: "arabic-3-prep",
     title: "اللغة العربية — الثالث الإعدادي",
+    grade: "prep-3",
     description:
       "مراجعة مركّزة ومهارات إجابة: من القاعدة إلى الدرجة — مع تدريب مستمر قبل الشهادة.",
   },
@@ -136,6 +139,7 @@ async function main() {
         where: { id: existing.id },
         data: {
           title: def.title,
+          grade: def.grade,
           description: def.description,
           teacherId: teacher.id,
           status: "PUBLISHED",
@@ -148,6 +152,7 @@ async function main() {
         tenantId: tenant.id,
         title: def.title,
         slug: def.slug,
+        grade: def.grade,
         description: def.description,
         language: "ar",
         price: "0",

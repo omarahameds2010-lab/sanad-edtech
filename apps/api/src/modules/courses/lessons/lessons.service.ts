@@ -38,6 +38,9 @@ export class LessonsService {
       orderIndex?: number;
       isFree?: boolean;
       releaseAt?: Date;
+      /** Authoring default is UNLOCKED — the teacher publishes freely;
+       *  lock states are authored later (progression extension points). */
+      lockStatus?: "LOCKED" | "UNLOCKED";
     },
   ) {
     const section = await this.prisma.section.findFirst({
@@ -67,6 +70,7 @@ export class LessonsService {
         orderIndex,
         isFree: dto.isFree ?? false,
         releaseAt: dto.releaseAt,
+        lockStatus: dto.lockStatus ?? "UNLOCKED",
       },
     });
   }

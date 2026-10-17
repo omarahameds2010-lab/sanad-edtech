@@ -1910,3 +1910,313 @@ textarea.sc-input {
     animation: none !important;
   }
 }
+
+/* ======================================================================
+   PUBLISH WORKSPACE — teacher grade hub → courses → lessons
+   Rides the teacher command-room tokens; sc-* primitives reused for
+   modals/buttons/inputs.
+   ====================================================================== */
+.pub-head {
+  margin-bottom: var(--space-6);
+}
+.pub-eyebrow {
+  margin: 0 0 10px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  color: var(--tc-emerald-lit);
+}
+.pub-title {
+  margin: 0;
+  font-size: clamp(26px, 3.4vw, 38px);
+  font-weight: 800;
+  color: var(--tc-ink);
+}
+.pub-sub {
+  margin: 10px 0 0;
+  max-width: 660px;
+  font-size: 15px;
+  line-height: 1.95;
+  color: var(--tc-ink-dim);
+}
+.pub-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: var(--space-5);
+  color: var(--tc-ink-faint);
+  font-size: 13px;
+  text-decoration: none;
+}
+.pub-back:hover {
+  color: var(--tc-ink);
+  text-decoration: none;
+}
+.pub-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: var(--space-4);
+}
+.pub-grade {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  text-decoration: none;
+  transition:
+    border-color 240ms ease,
+    background 240ms ease,
+    transform 240ms ease;
+}
+.pub-grade:hover {
+  border-color: var(--tc-hairline-on);
+  background: rgba(255, 255, 255, 0.025);
+  transform: translateY(-2px);
+  text-decoration: none;
+}
+.pub-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  align-self: flex-start;
+  padding: 5px 12px;
+  border: 1px solid var(--tc-hairline);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.02);
+  color: var(--tc-ink-dim);
+  font-size: 12px;
+  font-weight: 600;
+}
+.pub-chip-on {
+  border-color: rgba(52, 211, 153, 0.35);
+  background: rgba(52, 211, 153, 0.08);
+  color: #6ee7b7;
+}
+.pub-chip-draft {
+  border-color: rgba(251, 191, 36, 0.3);
+  background: rgba(251, 191, 36, 0.07);
+  color: #fcd34d;
+}
+.pub-chip-muted {
+  color: var(--tc-ink-faint);
+}
+.pub-grade-title {
+  margin: 0;
+  font-size: 21px;
+  font-weight: 800;
+  color: var(--tc-ink);
+}
+.pub-grade-meta {
+  margin: 0;
+  font-size: 13.5px;
+  line-height: 1.9;
+  color: var(--tc-ink-dim);
+}
+.pub-grade-meta b {
+  color: var(--tc-ink);
+  font-weight: 700;
+}
+.pub-cta {
+  margin-top: auto;
+  padding-top: 10px;
+  color: var(--tc-emerald-lit);
+  font-size: 14px;
+  font-weight: 700;
+}
+.pub-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.pub-stat {
+  padding: 7px 12px;
+  border: 1px solid var(--tc-hairline);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.02);
+  color: var(--tc-ink-dim);
+  font-size: 12.5px;
+}
+.pub-stat b {
+  margin-inline-end: 4px;
+  color: var(--tc-ink);
+}
+.pub-note {
+  margin-top: var(--space-5);
+  padding: 13px 16px;
+  border: 1px dashed var(--tc-hairline);
+  border-radius: 14px;
+  color: var(--tc-ink-dim);
+  font-size: 13.5px;
+  line-height: 1.85;
+}
+.pub-note a {
+  color: var(--tc-emerald-lit);
+}
+.pub-note-ok {
+  border-style: solid;
+  border-color: rgba(52, 211, 153, 0.4);
+  color: #a7f3d0;
+}
+.pub-error {
+  margin-top: var(--space-4);
+  color: #fca5a5;
+  font-size: 13.5px;
+}
+.pub-course {
+  margin-top: var(--space-5);
+}
+.pub-course-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+.pub-course-title {
+  margin: 0;
+  font-size: 19px;
+  font-weight: 800;
+  color: var(--tc-ink);
+}
+.pub-course-chips {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+.pub-course-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.pub-sec {
+  margin-top: var(--space-4);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--tc-hairline);
+}
+.pub-sec-title {
+  margin: 0 0 12px;
+  color: var(--tc-ink-dim);
+  font-size: 14px;
+  font-weight: 700;
+}
+.pub-lesson {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 8px 14px;
+  padding: 11px 14px;
+  border: 1px solid var(--tc-hairline);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.014);
+}
+.pub-lesson + .pub-lesson {
+  margin-top: 8px;
+}
+.pub-lesson-title {
+  color: var(--tc-ink);
+  font-size: 14.5px;
+  font-weight: 600;
+}
+.pub-lesson-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+}
+.pub-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border: 1px solid var(--tc-hairline);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.02);
+  color: var(--tc-ink);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: none;
+  transition:
+    border-color 200ms ease,
+    background 200ms ease,
+    color 200ms ease;
+}
+.pub-btn:hover {
+  border-color: var(--tc-hairline-on);
+  background: rgba(255, 255, 255, 0.05);
+  text-decoration: none;
+}
+.pub-btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.pub-btn-primary {
+  border-color: rgba(52, 211, 153, 0.4);
+  background: rgba(52, 211, 153, 0.12);
+  color: #6ee7b7;
+}
+.pub-btn-primary:hover {
+  background: rgba(52, 211, 153, 0.18);
+}
+.pub-btn-warn {
+  border-color: rgba(251, 191, 36, 0.35);
+  background: rgba(251, 191, 36, 0.08);
+  color: #fcd34d;
+}
+.pub-form {
+  display: grid;
+  gap: var(--space-3);
+}
+.pub-label {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--tc-ink-dim);
+  font-size: 12.5px;
+}
+.pub-inline-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  margin-top: var(--space-3);
+}
+.pub-type-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.pub-type-opt {
+  padding: 9px 14px;
+  border: 1px solid var(--tc-hairline);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.02);
+  color: var(--tc-ink-dim);
+  font-family: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+.pub-type-opt[aria-pressed="true"] {
+  border-color: rgba(52, 211, 153, 0.45);
+  background: rgba(52, 211, 153, 0.12);
+  color: #a7f3d0;
+}
+.pub-empty {
+  margin-top: var(--space-3);
+  padding: 18px;
+  border: 1px dashed var(--tc-hairline);
+  border-radius: 16px;
+  color: var(--tc-ink-faint);
+  font-size: 13.5px;
+  text-align: center;
+}
+.pub-modal-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: var(--space-4);
+}
+.pub-w-full {
+  width: 100%;
+}

@@ -420,6 +420,8 @@ export interface CreateCourseInput {
   language: string;
   price?: number;
   currency?: string;
+  /** Prep grade (prep-1 | prep-2 | prep-3). */
+  grade?: string;
 }
 
 export interface CreatedCourse {
@@ -427,6 +429,71 @@ export interface CreatedCourse {
   title: string;
   slug: string;
   status: string;
+}
+
+/** Teacher-side course row (GET /api/v1/teacher/courses). */
+export interface TeacherCourse {
+  id: string;
+  title: string;
+  slug: string;
+  shortDescription?: string | null;
+  description?: string | null;
+  thumbnailUrl?: string | null;
+  visibility?: string;
+  level?: string | null;
+  language?: string;
+  price?: number | string;
+  currency?: string;
+  grade: string | null;
+  status: string;
+  publishedAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface TeacherSectionLesson {
+  id: string;
+  title: string;
+  type: string;
+  orderIndex: number;
+  status: string;
+}
+
+export interface TeacherSection {
+  id: string;
+  title: string;
+  orderIndex: number;
+  lessons?: TeacherSectionLesson[];
+}
+
+/** Full lesson row from the teacher API (includes attached exam/assignment). */
+export interface TeacherLessonDetail {
+  id: string;
+  title: string;
+  type: string;
+  status: string;
+  slug?: string;
+  description?: string | null;
+  duration?: number | null;
+  orderIndex?: number;
+  isFree?: boolean;
+  videoId?: string | null;
+  lockStatus?: string;
+  unlockType?: string;
+  sectionId: string;
+  section: { id: string; courseId: string };
+  exam?: {
+    id: string;
+    title: string;
+    status: string;
+    timerMinutes: number;
+  } | null;
+  assignment?: {
+    id: string;
+    title: string;
+    status: string;
+    timerMinutes: number;
+  } | null;
 }
 
 export interface CreateExamInput {
@@ -988,6 +1055,97 @@ export const api = {
       token,
       method: "POST",
       body: input,
+    }),
+
+  listTeacherCourses: (token: string) =>
+    apiFetch<TeacherCourse[]>("/api/v1/teacher/courses", { token }),
+
+  getTeacherCourse: (token: string, courseId: string) =>
+    apiFetch<TeacherCourse>(`/api/v1/teacher/courses/${courseId}`, { token }),
+
+  updateTeacherCourse: (
+    token: string,
+    courseId: string,
+    input: Partial<CreateCourseInput>,
+  ) =>
+    apiFetch<TeacherCourse>(`/api/v1/teacher/courses/${courseId}`, {
+      token,
+      method: "PATCH",
+      body: input,
+    }),
+
+  publishCourse: (token: string, courseId: string) =>
+    apiFetch<TeacherCourse>(`/api/v1/teacher/courses/${courseId}/publish`, {
+      token,
+      method: "POST",
+      body: {},
+    }),
+
+  unpublishCourse: (token: string, courseId: string) =>
+    apiFetch<TeacherCourse>(`/api/v1/teacher/courses/${courseId}/unpublish`, {
+      token,
+      method: "POST",
+      body: {},
+    }),
+
+  listSections: (token: string, courseId: string) =>
+    apiFetch<TeacherSection[]>(`/api/v1/teacher/courses/${courseId}/sections`, {
+      token,
+    }),
+
+  createSection: (
+    token: string,
+    courseId: string,
+    input: { title: string; orderIndex?: number },
+  ) =>
+    apiFetch<TeacherSection>(`/api/v1/teacher/courses/${courseId}/sections`, {
+      token,
+      method: "POST",
+      body: input,
+    }),
+
+  createLesson: (
+    token: string,
+    sectionId: string,
+    input: { title: string; type: string; description?: string },
+  ) =>
+    apiFetch<TeacherLessonDetail>(
+      `/api/v1/teacher/sections/${sectionId}/lessons`,
+      { token, method: "POST", body: input },
+    ),
+
+  getTeacherLesson: (token: string, lessonId: string) =>
+    apiFetch<TeacherLessonDetail>(`/api/v1/teacher/lessons/${lessonId}`, {
+      token,
+    }),
+
+  updateTeacherLesson: (
+    token: string,
+    lessonId: string,
+    input: { title?: string; description?: string },
+  ) =>
+    apiFetch<TeacherLessonDetail>(`/api/v1/teacher/lessons/${lessonId}`, {
+      token,
+      method: "PATCH",
+      body: input,
+    }),
+
+  publishLesson: (token: string, lessonId: string) =>
+    apiFetch<TeacherLessonDetail>(
+      `/api/v1/teacher/lessons/${lessonId}/publish`,
+      { token, method: "POST", body: {} },
+    ),
+
+  unpublishLesson: (token: string, lessonId: string) =>
+    apiFetch<TeacherLessonDetail>(
+      `/api/v1/teacher/lessons/${lessonId}/unpublish`,
+      { token, method: "POST", body: {} },
+    ),
+
+  deleteLesson: (token: string, lessonId: string) =>
+    apiFetch<null>(`/api/v1/teacher/lessons/${lessonId}`, {
+      token,
+      method: "DELETE",
     }),
 
   getCourseStructureBySlug: (slug: string) =>

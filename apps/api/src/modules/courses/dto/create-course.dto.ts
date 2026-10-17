@@ -68,6 +68,15 @@ export class CreateCourseRequest {
   @IsString()
   @MaxLength(3)
   currency?: string | null;
+
+  @ApiPropertyOptional({
+    example: "prep-1",
+    description: "Prep grade the course belongs to (prep-1 | prep-2 | prep-3)",
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(30)
+  grade?: string | null;
 }
 
 export class UpdateCourseRequest {
@@ -133,4 +142,13 @@ export class UpdateCourseRequest {
   @IsString()
   @MaxLength(3)
   currency?: string | null;
+
+  @ApiPropertyOptional({
+    example: "prep-1",
+    description: "Prep grade the course belongs to (prep-1 | prep-2 | prep-3)",
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(30)
+  grade?: string | null;
 }

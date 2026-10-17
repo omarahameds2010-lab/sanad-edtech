@@ -1,178 +1,107 @@
-import Image from "next/image";
+"use client";
 
-const courses = [
-  {
-    id: "c1",
-    title: "الفيزياء للمرحلة الثانوية",
-    slug: "physics-secondary",
-    status: "PUBLISHED",
-    thumbnail: "https://picsum.photos/seed/physics/400/225",
-    students: 1240,
-    completion: 68,
-    revenue: 18400,
-    lastUpdated: "2026-10-01",
-  },
-  {
-    id: "c2",
-    title: "الرياضيات - جبر وهندسة",
-    slug: "math-algebra-geometry",
-    status: "DRAFT",
-    thumbnail: "https://picsum.photos/seed/math/400/225",
-    students: 0,
-    completion: 0,
-    revenue: 0,
-    lastUpdated: "2026-10-05",
-  },
-  {
-    id: "c3",
-    title: "اللغة العربية - نحو وبلاغة",
-    slug: "arabic-grammar",
-    status: "PUBLISHED",
-    thumbnail: "https://picsum.photos/seed/arabic/400/225",
-    students: 980,
-    completion: 72,
-    revenue: 12600,
-    lastUpdated: "2026-09-28",
-  },
-];
+import { useEffect, useState } from "react";
+import Link from "next/link";
+import { useAuth } from "@/app/lib/auth";
+import { api, ApiError, type TeacherCourse } from "@/app/lib/api";
+import {
+  COURSE_STATUS_LABELS,
+  gradeLabel,
+  isPrepGrade,
+} from "@/app/lib/teacher-content";
 
-const statusLabels: Record<string, string> = {
-  PUBLISHED: "منشور",
-  DRAFT: "مسودة",
-  UNPUBLISHED: "غير منشور",
-  ARCHIVED: "مؤرشف",
-};
+export default function TeacherCoursesPage() {
+  const { token } = useAuth();
+  const [courses, setCourses] = useState<TeacherCourse[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
-const statusColors: Record<string, string> = {
-  PUBLISHED: "var(--color-action)",
-  DRAFT: "var(--text-muted)",
-  UNPUBLISHED: "#f59e0b",
-  ARCHIVED: "#6b7280",
-};
+  useEffect(() => {
+    if (!token) return;
+    let alive = true;
+    api
+      .listTeacherCourses(token)
+      .then((list) => {
+        if (alive) setCourses(list);
+      })
+      .catch((e) => {
+        if (alive)
+          setError(e instanceof ApiError ? e.message : "تعذر تحميل الكورسات");
+      });
+    return () => {
+      alive = false;
+    };
+  }, [token]);
 
-export default function CoursesPage() {
+  if (!token) {
+    return (
+      <div className="pub-note">
+        سجّل الدخول أولًا. <Link href="/login">تسجيل الدخول</Link>
+      </div>
+    );
+  }
+
+  const active = (courses ?? []).filter((c) => c.status !== "ARCHIVED");
+
   return (
-    <>
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          marginBottom: "var(--space-lg)",
-        }}
-      >
-        <h1>الكورسات</h1>
-        <a href="/teacher/courses/new">
-          <button>+ كورس جديد</button>
-        </a>
+    <section>
+      <header className="pub-head">
+        <p className="pub-eyebrow">الكورسات</p>
+        <h1 className="pub-title">كل كورساتك</h1>
+        <p className="pub-sub">
+          نفس الكورسات موجودة مقسّمة على الصفوف في{" "}
+          <Link href="/teacher/publish">مساحة النشر</Link>.
+        </p>
+        <p style={{ marginTop: "var(--space-4)" }}>
+          <Link className="pub-btn pub-btn-primary" href="/teacher/courses/new">
+            + كورس جديد
+          </Link>
+        </p>
+      </header>
+
+      {error && <p className="pub-error">{error}</p>}
+      {courses === null && !error && <p className="pub-note">جاري التحميل…</p>}
+
+      <div className="pub-grid">
+        {active.map((c) => (
+          <article key={c.id} className="tc-panel pub-grade">
+            <span
+              className={
+                c.status === "PUBLISHED"
+                  ? "pub-chip pub-chip-on"
+                  : "pub-chip pub-chip-draft"
+              }
+            >
+              {COURSE_STATUS_LABELS[c.status] ?? c.status}
+            </span>
+            <h2 className="pub-grade-title">{c.title}</h2>
+            <p className="pub-grade-meta">
+              {gradeLabel(c.grade)}
+              {c.price && Number(c.price) > 0
+                ? ` · ${Number(c.price).toLocaleString("ar-EG")} ${c.currency ?? "EGP"}`
+                : " · مجاني"}
+            </p>
+            <div className="pub-course-links" style={{ marginTop: "auto" }}>
+              <Link
+                className="pub-btn pub-btn-primary"
+                href={`/teacher/courses/${c.id}`}
+              >
+                مساحة الكورس
+              </Link>
+              {c.grade && isPrepGrade(c.grade) && (
+                <Link className="pub-btn" href={`/teacher/publish/${c.grade}`}>
+                  صفحة الصف
+                </Link>
+              )}
+            </div>
+          </article>
+        ))}
       </div>
 
-      <div className="card" style={{ overflow: "hidden" }}>
-        <table style={{ width: "100%", borderCollapse: "collapse" }}>
-          <thead>
-            <tr
-              style={{
-                textAlign: "right",
-                borderBottom: "1px solid var(--border-subtle)",
-              }}
-            >
-              <th style={{ padding: "var(--space-md)" }}>الكورس</th>
-              <th style={{ padding: "var(--space-md)" }}>الحالة</th>
-              <th style={{ padding: "var(--space-md)" }}>الطلاب</th>
-              <th style={{ padding: "var(--space-md)" }}>الإكمال</th>
-              <th style={{ padding: "var(--space-md)" }}>الإيرادات</th>
-              <th style={{ padding: "var(--space-md)" }}>آخر تحديث</th>
-              <th style={{ padding: "var(--space-md)" }}>إجراءات</th>
-            </tr>
-          </thead>
-          <tbody>
-            {courses.map((course) => (
-              <tr
-                key={course.id}
-                style={{ borderBottom: "1px solid var(--border-subtle)" }}
-              >
-                <td style={{ padding: "var(--space-md)" }}>
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "var(--space-md)",
-                    }}
-                  >
-                    <Image
-                      src={course.thumbnail}
-                      alt={course.title}
-                      width={64}
-                      height={36}
-                      style={{
-                        borderRadius: "var(--radius-control)",
-                        objectFit: "cover",
-                      }}
-                    />
-                    <div>
-                      <div style={{ fontWeight: 600 }}>{course.title}</div>
-                      <div style={{ fontSize: 12, color: "var(--text-muted)" }}>
-                        {course.slug}
-                      </div>
-                    </div>
-                  </div>
-                </td>
-                <td style={{ padding: "var(--space-md)" }}>
-                  <span
-                    style={{
-                      display: "inline-block",
-                      padding: "2px 10px",
-                      borderRadius: "999px",
-                      fontSize: 12,
-                      fontWeight: 600,
-                      background: `${statusColors[course.status]}20`,
-                      color: statusColors[course.status],
-                    }}
-                  >
-                    {statusLabels[course.status]}
-                  </span>
-                </td>
-                <td style={{ padding: "var(--space-md)" }}>
-                  {course.students.toLocaleString("ar-EG")}
-                </td>
-                <td style={{ padding: "var(--space-md)" }}>
-                  {course.completion}%
-                </td>
-                <td style={{ padding: "var(--space-md)" }}>
-                  {course.revenue > 0
-                    ? `${course.revenue.toLocaleString("ar-EG")} ج.م`
-                    : "—"}
-                </td>
-                <td
-                  style={{
-                    padding: "var(--space-md)",
-                    color: "var(--text-muted)",
-                    fontSize: 13,
-                  }}
-                >
-                  {course.lastUpdated}
-                </td>
-                <td style={{ padding: "var(--space-md)" }}>
-                  <div style={{ display: "flex", gap: "var(--space-sm)" }}>
-                    <a
-                      href={`/teacher/courses/${course.id}`}
-                      style={{ fontWeight: 600 }}
-                    >
-                      تحرير
-                    </a>
-                    <a
-                      href={`/teacher/courses/${course.id}/preview`}
-                      style={{ color: "var(--text-muted)" }}
-                    >
-                      معاينة
-                    </a>
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </>
+      {courses !== null && active.length === 0 && !error && (
+        <p className="pub-note">
+          مفيش كورسات بعد — ابدأ بـ«كورس جديد» واختار الصف.
+        </p>
+      )}
+    </section>
   );
 }
