@@ -602,9 +602,14 @@ export class PaymentOrchestratorService {
   }
 
   /**
-   * Complete payment - create ledger, enrollment, outbox events
+   * Complete payment - create ledger, enrollment, outbox events.
+   *
+   * Public since bundle B: the webhook inbox calls it when a provider confirms
+   * a payment. Everything inside runs in ONE transaction (including the
+   * entitlement grants and the outbox publish), so a mid-flight failure rolls
+   * back atomically and a retry re-runs from a clean slate.
    */
-  private async completePayment(
+  async completePayment(
     tenantId: string,
     paymentId: string,
     orderId: string,
@@ -659,23 +664,28 @@ export class PaymentOrchestratorService {
             item.resourceId,
             "purchase",
             { orderId, paymentId, provider: providerName },
+            tx,
           );
         }
       }
 
       // Publish event
-      await this.outbox.publish(tenantId, {
-        eventType: "payment.paid",
-        aggregateType: "payment",
-        aggregateId: paymentId,
-        payload: {
-          paymentId,
-          orderId,
-          userId,
-          amountMinor: payment!.amountMinor.toString(),
-          provider: providerName,
+      await this.outbox.publish(
+        tenantId,
+        {
+          eventType: "payment.paid",
+          aggregateType: "payment",
+          aggregateId: paymentId,
+          payload: {
+            paymentId,
+            orderId,
+            userId,
+            amountMinor: payment!.amountMinor.toString(),
+            provider: providerName,
+          },
         },
-      });
+        tx,
+      );
     });
 
     await this.audit.log(

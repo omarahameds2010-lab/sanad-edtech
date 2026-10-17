@@ -268,7 +268,23 @@ export class WebhookInboxService {
       });
     }
 
-    if (!intent) return;
+    if (!intent) {
+      // No PROCESSING intent. Two very different cases (bundle B):
+      //  - a redelivery for a transaction this inbox already settled → drop
+      //    it as a duplicate no-op;
+      //  - the delivery raced intent creation (or the transaction is not
+      //    ours) → never swallow it: fail the event so it stays visible and
+      //    `retryFailedWebhooks` can finish it once the intent exists.
+      if (transactionId !== undefined) {
+        const settled = await this.prisma.payment.findFirst({
+          where: { provider, providerTransactionId: String(transactionId) },
+        });
+        if (settled) return;
+      }
+      throw new Error(
+        `INTENT_NOT_FOUND:${orderId ?? String(obj.order?.id ?? "unknown")}`,
+      );
+    }
 
     // NOTE (audit 2026-10-16 §5.1): the previous flow re-verified the payment
     // through the provider API, but the intent never stores the Paymob payment
@@ -278,7 +294,10 @@ export class WebhookInboxService {
     // guards against double-processing.
     const idempotencyKey = `webhook_payment_${provider}_${transactionId ?? webhookEventId}`;
 
-    // Check idempotency
+    // Claim the key. `response` is set only when a previous attempt COMPLETED;
+    // a PENDING claim without a response means either a concurrent attempt or
+    // one that died before finishing — both resume below (bundle B), which is
+    // safe because completion is transactional and the payment row is reused.
     const idempotent = await this.idempotency.checkAndStore(
       intent.tenantId,
       intent.userId,
@@ -287,29 +306,37 @@ export class WebhookInboxService {
       { transactionId, orderId: intent.orderId },
     );
 
-    if (!idempotent.isNew) return;
+    if (!idempotent.isNew && idempotent.response !== undefined) return;
 
-    // Create payment record
-    const payment = await this.prisma.payment.create({
-      data: {
-        tenantId: intent.tenantId,
-        orderId: intent.orderId,
-        userId: intent.userId,
-        paymentIntentId: intent.id,
-        provider,
-        paymentMethod: intent.requestedMethod,
-        status: "PAID",
-        amountMinor: intent.amountMinor,
-        currency: intent.currency,
-        providerTransactionId:
-          transactionId !== undefined ? String(transactionId) : undefined,
-        confirmedAt: new Date(),
-        metadata: { webhookEventId: webhookEventId },
-      },
+    // Reuse the row a crashed attempt left behind instead of inserting a
+    // second PAID payment for the same intent.
+    let payment = await this.prisma.payment.findFirst({
+      where: { paymentIntentId: intent.id, provider, status: "PAID" },
     });
 
-    // Complete payment
-    await this.orchestrator["completePayment"](
+    if (!payment) {
+      payment = await this.prisma.payment.create({
+        data: {
+          tenantId: intent.tenantId,
+          orderId: intent.orderId,
+          userId: intent.userId,
+          paymentIntentId: intent.id,
+          provider,
+          paymentMethod: intent.requestedMethod,
+          status: "PAID",
+          amountMinor: intent.amountMinor,
+          currency: intent.currency,
+          providerTransactionId:
+            transactionId !== undefined ? String(transactionId) : undefined,
+          confirmedAt: new Date(),
+          metadata: { webhookEventId: webhookEventId },
+        },
+      });
+    }
+
+    // Complete payment (public since bundle B; all-or-nothing in one
+    // transaction, so re-running after a failure is safe).
+    await this.orchestrator.completePayment(
       intent.tenantId,
       payment.id,
       intent.orderId,
@@ -346,6 +373,13 @@ export class WebhookInboxService {
     }
 
     if (!intent) return;
+
+    // A provider can redeliver the failure; never pile up duplicate FAILED
+    // payment rows for the same intent (bundle B).
+    const existingFailure = await this.prisma.payment.findFirst({
+      where: { paymentIntentId: intent.id, provider, status: "FAILED" },
+    });
+    if (existingFailure) return;
 
     await this.prisma.paymentIntent.update({
       where: { id: intent.id },
@@ -424,8 +458,13 @@ export class WebhookInboxService {
   }
 
   async retryFailedWebhooks(): Promise<number> {
+    // SIGNATURE_INVALID rows are evidence of an attack/probe, not work to
+    // retry — replaying them would flip them to PROCESSED (bundle B).
     const failedEvents = await this.prisma.webhookEvent.findMany({
-      where: { processingStatus: "FAILED" },
+      where: {
+        processingStatus: "FAILED",
+        eventType: { not: "SIGNATURE_INVALID" },
+      },
       take: 50,
     });
 

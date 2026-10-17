@@ -123,6 +123,7 @@ export class VoucherProvider implements PaymentProvider {
           voucher.courseId,
           "voucher",
           { voucherId: voucher.id, redemptionId: redemption.id },
+          tx,
         );
       }
 

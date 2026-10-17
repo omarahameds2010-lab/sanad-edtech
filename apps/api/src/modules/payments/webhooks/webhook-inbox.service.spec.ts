@@ -2,12 +2,16 @@ import { Prisma } from "@prisma/client";
 import { WebhookInboxService } from "./webhook-inbox.service";
 
 /**
- * Regression suite for audit 2026-10-16 §5.1 (payment webhooks):
+ * Regression suite for audit 2026-10-16 §5.1 (payment webhooks), extended by
+ * bundle B (real webhook round trip):
  *  - raw body must exist before anything else,
  *  - signature verification runs before persistence,
  *  - dedup is keyed on the PROVIDER-derived event id (not the http header),
  *  - the raw payload is stored and later consumed by the event handlers,
- *  - replays / unique-constraint races never explode or double-queue.
+ *  - replays / unique-constraint races never explode or double-queue,
+ *  - a paid event with no matching intent is FAILED (visible, retryable) and
+ *    a redelivery for a settled transaction is a no-op,
+ *  - a PENDING claim resumes the completion instead of silently no-oping.
  */
 describe("WebhookInboxService (audit #5)", () => {
   const flushImmediates = () =>
@@ -24,7 +28,7 @@ describe("WebhookInboxService (audit #5)", () => {
         findMany: jest.fn(),
       },
       paymentIntent: { findFirst: jest.fn(), update: jest.fn() },
-      payment: { create: jest.fn() },
+      payment: { create: jest.fn(), findFirst: jest.fn() },
       refund: { updateMany: jest.fn() },
     };
     const registry = { getProvider: jest.fn() };
@@ -334,7 +338,7 @@ describe("WebhookInboxService (audit #5)", () => {
     );
   });
 
-  it("does not double-complete when idempotency says the event was processed", async () => {
+  it("replays a COMPLETED idempotency claim without touching the payment", async () => {
     const { service, prisma, orchestrator, idempotency } = build();
 
     prisma.webhookEvent.findUnique.mockResolvedValue({
@@ -356,12 +360,154 @@ describe("WebhookInboxService (audit #5)", () => {
       requestedMethod: "CARD",
       metadata: {},
     });
-    idempotency.checkAndStore.mockResolvedValue({ isNew: false });
+    idempotency.checkAndStore.mockResolvedValue({
+      isNew: false,
+      response: { paymentId: "pay-old" },
+    });
 
     await service.processEvent("evt-3");
 
+    expect(prisma.payment.findFirst).not.toHaveBeenCalled();
     expect(prisma.payment.create).not.toHaveBeenCalled();
     expect(orchestrator.completePayment).not.toHaveBeenCalled();
+  });
+
+  it("fails the event instead of swallowing a paid event with no intent and no settled payment", async () => {
+    const { service, prisma, orchestrator } = build();
+
+    prisma.webhookEvent.findUnique.mockResolvedValue({
+      id: "evt-5",
+      provider: "paymob",
+      eventType: "payment.paid",
+      rawPayload: {
+        obj: { id: 42, order: { merchant_order_id: "order-x" } },
+      },
+    });
+    prisma.webhookEvent.update.mockResolvedValue({});
+    prisma.paymentIntent.findFirst.mockResolvedValue(null);
+    prisma.payment.findFirst.mockResolvedValue(null);
+
+    await expect(service.processEvent("evt-5")).rejects.toThrow(
+      /INTENT_NOT_FOUND/,
+    );
+
+    expect(orchestrator.completePayment).not.toHaveBeenCalled();
+    expect(prisma.webhookEvent.update).toHaveBeenLastCalledWith({
+      where: { id: "evt-5" },
+      data: {
+        processingStatus: "FAILED",
+        errorCode: expect.stringContaining("INTENT_NOT_FOUND"),
+      },
+    });
+  });
+
+  it("treats a paid redelivery for an already-settled transaction as a duplicate no-op", async () => {
+    const { service, prisma, orchestrator, idempotency } = build();
+
+    prisma.webhookEvent.findUnique.mockResolvedValue({
+      id: "evt-6",
+      provider: "paymob",
+      eventType: "payment.paid",
+      rawPayload: {
+        obj: { id: 42, order: { merchant_order_id: "order-x" } },
+      },
+    });
+    prisma.webhookEvent.update.mockResolvedValue({});
+    prisma.paymentIntent.findFirst.mockResolvedValue(null);
+    prisma.payment.findFirst.mockResolvedValue({ id: "pay-settled" });
+
+    await service.processEvent("evt-6");
+
+    expect(idempotency.checkAndStore).not.toHaveBeenCalled();
+    expect(orchestrator.completePayment).not.toHaveBeenCalled();
+    expect(prisma.webhookEvent.update).toHaveBeenLastCalledWith({
+      where: { id: "evt-6" },
+      data: { processingStatus: "PROCESSED" },
+    });
+  });
+
+  it("resumes a PENDING idempotency claim by completing the existing PAID payment", async () => {
+    const { service, prisma, orchestrator, idempotency } = build();
+
+    prisma.webhookEvent.findUnique.mockResolvedValue({
+      id: "evt-7",
+      provider: "paymob",
+      eventType: "payment.paid",
+      rawPayload: {
+        obj: { id: 999, order: { merchant_order_id: "order-1" } },
+      },
+    });
+    prisma.webhookEvent.update.mockResolvedValue({});
+    prisma.paymentIntent.findFirst.mockResolvedValue({
+      id: "int-1",
+      tenantId: "t-1",
+      userId: "u-1",
+      orderId: "order-1",
+      amountMinor: 10000n,
+      currency: "EGP",
+      requestedMethod: "CARD",
+      metadata: {},
+    });
+    idempotency.checkAndStore.mockResolvedValue({ isNew: false });
+    prisma.payment.findFirst.mockResolvedValue({ id: "pay-resume" });
+
+    await service.processEvent("evt-7");
+
+    expect(prisma.payment.create).not.toHaveBeenCalled();
+    expect(orchestrator.completePayment).toHaveBeenCalledWith(
+      "t-1",
+      "pay-resume",
+      "order-1",
+      "u-1",
+      "paymob",
+    );
+    expect(idempotency.markCompleted).toHaveBeenCalledWith(
+      "t-1",
+      "webhook_payment_paymob_999",
+      { paymentId: "pay-resume" },
+    );
+  });
+
+  it("recreates the payment row when a PENDING claim died before inserting it", async () => {
+    const { service, prisma, orchestrator, idempotency } = build();
+
+    prisma.webhookEvent.findUnique.mockResolvedValue({
+      id: "evt-8",
+      provider: "paymob",
+      eventType: "payment.paid",
+      rawPayload: {
+        obj: { id: 999, order: { merchant_order_id: "order-1" } },
+      },
+    });
+    prisma.webhookEvent.update.mockResolvedValue({});
+    prisma.paymentIntent.findFirst.mockResolvedValue({
+      id: "int-1",
+      tenantId: "t-1",
+      userId: "u-1",
+      orderId: "order-1",
+      amountMinor: 10000n,
+      currency: "EGP",
+      requestedMethod: "CARD",
+      metadata: {},
+    });
+    idempotency.checkAndStore.mockResolvedValue({ isNew: false });
+    prisma.payment.findFirst.mockResolvedValue(null);
+    prisma.payment.create.mockResolvedValue({ id: "pay-retry" });
+
+    await service.processEvent("evt-8");
+
+    expect(orchestrator.completePayment).toHaveBeenCalledWith(
+      "t-1",
+      "pay-retry",
+      "order-1",
+      "u-1",
+      "paymob",
+    );
+    expect(idempotency.markCompleted).toHaveBeenCalledWith(
+      "t-1",
+      "webhook_payment_paymob_999",
+      { paymentId: "pay-retry" },
+    );
   });
 
   it("marks the event FAILED and rethrows when completion fails", async () => {
@@ -438,6 +584,54 @@ describe("WebhookInboxService (audit #5)", () => {
         status: "FAILED",
         failureCode: "DECLINED",
       }),
+    });
+  });
+
+  it("does not pile up FAILED rows when the provider redelivers a failure", async () => {
+    const { service, prisma } = build();
+
+    prisma.webhookEvent.findUnique.mockResolvedValue({
+      id: "evt-10",
+      provider: "fawry",
+      eventType: "payment.failed",
+      rawPayload: { merchantRefNum: "order-9", failure_code: "DECLINED" },
+    });
+    prisma.webhookEvent.update.mockResolvedValue({});
+    prisma.paymentIntent.findFirst.mockResolvedValue({
+      id: "int-9",
+      tenantId: "t-1",
+      userId: "u-1",
+      orderId: "order-9",
+      amountMinor: 2500n,
+      currency: "EGP",
+      requestedMethod: "CARD",
+      metadata: {},
+    });
+    prisma.payment.findFirst.mockResolvedValue({ id: "pay-fail" });
+
+    await service.processEvent("evt-10");
+
+    expect(prisma.payment.create).not.toHaveBeenCalled();
+    expect(prisma.paymentIntent.update).not.toHaveBeenCalled();
+  });
+
+  it("retries FAILED events but never re-processes SIGNATURE_INVALID records", async () => {
+    const { service, prisma } = build();
+    prisma.webhookEvent.findMany.mockResolvedValue([]);
+    const processSpy = jest
+      .spyOn(service, "processEvent")
+      .mockResolvedValue(undefined);
+
+    const retried = await service.retryFailedWebhooks();
+
+    expect(retried).toBe(0);
+    expect(processSpy).not.toHaveBeenCalled();
+    expect(prisma.webhookEvent.findMany).toHaveBeenCalledWith({
+      where: {
+        processingStatus: "FAILED",
+        eventType: { not: "SIGNATURE_INVALID" },
+      },
+      take: 50,
     });
   });
 });
