@@ -125,7 +125,7 @@ pnpm test
 
 ## Working Agreement
 
-- User = high-school student, 1 day/week on this project
+- User = high-school student named **Omar** (1 day/week on this project). «صالح حسين / جوكر اللغة العربية» is the **demo teacher persona** of the platform — the user is Omar; never address the user as Salih.
 - Work in **small verifiable steps**; commit after each working task
 - Explain security-critical code line-by-line when asked
 - **Never claim success without `pnpm build` passing and showing output**
