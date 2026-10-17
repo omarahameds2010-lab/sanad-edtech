@@ -1,147 +1,209 @@
-import { forwardRef } from 'react';
-import { motion, HTMLMotionProps } from 'framer-motion';
+import * as React from 'react';
 
-export interface CardProps extends HTMLMotionProps<'div'> {
-  /** Card variant */
+export interface CardProps extends React.HTMLAttributes<HTMLDivElement> {
   variant?: 'default' | 'outlined' | 'elevated' | 'filled';
-  /** Card size */
   size?: 'sm' | 'md' | 'lg';
-  /** Hover effect */
   hoverable?: boolean;
-  /** Clickable card */
   clickable?: boolean;
-  /** Card header */
   header?: React.ReactNode;
-  /** Card footer */
   footer?: React.ReactNode;
-  /** Card image */
   image?: {
     src: string;
     alt: string;
     position?: 'top' | 'bottom';
   };
-  /** Padding */
   padding?: 'none' | 'sm' | 'md' | 'lg';
-  /** Disabled state */
+  subject?: 'math' | 'physics' | 'arabic' | 'english' | 'chemistry' | 'computer-science';
+  arabicRhythmStrip?: boolean;
+  arabicRhythmStripLabel?: string;
+  rhythmStripLabel?: string;
   disabled?: boolean;
 }
 
-const variantStyles = {
-  default: {
-    background: 'var(--color-surface-primary)',
-    border: '1px solid var(--color-border-main)',
-  },
-  outlined: {
-    background: 'var(--color-surface-primary)',
-    border: '2px solid var(--color-border-main)',
-  },
-  elevated: {
-    background: 'var(--color-surface-primary)',
-    border: 'none',
-    boxShadow: 'var(--shadow-lg)',
-  },
-  filled: {
-    background: 'var(--color-surface-secondary)',
-    border: 'none',
-  },
-} as const;
+const subjectMotifChars: Record<string, string> = {
+  math: '⊞',
+  physics: '∼',
+  arabic: '✎',
+  english: '"',
+  chemistry: '●',
+  'computer-science': '◈',
+};
 
-const sizeStyles = {
-  sm: { padding: '12px', borderRadius: 'var(--radius-md)' },
-  md: { padding: '16px', borderRadius: 'var(--radius-lg)' },
-  lg: { padding: '24px', borderRadius: 'var(--radius-xl)' },
-} as const;
+const subjectMotifColors: Record<string, string> = {
+  math: 'var(--color-action)',
+  physics: 'var(--color-action)',
+  arabic: 'var(--color-action)',
+  english: 'var(--color-action)',
+  chemistry: 'var(--color-action)',
+  'computer-science': 'var(--color-action)',
+};
 
-const paddingStyles = {
-  none: { padding: 0 },
-  sm: { padding: '8px' },
-  md: { padding: '16px' },
-  lg: { padding: '24px' },
-} as const;
+const subjectRhythmStripHeight: Record<string, number> = {
+  math: 48,
+  physics: 48,
+  arabic: 64,
+  english: 48,
+  chemistry: 48,
+  'computer-science': 48,
+};
 
-const Card = forwardRef<HTMLDivElement, CardProps>(
-  (
-    {
-      variant = 'default',
-      size = 'md',
-      hoverable = false,
-      clickable = false,
-      header,
-      footer,
-      image,
-      padding = 'md',
-      disabled = false,
-      className = '',
-      style,
-      children,
-      onClick,
-      ...props
-    },
-    ref
-  ) => {
-    const baseStyles = {
+const subjectA2BandOffset: Record<string, string> = {
+  math: '-24px',
+  physics: '-24px',
+  arabic: '-24px',
+  english: '-24px',
+  chemistry: '-24px',
+  'computer-science': '-24px',
+};
+
+const subjectBandHeight: Record<string, string> = {
+  math: '96px',
+  physics: '96px',
+  arabic: '96px',
+  english: '96px',
+  chemistry: '96px',
+  'computer-science': '96px',
+};
+
+export const Card = React.forwardRef<HTMLDivElement, CardProps>(
+  ({
+    children,
+    variant = 'default',
+    size = 'md',
+    hoverable = false,
+    clickable = false,
+    header,
+    footer,
+    image,
+    padding = 'md',
+    subject,
+    arabicRhythmStrip = false,
+    arabicRhythmStripLabel,
+    rhythmStripLabel,
+    disabled = false,
+    onClick,
+    style,
+    ...props
+  }, ref) => {
+    const variantStyles = {
+      default: { background: 'var(--color-surface-primary)', border: '1px solid var(--color-border-main)' },
+      outlined: { background: 'var(--color-surface-primary)', border: '2px solid var(--color-border-main)' },
+      elevated: { background: 'var(--color-surface-primary)', border: 'none', boxShadow: 'var(--shadow-lg)' },
+      filled: { background: 'var(--color-surface-secondary)', border: 'none' },
+    };
+
+    const sizeStyles = {
+      sm: { borderRadius: 'var(--radius-md)' },
+      md: { borderRadius: 'var(--radius-lg)' },
+      lg: { borderRadius: 'var(--radius-xl)' },
+    };
+
+    const paddingStyles = {
+      none: { padding: 0 },
+      sm: { padding: '8px' },
+      md: { padding: '16px' },
+      lg: { padding: '24px' },
+    };
+
+    const isArabic = subject === 'arabic';
+    const rhythmStrip = arabicRhythmStrip || isArabic;
+    const rhythmStripLabelValue = arabicRhythmStripLabel || rhythmStripLabel || (isArabic ? 'A2' : undefined);
+
+    const arabicRhythmStripStyle: React.CSSProperties = {
+      height: subjectRhythmStripHeight[subject as keyof typeof subjectRhythmStripHeight] || 64,
+      background: 'var(--color-surface-primary)',
+      borderRadius: 'var(--radius-lg) var(--radius-lg) 0 0',
+      margin: subjectA2BandOffset[subject as keyof typeof subjectA2BandOffset] || '-24px -24px 16px -24px',
+      position: 'relative' as const,
+      overflow: 'hidden',
+      display: 'flex',
+      alignItems: 'center',
+      padding: '0 24px',
+      ...(isArabic && {
+        background: 'var(--color-surface-primary)',
+        border: '1px solid var(--color-border-main)',
+      }),
+    };
+
+    const subjectBandStyle: React.CSSProperties = {
+      height: subjectBandHeight[subject as keyof typeof subjectBandHeight] || '96px',
+      background: 'var(--color-surface-primary)',
+      borderRadius: 'var(--radius-lg) var(--radius-lg) 0 0',
+      margin: subjectA2BandOffset[subject as keyof typeof subjectA2BandOffset] || '-24px -24px 16px -24px',
+      position: 'relative' as const,
+      overflow: 'hidden',
+      display: 'flex',
+      alignItems: 'center',
+      padding: '0 24px',
+    };
+
+    const motifChar = subjectMotifChars[subject as keyof typeof subjectMotifChars] || '⊞';
+    const motifColor = subjectMotifColors[subject as keyof typeof subjectMotifColors] || 'var(--color-action)';
+
+    const handleCardClick = (e: React.MouseEvent<HTMLDivElement>) => {
+      if (disabled) {
+        e.preventDefault();
+        return;
+      }
+      if (onClick) onClick(e);
+    };
+
+    const computedStyle: React.CSSProperties = {
       ...variantStyles[variant],
       ...sizeStyles[size],
       ...paddingStyles[padding],
-    } as React.CSSProperties;
+      opacity: disabled ? 0.6 : 1,
+      cursor: disabled ? 'not-allowed' : (clickable || onClick ? 'pointer' : 'default'),
+      transition: 'all 0.2s ease-out',
+      ...style
+    };
 
     return (
-      <motion.div
+      <div
         ref={ref}
-        className={className}
-        style={{
-          ...baseStyles,
-          ...style,
-        } as React.CSSProperties}
-        whileHover={hoverable && !disabled ? { y: -4, boxShadow: 'var(--shadow-lg)' } : undefined}
-        whileTap={clickable ? { scale: 0.98 } : undefined}
-        transition={{ duration: 0.2, ease: 'ease-out' }}
-        onClick={onClick}
+        style={computedStyle}
+        onClick={handleCardClick}
         {...props}
       >
         {image && image.position !== 'bottom' && (
           <img
             src={image.src}
             alt={image.alt}
-            style={{
-              width: '100%',
-              height: 'auto',
-              borderRadius: 'inherit',
-              margin: '-16px -16px 16px -16px',
-              objectFit: 'cover',
-            }}
-          )}
-        {header && (
-          <div style={{ marginBottom: '12px' }}>
-            {header}
+            style={{ width: '100%', height: 'auto', borderRadius: 'inherit', margin: '-16px -16px 16px -16px', objectFit: 'cover' }}
+          />
+        )}
+        {header && <div style={{ marginBottom: '12px' }}>{header}</div>}
+        
+        {rhythmStrip && (
+          <div style={arabicRhythmStripStyle}>
+            <span style={{ color: motifColor, fontSize: '24px', marginRight: '12px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              {motifChar}
+            </span>
+            <span style={{ fontSize: '11px', color: 'var(--color-text-muted)', marginLeft: '12px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              {rhythmStripLabelValue}
+            </span>
           </div>
         )}
-        <div style={{ flex: 1 }}>
-          {children}
-        </div>
-        {footer && (
-          <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid var(--color-border-main)' }}>
-            {footer}
+
+        {subject && !rhythmStrip && (
+          <div style={subjectBandStyle}>
+            <span style={{ color: motifColor, fontSize: '20px', marginRight: '12px' }}>{motifChar}</span>
           </div>
         )}
+
+        <div className="lp-card-content">{children}</div>
+
         {image && image.position === 'bottom' && (
           <img
             src={image.src}
             alt={image.alt}
-            style={{
-              width: '100%',
-              height: 'auto',
-              borderRadius: 'inherit',
-              margin: '16px -16px -16px -16px',
-              objectFit: 'cover',
-            }}
-          )}
-      </motion.div>
+            style={{ width: '100%', height: 'auto', borderRadius: 'inherit', marginTop: '16px', objectFit: 'cover' }}
+          />
+        )}
+        {footer && <div style={{ marginTop: '12px' }}>{footer}</div>}
+      </div>
     );
   }
 );
 
 Card.displayName = 'Card';
-
-export { Card };
-export type { CardProps };

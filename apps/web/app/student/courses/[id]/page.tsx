@@ -84,19 +84,32 @@ export default function StudentCourseDetailPage({
 
   return (
     <div style={{ maxWidth: 860 }}>
-      <nav style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: "var(--space-sm)" }}>
+      <nav
+        style={{
+          fontSize: 12,
+          color: "var(--text-muted)",
+          marginBottom: "var(--space-sm)",
+        }}
+      >
         <Link href="/student/courses">كورساتي</Link> › {data.course.title}
       </nav>
 
       <h1 style={{ marginBottom: 4 }}>{data.course.title}</h1>
       {data.course.shortDescription && (
-        <p style={{ color: "var(--text-muted)", marginBottom: "var(--space-lg)" }}>
+        <p
+          style={{
+            color: "var(--text-muted)",
+            marginBottom: "var(--space-lg)",
+          }}
+        >
           {data.course.shortDescription}
         </p>
       )}
 
       {data.sections.length === 0 && (
-        <div className="card"><p>لا توجد وحدات منشورة في هذا الكورس بعد.</p></div>
+        <div className="card">
+          <p>لا توجد وحدات منشورة في هذا الكورس بعد.</p>
+        </div>
       )}
 
       {data.sections.map((section) => (
@@ -134,7 +147,9 @@ export default function StudentCourseDetailPage({
                   >
                     {lockLabels[lesson.lockStatus] ?? lesson.lockStatus}
                   </span>
-                  <span style={{ flex: 1, fontWeight: 600 }}>{lesson.title}</span>
+                  <span style={{ flex: 1, fontWeight: 600 }}>
+                    {lesson.title}
+                  </span>
                   <span style={{ fontSize: 12, color: "var(--text-muted)" }}>
                     {typeLabels[lesson.type] ?? lesson.type}
                   </span>

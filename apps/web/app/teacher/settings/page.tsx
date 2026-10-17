@@ -30,8 +30,18 @@ export default function TeacherSettingsPage() {
     );
   }
 
-  if (error) return <div className="card"><p>{error}</p></div>;
-  if (!tenant) return <div className="card"><p>جاري التحميل…</p></div>;
+  if (error)
+    return (
+      <div className="card">
+        <p>{error}</p>
+      </div>
+    );
+  if (!tenant)
+    return (
+      <div className="card">
+        <p>جاري التحميل…</p>
+      </div>
+    );
 
   return (
     <div className="card" style={{ maxWidth: 560 }}>

@@ -91,8 +91,10 @@ export class EntitlementsService {
     userId: string,
     resourceType: string,
     resourceId: string,
+    tx?: Prisma.TransactionClient,
   ): Promise<Entitlement | null> {
-    const entitlement = await this.prisma.entitlement.findFirst({
+    const db: any = tx ?? this.prisma;
+    const entitlement = await db.entitlement.findFirst({
       where: {
         userId,
         resourceType,
@@ -129,12 +131,23 @@ export class EntitlementsService {
     return entitlement.status === "ACTIVE";
   }
 
-  async grantEntitlement(input: GrantEntitlementInput): Promise<Entitlement> {
+  /**
+   * Grant an entitlement. `tx` runs every read/write inside the caller's
+   * interactive transaction (atomic with payment completion, bundle B);
+   * callers without a transaction keep the request-scoped client.
+   */
+  async grantEntitlement(
+    input: GrantEntitlementInput,
+    tx?: Prisma.TransactionClient,
+  ): Promise<Entitlement> {
+    const db: any = tx ?? this.prisma;
+
     // Check if already has active entitlement
     const existing = await this.getEntitlement(
       input.userId,
       input.resourceType,
       input.resourceId,
+      tx,
     );
     if (existing && existing.status === "ACTIVE") {
       // Update existing entitlement if new one has later expiry
@@ -142,16 +155,20 @@ export class EntitlementsService {
         input.expiresAt &&
         (!existing.expiresAt || input.expiresAt > existing.expiresAt)
       ) {
-        return this.updateEntitlement(existing.id, {
-          expiresAt: input.expiresAt,
-          metadata: { ...existing.metadata, ...input.metadata },
-        });
+        return this.updateEntitlement(
+          existing.id,
+          {
+            expiresAt: input.expiresAt,
+            metadata: { ...existing.metadata, ...input.metadata },
+          },
+          tx,
+        );
       }
       return existing;
     }
 
     // Create new entitlement
-    const created = await this.prisma.entitlement.create({
+    const created = await db.entitlement.create({
       data: {
         tenantId: input.tenantId,
         userId: input.userId,
@@ -173,19 +190,25 @@ export class EntitlementsService {
     courseId: string,
     source: EntitlementSource,
     metadata?: Record<string, any>,
+    tx?: Prisma.TransactionClient,
   ): Promise<Entitlement[]> {
+    const db: any = tx ?? this.prisma;
+
     // Grant entitlement to course
-    const courseEntitlement = await this.grantEntitlement({
-      tenantId,
-      userId,
-      resourceType: "course",
-      resourceId: courseId,
-      source,
-      metadata,
-    });
+    const courseEntitlement = await this.grantEntitlement(
+      {
+        tenantId,
+        userId,
+        resourceType: "course",
+        resourceId: courseId,
+        source,
+        metadata,
+      },
+      tx,
+    );
 
     // Get all lessons in the course and grant entitlements
-    const lessons = await this.prisma.lesson.findMany({
+    const lessons = await db.lesson.findMany({
       where: {
         tenantId,
         section: { courseId },
@@ -195,20 +218,23 @@ export class EntitlementsService {
     });
 
     const lessonEntitlements = await Promise.all(
-      lessons.map((lesson) =>
-        this.grantEntitlement({
-          tenantId,
-          userId,
-          resourceType: "lesson",
-          resourceId: lesson.id,
-          source,
-          metadata: { courseId, ...metadata },
-        }),
+      lessons.map((lesson: { id: string }) =>
+        this.grantEntitlement(
+          {
+            tenantId,
+            userId,
+            resourceType: "lesson",
+            resourceId: lesson.id,
+            source,
+            metadata: { courseId, ...metadata },
+          },
+          tx,
+        ),
       ),
     );
 
     // Get exams for the course
-    const exams = await this.prisma.exam.findMany({
+    const exams = await db.exam.findMany({
       where: {
         tenantId,
         status: "PUBLISHED",
@@ -218,20 +244,23 @@ export class EntitlementsService {
     });
 
     const examEntitlements = await Promise.all(
-      exams.map((exam) =>
-        this.grantEntitlement({
-          tenantId,
-          userId,
-          resourceType: "exam",
-          resourceId: exam.id,
-          source,
-          metadata: { courseId, ...metadata },
-        }),
+      exams.map((exam: { id: string }) =>
+        this.grantEntitlement(
+          {
+            tenantId,
+            userId,
+            resourceType: "exam",
+            resourceId: exam.id,
+            source,
+            metadata: { courseId, ...metadata },
+          },
+          tx,
+        ),
       ),
     );
 
     // Get assignments for the course
-    const assignments = await this.prisma.assignment.findMany({
+    const assignments = await db.assignment.findMany({
       where: {
         tenantId,
         status: "PUBLISHED",
@@ -241,15 +270,18 @@ export class EntitlementsService {
     });
 
     const assignmentEntitlements = await Promise.all(
-      assignments.map((assignment) =>
-        this.grantEntitlement({
-          tenantId,
-          userId,
-          resourceType: "assignment",
-          resourceId: assignment.id,
-          source,
-          metadata: { courseId, ...metadata },
-        }),
+      assignments.map((assignment: { id: string }) =>
+        this.grantEntitlement(
+          {
+            tenantId,
+            userId,
+            resourceType: "assignment",
+            resourceId: assignment.id,
+            source,
+            metadata: { courseId, ...metadata },
+          },
+          tx,
+        ),
       ),
     );
 
@@ -310,8 +342,10 @@ export class EntitlementsService {
         "id" | "tenantId" | "userId" | "createdAt" | "updatedAt"
       >
     >,
+    tx?: Prisma.TransactionClient,
   ): Promise<Entitlement> {
-    const updated = await this.prisma.entitlement.update({
+    const db: any = tx ?? this.prisma;
+    const updated = await db.entitlement.update({
       where: { id },
       data: { ...data, updatedAt: new Date() },
     });

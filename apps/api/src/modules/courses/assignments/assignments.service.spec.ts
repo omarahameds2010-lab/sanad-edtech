@@ -6,6 +6,7 @@ import {
   ForbiddenException,
 } from "@nestjs/common";
 import { AssignmentsService } from "./assignments.service";
+import { SanadClient } from "./sanad.client";
 import { PrismaService } from "../../tenants/prisma.service";
 import { IdempotencyService } from "../../payments/security/idempotency.service";
 import { ProgressionService } from "../progression/progression.service";
@@ -50,7 +51,9 @@ describe("AssignmentsService", () => {
       getStatus: jest.fn().mockResolvedValue(null),
     };
     progressionService = {
-      handleEnterAssignment: jest.fn().mockResolvedValue({ unlocked: 1 }),
+      handleEnterAssignment: jest
+        .fn()
+        .mockResolvedValue({ unlocked: 1, lessonIds: ["lessonExam"] }),
     };
 
     service = new AssignmentsService(
@@ -135,6 +138,7 @@ describe("AssignmentsService", () => {
       );
       expect(result).toEqual(cached);
       expect(prisma.assignment.findFirst).not.toHaveBeenCalled();
+      expect(progressionService.handleEnterAssignment).not.toHaveBeenCalled();
     });
 
     it("throws BadRequestException when assignment is not published", async () => {
@@ -245,6 +249,19 @@ describe("AssignmentsService", () => {
         "a1",
         "l1",
         "key1:progression",
+      );
+      // Single progression call: the unlock result travels inside the SAME
+      // idempotent response (audit 2026-10-16 §6.1 — the controller used to
+      // call progression a second time and always reported 0 unlocks).
+      expect(result.unlocked).toEqual({
+        unlocked: 1,
+        lessonIds: ["lessonExam"],
+      });
+      // Unlocks are computed BEFORE the response is cached
+      expect(
+        progressionService.handleEnterAssignment.mock.invocationCallOrder[0],
+      ).toBeLessThan(
+        idempotencyService.markCompleted.mock.invocationCallOrder[0],
       );
       expect(idempotencyService.markCompleted).toHaveBeenCalled();
       expect(result.startedAt.getTime()).toBeGreaterThanOrEqual(before);
@@ -418,6 +435,152 @@ describe("AssignmentsService", () => {
           data: expect.objectContaining({ status: "PUBLISHED" }),
         }),
       );
+    });
+  });
+
+  describe("evaluateAssignmentWithAI", () => {
+    const grading = {
+      reference_answer: "ref",
+      max_score: 10,
+      rubric_version: "v1",
+      criteria: [{ id: "c1", description: "d1", max_score: 10 }],
+    };
+
+    it("throws BadRequestException when rubric or sources are missing", async () => {
+      const svc: any = new AssignmentsService(
+        prisma,
+        idempotencyService,
+        progressionService,
+        { evaluateSubmission: jest.fn() } as unknown as SanadClient,
+      );
+      await expect(
+        svc.evaluateAssignmentWithAI(tenantId, userId, "a1", "ans"),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it("maps SANAD suggestion without setting the official grade", async () => {
+      const sanadResult = {
+        evaluation_id: "e1",
+        request_id: "r1",
+        sanad_submission_id: "s1",
+        status: "COMPLETED",
+        suggested_score: 7,
+        max_score: 10,
+        criteria: [],
+        feedback_ar: "good",
+        review_signal: 0.9,
+        needs_teacher_review: true,
+        knowledge_gaps: [],
+        provenance: {},
+        usage: {},
+      };
+      const sanad = {
+        evaluateSubmission: jest.fn().mockResolvedValue(sanadResult),
+      };
+      const svc: any = new AssignmentsService(
+        prisma,
+        idempotencyService,
+        progressionService,
+        sanad as unknown as SanadClient,
+      );
+      const result = await svc.evaluateAssignmentWithAI(
+        tenantId,
+        userId,
+        "a1",
+        "ans",
+        "q?",
+        grading,
+        ["gen_fixed_irab_v1"],
+      );
+      expect(sanad.evaluateSubmission).toHaveBeenCalledWith(
+        expect.objectContaining({
+          tenantId,
+          grading,
+          sourceIds: ["gen_fixed_irab_v1"],
+        }),
+      );
+      expect(result.data.score).toBe(7);
+      expect(result.data.needsTeacherReview).toBe(true);
+      expect(result.data.sanadSubmissionId).toBe("s1");
+      // Official grade stays untouched: no submission update here.
+      expect(prisma.assignmentSubmission.update).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("getStudentAssignmentView", () => {
+    // Security regression (leak fix 2026-10-16): the student view used to
+    // spread the full assignment, including EVERY student's submissions
+    // (content, score, feedback). It must query only the caller's rows.
+    const assignmentRow = {
+      id: "a1",
+      lessonId: "l1",
+      timerMinutes: 300,
+      maxAttempts: 1,
+      // Deliberately no `submissions` key: the view must not depend on it.
+    };
+
+    beforeEach(() => {
+      prisma.assignment.findFirst.mockResolvedValue({ ...assignmentRow });
+      prisma.lesson.findUnique.mockResolvedValue({
+        id: "l1",
+        section: { courseId: "c1" },
+      });
+      prisma.enrollment.findFirst.mockResolvedValue({ id: "en1" });
+    });
+
+    it("queries ONLY the calling student's submissions", async () => {
+      prisma.assignmentSubmission.findMany.mockResolvedValue([]);
+
+      const result = await service.getStudentAssignmentView(
+        tenantId,
+        userId,
+        "a1",
+      );
+
+      expect(prisma.assignmentSubmission.findMany).toHaveBeenCalledWith({
+        where: { tenantId, assignmentId: "a1", studentId: userId },
+        orderBy: { submittedAt: "desc" },
+      });
+      expect(result).not.toHaveProperty("submissions");
+      expect(result.studentAttemptCount).toBe(0);
+    });
+
+    it("never requests submissions via the assignment include", async () => {
+      prisma.assignmentSubmission.findMany.mockResolvedValue([]);
+
+      await service.getStudentAssignmentView(tenantId, userId, "a1");
+
+      expect(prisma.assignment.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({
+          include: expect.objectContaining({ submissions: false }),
+        }),
+      );
+    });
+
+    it("computes remaining time from the student's own active submission", async () => {
+      const submittedAt = new Date();
+      submittedAt.setMinutes(submittedAt.getMinutes() - 10);
+      prisma.assignmentSubmission.findMany.mockResolvedValue([
+        {
+          id: "s1",
+          studentId: userId,
+          status: "SUBMITTED",
+          submittedAt,
+          content: "my answer",
+          attachments: null,
+        },
+      ]);
+
+      const result = await service.getStudentAssignmentView(
+        tenantId,
+        userId,
+        "a1",
+      );
+
+      expect(result.activeSubmission).toEqual(
+        expect.objectContaining({ id: "s1", content: "my answer" }),
+      );
+      expect(result.timeRemainingSeconds).toBeGreaterThan(280 * 60);
     });
   });
 });

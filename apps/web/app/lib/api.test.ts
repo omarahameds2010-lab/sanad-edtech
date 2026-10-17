@@ -12,7 +12,9 @@ import {
 
 function mockFetchOnce(payload: unknown, status = 200) {
   const json = vi.fn().mockResolvedValue(payload);
-  const fetchMock = vi.fn().mockResolvedValue({ ok: status < 300, status, json });
+  const fetchMock = vi
+    .fn()
+    .mockResolvedValue({ ok: status < 300, status, json });
   vi.stubGlobal("fetch", fetchMock);
   return { fetchMock, json };
 }
@@ -55,9 +57,9 @@ describe("apiFetch", () => {
   it("returns raw JSON when there is no envelope (login)", async () => {
     const raw = { accessToken: "a", user: { id: "u" } };
     mockFetchOnce(raw);
-    await expect(apiFetch("/api/auth/login", { method: "POST" })).resolves.toEqual(
-      raw,
-    );
+    await expect(
+      apiFetch("/api/auth/login", { method: "POST" }),
+    ).resolves.toEqual(raw);
   });
 
   it("throws ApiError with the server message on failure", async () => {
@@ -97,23 +99,27 @@ describe("exam endpoints", () => {
 
 describe("newIdempotencyKey", () => {
   it("generates unique keys", () => {
-    const keys = new Set(
-      Array.from({ length: 50 }, () => newIdempotencyKey()),
-    );
+    const keys = new Set(Array.from({ length: 50 }, () => newIdempotencyKey()));
     expect(keys.size).toBe(50);
   });
 });
 
 describe("teacher grading endpoints", () => {
   it("getGradingQueue supports an optional status filter", async () => {
-    const { fetchMock } = mockFetchOnce({ data: { attempts: [], nextCursor: null } });
+    const { fetchMock } = mockFetchOnce({
+      data: { attempts: [], nextCursor: null },
+    });
     await api.getGradingQueue("t", "exam-1", "SUBMITTED");
     const [url] = fetchMock.mock.calls[0] as [string, RequestInit];
-    expect(url).toContain("/api/v1/exams/exam-1/attempts/grading?status=SUBMITTED");
+    expect(url).toContain(
+      "/api/v1/exams/exam-1/attempts/grading?status=SUBMITTED",
+    );
   });
 
   it("getGradingQueue omits the filter when absent", async () => {
-    const { fetchMock } = mockFetchOnce({ data: { attempts: [], nextCursor: null } });
+    const { fetchMock } = mockFetchOnce({
+      data: { attempts: [], nextCursor: null },
+    });
     await api.getGradingQueue("t", "exam-1");
     const [url] = fetchMock.mock.calls[0] as [string, RequestInit];
     expect(url).toBe(`${API_BASE_URL}/api/v1/exams/exam-1/attempts/grading`);
@@ -232,9 +238,7 @@ describe("five new pages endpoints", () => {
     });
     await api.getStudentCourseStructure("t", "c1");
     const [url] = fetchMock.mock.calls[0] as [string, RequestInit];
-    expect(url).toBe(
-      `${API_BASE_URL}/api/v1/student/courses/c1/structure`,
-    );
+    expect(url).toBe(`${API_BASE_URL}/api/v1/student/courses/c1/structure`);
   });
 
   it("enrollCourse posts to the enroll endpoint", async () => {
@@ -277,7 +281,9 @@ describe("five new pages endpoints", () => {
     });
     await api.getSubmissionQueue("t", "a1", "SUBMITTED");
     const [url] = fetchMock.mock.calls[0] as [string, RequestInit];
-    expect(url).toContain("/api/v1/assignments/a1/submissions?status=SUBMITTED");
+    expect(url).toContain(
+      "/api/v1/assignments/a1/submissions?status=SUBMITTED",
+    );
   });
 
   it("gradeSubmission posts score and feedback", async () => {
@@ -303,6 +309,16 @@ describe("five new pages endpoints", () => {
     expect(url).toBe(`${API_BASE_URL}/api/users/u1`);
   });
 
+  it("listStudents hits users/students", async () => {
+    const { fetchMock } = mockFetchOnce({
+      data: [{ id: "u1", name: "طالب", phone: "01000000002" }],
+    });
+    const result = await api.listStudents("t");
+    expect(result).toHaveLength(1);
+    const [url] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe(`${API_BASE_URL}/api/users/students`);
+  });
+
   it("getStudentProgression hits the progression endpoint", async () => {
     const { fetchMock } = mockFetchOnce({
       data: { courseId: "c1", userId: "u1", progression: [] },
@@ -315,7 +331,8 @@ describe("five new pages endpoints", () => {
 
   it("listPublicCourses is public and supports search", async () => {
     const { fetchMock } = mockFetchOnce({
-      data: { courses: [], nextCursor: null },
+      data: [],
+      pagination: { hasNextPage: false, nextCursor: null },
     });
     await api.listPublicCourses("جبر");
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
@@ -323,6 +340,105 @@ describe("five new pages endpoints", () => {
     expect(
       (init.headers as Record<string, string>).Authorization,
     ).toBeUndefined();
+  });
+});
+
+describe("teacher authoring endpoints", () => {
+  it("createExam posts to the lesson exam endpoint", async () => {
+    const { fetchMock } = mockFetchOnce({
+      data: { id: "e1", lessonId: "l1", title: "T", status: "DRAFT" },
+    });
+    const result = await api.createExam("t", "l1", {
+      title: "T",
+      timerMinutes: 70,
+    });
+    expect(result.id).toBe("e1");
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe(`${API_BASE_URL}/api/v1/exams/lessons/l1/exams`);
+    expect(init.method).toBe("POST");
+    expect(JSON.parse(init.body as string).timerMinutes).toBe(70);
+  });
+
+  it("updateExam patches the exam", async () => {
+    const { fetchMock } = mockFetchOnce({
+      data: { id: "e1", title: "T2" },
+    });
+    await api.updateExam("t", "e1", { title: "T2" });
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe(`${API_BASE_URL}/api/v1/exams/e1`);
+    expect(init.method).toBe("PATCH");
+  });
+
+  it("publishExam posts to publish", async () => {
+    const { fetchMock } = mockFetchOnce({
+      data: { id: "e1", status: "PUBLISHED" },
+    });
+    const result = await api.publishExam("t", "e1");
+    expect(result.status).toBe("PUBLISHED");
+    const [url] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe(`${API_BASE_URL}/api/v1/exams/e1/publish`);
+  });
+
+  it("addExamQuestion posts the question payload", async () => {
+    const { fetchMock } = mockFetchOnce({
+      data: { id: "q1", examId: "e1", type: "MCQ" },
+    });
+    const result = await api.addExamQuestion("t", "e1", {
+      type: "MCQ",
+      text: "2+2?",
+      options: [{ id: "a", text: "4" }],
+      correctAnswer: { correctOptionId: "a" },
+    });
+    expect(result.id).toBe("q1");
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe(`${API_BASE_URL}/api/v1/exams/e1/questions`);
+    expect(JSON.parse(init.body as string).type).toBe("MCQ");
+  });
+
+  it("createAssignment posts to the lesson endpoint", async () => {
+    const { fetchMock } = mockFetchOnce({
+      data: { id: "a1", lessonId: "l1", title: "W", status: "DRAFT" },
+    });
+    const result = await api.createAssignment("t", "l1", {
+      title: "W",
+      timerMinutes: 300,
+    });
+    expect(result.id).toBe("a1");
+    const [url] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe(
+      `${API_BASE_URL}/api/v1/assignments/lessons/l1/assignments`,
+    );
+  });
+
+  it("publishAssignment posts to publish", async () => {
+    const { fetchMock } = mockFetchOnce({
+      data: { id: "a1", status: "PUBLISHED" },
+    });
+    await api.publishAssignment("t", "a1");
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe(`${API_BASE_URL}/api/v1/assignments/a1/publish`);
+    expect(init.method).toBe("POST");
+  });
+
+  it("attachYouTube posts lesson video data", async () => {
+    const { fetchMock } = mockFetchOnce({
+      data: {
+        id: "v1",
+        lessonId: "l1",
+        provider: "youtube",
+        providerVideoId: "dQw4w9WgXcQ",
+        status: "READY",
+      },
+    });
+    const result = await api.attachYouTube("t", {
+      lessonId: "l1",
+      title: "Intro",
+      providerVideoId: "dQw4w9WgXcQ",
+    });
+    expect(result.provider).toBe("youtube");
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe(`${API_BASE_URL}/api/video/youtube`);
+    expect(init.method).toBe("POST");
   });
 });
 

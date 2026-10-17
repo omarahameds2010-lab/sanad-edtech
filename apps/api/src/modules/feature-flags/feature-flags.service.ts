@@ -99,6 +99,21 @@ export class FeatureFlagsService {
       defaultValue: true,
     },
     {
+      key: "payments",
+      name: "Payments",
+      // The payment orchestrator gates every non-voucher checkout on
+      // `flags.payments?.enabled`, but no such flag existed in this list — so
+      // `getTenantFlags` never returned the key and EVERY card/wallet intent
+      // was rejected with "Payments not enabled for this tenant" (found while
+      // proving bundle C live: `POST /payments/intents` could not be reached
+      // by any real checkout). Enabled by default; tenants/plans can turn it
+      // off through the normal override/plan-rule pipeline.
+      description: "Enable card/wallet checkout for this tenant",
+      enabled: true,
+      type: "boolean",
+      defaultValue: true,
+    },
+    {
       key: "assignments",
       name: "Assignments",
       description: "Enable assignment submission",

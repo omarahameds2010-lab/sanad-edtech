@@ -1,6 +1,6 @@
 import { forwardRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronLeftIcon, ChevronRightIcon, CheckIcon } from '../../icon/icons';
+import { ChevronLeftIcon, ChevronRightIcon, CheckIcon } from '../icon/icons';
 
 export interface WizardStep {
   id: string;
@@ -20,6 +20,14 @@ export interface WizardProps {
   onStepChange?: (stepIndex: number, step: any) => void;
   initialData?: any;
   validateOnStepChange?: boolean;
+}
+
+interface WizardState {
+  currentStep: number;
+  data: any;
+  errors: Record<string, string>;
+  isSubmitting: boolean;
+  completedSteps: Set<number>;
 }
 
 const Wizard = forwardRef<HTMLDivElement, WizardProps>(
@@ -114,20 +122,6 @@ const Wizard = forwardRef<HTMLDivElement, WizardProps>(
                   {step.title}
                 </p>
               </div>
-              {index < steps.length - 1 && (
-                <motion.div
-                  initial={{ width: 0 }}
-                  animate={{ width: '100%' }}
-                  transition={{ duration: 0.5, delay: index * 0.1, ease: 'easeOut' }}
-                  style={{
-                    flex: 1,
-                    height: '2px',
-                    background: index < currentStep ? 'var(--color-success)' : 'var(--color-neutral-200)',
-                    borderRadius: '2px',
-                    marginTop: '16px',
-                  }}
-                />
-              )}
             ))}
           </div>
         </div>

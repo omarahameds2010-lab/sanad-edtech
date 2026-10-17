@@ -110,8 +110,18 @@ export default function TeacherExamGradingPage({
     );
   }
 
-  if (error) return <div className="card"><p>{error}</p></div>;
-  if (!exam) return <div className="card"><p>جاري التحميل…</p></div>;
+  if (error)
+    return (
+      <div className="card">
+        <p>{error}</p>
+      </div>
+    );
+  if (!exam)
+    return (
+      <div className="card">
+        <p>جاري التحميل…</p>
+      </div>
+    );
 
   const stats = {
     total: attempts.length,
@@ -126,7 +136,13 @@ export default function TeacherExamGradingPage({
 
   return (
     <>
-      <nav style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: "var(--space-sm)" }}>
+      <nav
+        style={{
+          fontSize: 12,
+          color: "var(--text-muted)",
+          marginBottom: "var(--space-sm)",
+        }}
+      >
         <Link href="/teacher/exams">الاختبارات</Link> › {exam.title}
       </nav>
       <h1 style={{ marginBottom: "var(--space-md)" }}>تصحيح: {exam.title}</h1>
@@ -141,18 +157,28 @@ export default function TeacherExamGradingPage({
       >
         <div className="card" style={{ textAlign: "center" }}>
           <div style={{ fontSize: 28, fontWeight: 700 }}>{stats.total}</div>
-          <div style={{ fontSize: 12, color: "var(--text-muted)" }}>الإجمالي</div>
+          <div style={{ fontSize: 12, color: "var(--text-muted)" }}>
+            الإجمالي
+          </div>
         </div>
         <div className="card" style={{ textAlign: "center" }}>
-          <div style={{ fontSize: 28, fontWeight: 700, color: "#3b82f6" }}>{stats.pending}</div>
-          <div style={{ fontSize: 12, color: "var(--text-muted)" }}>بانتظار التصحيح</div>
+          <div style={{ fontSize: 28, fontWeight: 700, color: "#3b82f6" }}>
+            {stats.pending}
+          </div>
+          <div style={{ fontSize: 12, color: "var(--text-muted)" }}>
+            بانتظار التصحيح
+          </div>
         </div>
         <div className="card" style={{ textAlign: "center" }}>
-          <div style={{ fontSize: 28, fontWeight: 700, color: "#10b981" }}>{stats.graded}</div>
+          <div style={{ fontSize: 28, fontWeight: 700, color: "#10b981" }}>
+            {stats.graded}
+          </div>
           <div style={{ fontSize: 12, color: "var(--text-muted)" }}>مُصحّح</div>
         </div>
         <div className="card" style={{ textAlign: "center" }}>
-          <div style={{ fontSize: 28, fontWeight: 700, color: "#10b981" }}>{stats.passed}</div>
+          <div style={{ fontSize: 28, fontWeight: 700, color: "#10b981" }}>
+            {stats.passed}
+          </div>
           <div style={{ fontSize: 12, color: "var(--text-muted)" }}>ناجح</div>
         </div>
       </div>
@@ -164,7 +190,13 @@ export default function TeacherExamGradingPage({
           ) : (
             <table style={{ width: "100%", borderCollapse: "collapse" }}>
               <thead>
-                <tr style={{ textAlign: "right", borderBottom: "1px solid var(--border-subtle)", background: "var(--bg-surface)" }}>
+                <tr
+                  style={{
+                    textAlign: "right",
+                    borderBottom: "1px solid var(--border-subtle)",
+                    background: "var(--bg-surface)",
+                  }}
+                >
                   <th style={{ padding: "var(--space-md)" }}>الطالب</th>
                   <th style={{ padding: "var(--space-md)" }}>المحاولة</th>
                   <th style={{ padding: "var(--space-md)" }}>الحالة</th>
@@ -175,16 +207,33 @@ export default function TeacherExamGradingPage({
               </thead>
               <tbody>
                 {attempts.map((att) => (
-                  <tr key={att.id} style={{ borderBottom: "1px solid var(--border-subtle)" }}>
+                  <tr
+                    key={att.id}
+                    style={{ borderBottom: "1px solid var(--border-subtle)" }}
+                  >
                     <td style={{ padding: "var(--space-md)", fontWeight: 600 }}>
                       <Link href={`/teacher/students/${att.student.id}`}>
                         {att.student.name}
                       </Link>
-                      <div style={{ fontSize: 11, fontWeight: 400, color: "var(--text-muted)" }} dir="ltr">
+                      <div
+                        style={{
+                          fontSize: 11,
+                          fontWeight: 400,
+                          color: "var(--text-muted)",
+                        }}
+                        dir="ltr"
+                      >
                         {att.student.phone}
                       </div>
                     </td>
-                    <td style={{ padding: "var(--space-md)", textAlign: "center" }}>#{att.attemptNumber}</td>
+                    <td
+                      style={{
+                        padding: "var(--space-md)",
+                        textAlign: "center",
+                      }}
+                    >
+                      #{att.attemptNumber}
+                    </td>
                     <td style={{ padding: "var(--space-md)" }}>
                       <span
                         style={{
@@ -201,13 +250,29 @@ export default function TeacherExamGradingPage({
                       </span>
                     </td>
                     <td style={{ padding: "var(--space-md)", fontWeight: 600 }}>
-                      {att.score !== null && att.score !== undefined ? `${att.score}/100` : "—"}
+                      {att.score !== null && att.score !== undefined
+                        ? `${att.score}/100`
+                        : "—"}
                     </td>
-                    <td style={{ padding: "var(--space-md)", fontSize: 12, color: "var(--text-muted)" }}>
-                      {att.submittedAt ? new Date(att.submittedAt).toLocaleString("ar-EG") : "—"}
+                    <td
+                      style={{
+                        padding: "var(--space-md)",
+                        fontSize: 12,
+                        color: "var(--text-muted)",
+                      }}
+                    >
+                      {att.submittedAt
+                        ? new Date(att.submittedAt).toLocaleString("ar-EG")
+                        : "—"}
                     </td>
                     <td style={{ padding: "var(--space-md)" }}>
-                      <button onClick={() => { setSelectedId(att.id); setNotice(null); }} style={{ padding: "4px 12px", fontSize: 12 }}>
+                      <button
+                        onClick={() => {
+                          setSelectedId(att.id);
+                          setNotice(null);
+                        }}
+                        style={{ padding: "4px 12px", fontSize: 12 }}
+                      >
                         تصحيح
                       </button>
                     </td>
@@ -218,7 +283,14 @@ export default function TeacherExamGradingPage({
           )}
         </div>
       ) : (
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 320px", gap: "var(--space-lg)", maxWidth: 1200 }}>
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "1fr 320px",
+            gap: "var(--space-lg)",
+            maxWidth: 1200,
+          }}
+        >
           <div className="card">
             <h3 style={{ marginBottom: "var(--space-md)" }}>
               إجابات {selected.student.name} (محاولة #{selected.attemptNumber})
@@ -227,8 +299,18 @@ export default function TeacherExamGradingPage({
               {(selected.answers ?? []).map((ans, idx) => {
                 const q = questionById.get(ans.questionId);
                 return (
-                  <div key={idx} style={{ padding: "var(--space-sm)", borderRadius: "var(--radius-control)", background: "var(--bg-surface)", border: "1px solid var(--border-subtle)" }}>
-                    <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 4 }}>
+                  <div
+                    key={idx}
+                    style={{
+                      padding: "var(--space-sm)",
+                      borderRadius: "var(--radius-control)",
+                      background: "var(--bg-surface)",
+                      border: "1px solid var(--border-subtle)",
+                    }}
+                  >
+                    <div
+                      style={{ fontSize: 13, fontWeight: 600, marginBottom: 4 }}
+                    >
                       {q ? q.text : ans.questionId}
                     </div>
                     <div style={{ fontSize: 13, color: "var(--text-muted)" }}>
@@ -248,14 +330,24 @@ export default function TeacherExamGradingPage({
           <aside>
             <div className="card">
               <h3 style={{ marginBottom: "var(--space-md)" }}>التصحيح</h3>
-              <p style={{ fontSize: 13, color: "var(--text-muted)", marginBottom: 8 }}>
+              <p
+                style={{
+                  fontSize: 13,
+                  color: "var(--text-muted)",
+                  marginBottom: 8,
+                }}
+              >
                 الحالة الحالية: {statusLabel(selected.status)}
                 {selected.score !== null && selected.score !== undefined
                   ? ` · الدرجة: ${selected.score}/100`
                   : ""}
               </p>
-              <label style={{ display: "block", marginBottom: "var(--space-sm)" }}>
-                <span style={{ display: "block", fontSize: 13, marginBottom: 4 }}>
+              <label
+                style={{ display: "block", marginBottom: "var(--space-sm)" }}
+              >
+                <span
+                  style={{ display: "block", fontSize: 13, marginBottom: 4 }}
+                >
                   الدرجة (0–100)
                 </span>
                 <input
@@ -268,8 +360,12 @@ export default function TeacherExamGradingPage({
                   style={{ width: "100%" }}
                 />
               </label>
-              <label style={{ display: "block", marginBottom: "var(--space-md)" }}>
-                <span style={{ display: "block", fontSize: 13, marginBottom: 4 }}>
+              <label
+                style={{ display: "block", marginBottom: "var(--space-md)" }}
+              >
+                <span
+                  style={{ display: "block", fontSize: 13, marginBottom: 4 }}
+                >
                   ملاحظات للطالب
                 </span>
                 <textarea
@@ -281,18 +377,34 @@ export default function TeacherExamGradingPage({
                 />
               </label>
               {notice && (
-                <p style={{ fontSize: 13, marginBottom: "var(--space-sm)" }}>{notice}</p>
+                <p style={{ fontSize: 13, marginBottom: "var(--space-sm)" }}>
+                  {notice}
+                </p>
               )}
               <button
                 onClick={() => void handleGrade()}
                 disabled={grading}
-                style={{ width: "100%", background: "var(--color-action)", color: "white", marginBottom: "var(--space-sm)" }}
+                style={{
+                  width: "100%",
+                  background: "var(--color-action)",
+                  color: "white",
+                  marginBottom: "var(--space-sm)",
+                }}
               >
                 {grading ? "جاري الحفظ…" : "حفظ الدرجة"}
               </button>
               <button
-                onClick={() => { setSelectedId(null); setScore(""); setFeedback(""); setNotice(null); }}
-                style={{ width: "100%", background: "var(--bg-surface)", border: "1px solid var(--border-subtle)" }}
+                onClick={() => {
+                  setSelectedId(null);
+                  setScore("");
+                  setFeedback("");
+                  setNotice(null);
+                }}
+                style={{
+                  width: "100%",
+                  background: "var(--bg-surface)",
+                  border: "1px solid var(--border-subtle)",
+                }}
               >
                 رجوع إلى الطابور
               </button>

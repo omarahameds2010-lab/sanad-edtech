@@ -91,7 +91,7 @@ export default function LessonEditorShell({
 
       {/* Layout: Editor + Settings */}
       <div style={{ display: 'grid', gridTemplateColumns: settingsPanel ? '1fr 280px' : '1fr', gap: 'var(--space-lg)' }}>
-        <div>{children}</div>
+        <div>{(children as any)}</div>
         {settingsPanel && <aside>{settingsPanel}</aside>}
       </div>
     </div>

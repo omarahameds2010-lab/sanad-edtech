@@ -26,6 +26,18 @@ export class UsersController {
     };
   }
 
+  // NOTE: static "students" must stay above ":id" — Express matches in
+  // registration order, otherwise "students" resolves as an id param.
+  @Get("students")
+  @RequirePermission({ action: "read", resourceType: "user" })
+  async listStudents(@Request() req) {
+    const result = await this.usersService.listStudentsForTeacher(
+      req.tenantId,
+      req.user.sub,
+    );
+    return { data: result };
+  }
+
   @Get(":id")
   @RequirePermission({
     action: "read",

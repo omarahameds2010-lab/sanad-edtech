@@ -1,6 +1,5 @@
 import { forwardRef, useId } from 'react';
 import { motion, HTMLMotionProps } from 'framer-motion';
-import { ChevronDownIcon, CheckIcon, XIcon } from '../../icon/icons';
 
 export interface FormFieldProps {
   label?: string;
@@ -100,7 +99,6 @@ const FormField = forwardRef<HTMLDivElement, FormFieldProps>(
       outline: 'none',
       transition: 'all var(--motion-fast) var(--ease-standard)',
       padding: '10px 14px',
-      fontSize: '14px',
       height: '40px',
       boxSizing: 'border-box',
     };
@@ -136,7 +134,7 @@ const FormField = forwardRef<HTMLDivElement, FormFieldProps>(
               backgroundRepeat: 'no-repeat',
               backgroundPosition: 'right 12px center',
               backgroundSize: '20px',
-            } as React.CSSProperties)
+            } as React.CSSProperties}
             {...props}
           />
         );
@@ -151,7 +149,7 @@ const FormField = forwardRef<HTMLDivElement, FormFieldProps>(
             paddingRight: suffix ? '40px' : undefined,
             borderColor: error ? 'var(--color-error)' : 'var(--color-border-main)',
             boxShadow: error ? '0 0 0 2px var(--color-error-bg)' : 'none',
-          } as React.CSSProperties>
+          } as React.CSSProperties}
           {...props}
         />
       );

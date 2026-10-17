@@ -5,6 +5,7 @@ import {
   BadRequestException,
 } from "@nestjs/common";
 import { PrismaService } from "../../../tenants/prisma.service";
+import { applyTenantContext } from "../../../../common/prisma/tenant-context";
 import { EntitlementsService } from "../../../entitlements/entitlements.service";
 import { OutboxService } from "../../../outbox/outbox.service";
 import {
@@ -78,14 +79,36 @@ export class VoucherProvider implements PaymentProvider {
       };
     }
 
+    const existingRedemption = await this.prisma.voucherRedemption.findUnique({
+      where: { voucherId_userId: { voucherId: voucher.id, userId } },
+    });
+
+    // Checkout crash-resume (bundle C): the same checkout attempt already
+    // redeemed this voucher and then died before its payment completed. The
+    // redemption (and its grants) are committed — return success without
+    // touching usedCount so the retry can finish the payment instead of
+    // losing the voucher to ALREADY_REDEEMED.
+    //
+    // This check MUST run before validateVoucher: the crashed attempt already
+    // consumed a use, so `usedCount >= maxUses` would reject the very retry
+    // that is supposed to finish that checkout with VOUCHER_EXHAUSTED (the
+    // first live smoke of this bundle caught the wrong ordering).
+    if (existingRedemption) {
+      const existingIntentId = (existingRedemption.metadata as any)?.intentId;
+      const incomingIntentId = metadata?.intentId;
+      if (
+        existingIntentId &&
+        incomingIntentId &&
+        String(existingIntentId) === String(incomingIntentId)
+      ) {
+        return { success: true, voucher, entitlements: [] };
+      }
+    }
+
     const validationError = this.validateVoucher(voucher, courseId, userId);
     if (validationError) {
       return { success: false, ...validationError };
     }
-
-    const existingRedemption = await this.prisma.voucherRedemption.findUnique({
-      where: { voucherId_userId: { voucherId: voucher.id, userId } },
-    });
 
     if (existingRedemption) {
       return {
@@ -96,6 +119,10 @@ export class VoucherProvider implements PaymentProvider {
     }
 
     const result = await this.prisma.$transaction(async (tx) => {
+      // Interactive tx clients are not auto-wrapped: set the RLS tenant
+      // context for the whole transaction first.
+      await applyTenantContext(tx, tenantId);
+
       const updatedVoucher = await tx.voucher.update({
         where: { id: voucher.id },
         data: { usedCount: { increment: 1 } },
@@ -118,6 +145,7 @@ export class VoucherProvider implements PaymentProvider {
           voucher.courseId,
           "voucher",
           { voucherId: voucher.id, redemptionId: redemption.id },
+          tx,
         );
       }
 

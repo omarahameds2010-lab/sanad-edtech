@@ -47,7 +47,8 @@ export type Action =
   | "redeem"
   | "archive"
   | "reorder"
-  | "evaluate";  // AI evaluation action
+  | "refund" // money-out action on a captured payment (bundle C)
+  | "evaluate"; // AI evaluation action
 
 export interface AuthorizationContext {
   userId: string;
@@ -256,7 +257,10 @@ export class PolicyEngine {
         attempt: ["read", "grade", "manage"],
         enrollment: ["create", "read", "update", "delete", "manage"],
         order: ["read", "manage"],
-        payment: ["read", "manage"],
+        // `refund` is listed explicitly: moving money back out of a captured
+        // payment is the one payment action that must never ride on a generic
+        // "manage" grant (bundle C).
+        payment: ["read", "manage", "refund"],
         voucher: ["create", "read", "update", "delete", "manage"],
         user: ["read", "update", "manage"],
         tenant: ["read", "update", "configure"],
@@ -282,7 +286,7 @@ export class PolicyEngine {
           "unpublish",
           "reorder",
         ],
-        lesson: ["create", "read", "update", "publish", "unpublish"],
+        lesson: ["create", "read", "update", "delete", "publish", "unpublish"],
         exam: ["create", "read", "update", "publish", "unpublish", "grade"],
         attempt: ["read", "grade"],
         enrollment: ["read"],
@@ -292,7 +296,14 @@ export class PolicyEngine {
         user: ["read"],
         tenant: ["read"],
         certificate: ["create", "read"],
-        assignment: ["create", "read", "update", "grade", "evaluate"],
+        assignment: [
+          "create",
+          "read",
+          "update",
+          "publish",
+          "grade",
+          "evaluate",
+        ],
         question: ["create", "read", "update", "delete"],
         questionBank: ["create", "read", "update", "delete"],
         video: ["create", "read", "update", "delete"],
@@ -308,7 +319,7 @@ export class PolicyEngine {
         lesson: ["read", "watch"],
         exam: ["read", "attempt", "submit"],
         attempt: ["create", "read", "submit"],
-        enrollment: ["create", "read"],
+        enrollment: ["create", "read", "enroll"],
         order: ["create", "read"],
         payment: ["create", "read"],
         voucher: ["read"],
@@ -485,7 +496,12 @@ export class PolicyEngine {
     if (!featureFlag) return { allowed: true };
 
     const flags = context.featureFlags || {};
-    const isEnabled = flags[featureFlag] === true;
+    // getTenantFlags returns FeatureFlagEvaluation objects ({ enabled, value }),
+    // while unit tests and older callers may pass raw booleans — accept both.
+    // (Field audit 2026-10-16 §3.2: comparing `=== true` alone denied every
+    // gated action at runtime with 403 FEATURE_DISABLED.)
+    const flag = flags[featureFlag];
+    const isEnabled = flag === true || flag?.enabled === true;
 
     if (!isEnabled) {
       return {

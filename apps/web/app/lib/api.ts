@@ -12,29 +12,59 @@
 export const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3002";
 
-export class ApiError extends Error {
-  readonly status: number;
-
-  constructor(status: number, message: string) {
-    super(message);
-    this.name = "ApiError";
-    this.status = status;
-  }
-}
-
 export interface ApiOptions {
   token?: string;
   method?: "GET" | "POST" | "PATCH" | "PUT" | "DELETE";
   body?: unknown;
   idempotencyKey?: string;
+  /** Set on the login call so a rejected password is never mistaken for an expired session. */
+  skipAuthRetry?: boolean;
 }
 
-export async function apiFetch<T>(
-  path: string,
-  opts: ApiOptions = {},
-): Promise<T> {
-  const res = await fetch(`${API_BASE_URL}${path}`, {
+export class ApiError extends Error {
+  readonly status: number;
+  readonly code?: string;
+
+  constructor(status: number, message: string, code?: string) {
+    super(message);
+    this.name = "ApiError";
+    this.status = status;
+    this.code = code;
+  }
+}
+
+/**
+ * Fired on the window when the session is no longer usable.
+ *
+ * The auth provider listens and triggers the soft-exit UX. It is a DOM event
+ * rather than a direct callback so the HTTP layer never has to import a React
+ * module (and so non-React callers can subscribe too).
+ */
+export const SESSION_EXPIRED_EVENT = "sanad:session-expired";
+
+export type SessionExpiredDetail = {
+  /** The API's code, so the UI can tell theft from a plain expiry. */
+  reason?: string;
+};
+
+export function emitSessionExpired(reason?: string): void {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(
+    new CustomEvent<SessionExpiredDetail>(SESSION_EXPIRED_EVENT, {
+      detail: { reason },
+    }),
+  );
+}
+
+/**
+ * Every request carries `credentials: "include"`, without which the browser
+ * simply will not send the HttpOnly session cookies — and the whole
+ * server-side session model silently does nothing.
+ */
+function requestInit(opts: ApiOptions): RequestInit {
+  return {
     method: opts.method ?? "GET",
+    credentials: "include",
     headers: {
       "Content-Type": "application/json",
       ...(opts.token ? { Authorization: `Bearer ${opts.token}` } : {}),
@@ -43,19 +73,132 @@ export async function apiFetch<T>(
         : {}),
     },
     body: opts.body === undefined ? undefined : JSON.stringify(opts.body),
-  });
+  };
+}
 
+/** The one endpoint that must never itself trigger a refresh. */
+const REFRESH_PATH = "/api/auth/refresh";
+
+export type RefreshResult =
+  { ok: true; accessToken: string } | { ok: false; code?: string };
+
+/**
+ * Single-flight silent refresh.
+ *
+ * Several in-flight requests can hit 401 at the same moment — a dashboard
+ * fires four queries on mount. Without this guard that becomes four refresh
+ * calls, and because rotation revokes the token it replaces, three of them are
+ * guaranteed to look like a replay, so the family gets revoked and the student
+ * is thrown out of their own session. All callers therefore share one promise
+ * and one rotation.
+ */
+let refreshInFlight: Promise<RefreshResult> | null = null;
+
+export function refreshSession(): Promise<RefreshResult> {
+  if (refreshInFlight) return refreshInFlight;
+
+  const attempt = (async (): Promise<RefreshResult> => {
+    try {
+      const res = await fetch(`${API_BASE_URL}${REFRESH_PATH}`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+      });
+      const payload: any = await res.json().catch(() => null);
+
+      if (!res.ok) {
+        // Carry the server's own code: SESSION_FAMILY_REVOKED means theft was
+        // detected, which the soft-exit UX should say out loud.
+        return { ok: false, code: payload?.code };
+      }
+
+      const token = payload?.accessToken;
+      return typeof token === "string"
+        ? { ok: true, accessToken: token }
+        : { ok: false, code: "REFRESH_MALFORMED" };
+    } catch {
+      return { ok: false, code: "NETWORK_ERROR" };
+    }
+  })();
+
+  refreshInFlight = attempt;
+
+  attempt
+    .catch(() => null)
+    .finally(() => {
+      if (refreshInFlight === attempt) refreshInFlight = null;
+    });
+
+  return attempt;
+}
+
+/** The in-memory access token. The module holds it so every caller agrees. */
+let memoryAccessToken: string | null = null;
+
+export function setMemoryAccessToken(token: string | null): void {
+  memoryAccessToken = token;
+}
+
+export function getMemoryAccessToken(): string | null {
+  return memoryAccessToken;
+}
+
+async function sendRequest(
+  path: string,
+  opts: ApiOptions,
+): Promise<{ response: Response; payload: any }> {
+  const res = await fetch(`${API_BASE_URL}${path}`, requestInit(opts));
   let payload: any = null;
   try {
     payload = await res.json();
   } catch {
     payload = null;
   }
+  return { response: res, payload };
+}
 
-  if (!res.ok) {
+export async function apiFetch<T>(
+  path: string,
+  opts: ApiOptions = {},
+): Promise<T> {
+  let { response, payload } = await sendRequest(path, opts);
+
+  // Silent recovery: the access token expired (it lives 15 minutes) but the
+  // refresh cookie is still valid, so rotate and retry once. Only attempted for
+  // authenticated calls, and never for the refresh endpoint itself.
+  const isRefreshCall = path === REFRESH_PATH;
+  const isAuthenticatedCall = Boolean(opts.token) || opts.method === undefined;
+
+  if (
+    response.status === 401 &&
+    !isRefreshCall &&
+    isAuthenticatedCall &&
+    !opts.skipAuthRetry
+  ) {
+    const refreshed = await refreshSession();
+
+    if (refreshed.ok) {
+      const retried = await sendRequest(path, {
+        ...opts,
+        token: refreshed.accessToken,
+      });
+      response = retried.response;
+      payload = retried.payload;
+    } else {
+      // The refresh cookie is gone too. Announce it with the server's own code
+      // so the soft-exit screen can distinguish a theft revocation from a
+      // plain weekly expiry.
+      const code = refreshed.code ?? payload?.code;
+      emitSessionExpired(code);
+      throw new ApiError(401, payload?.message ?? "انتهت صلاحية الجلسة", code);
+    }
+  }
+
+  if (!response.ok) {
     throw new ApiError(
-      res.status,
-      payload?.message ?? `Request failed with status ${res.status}`,
+      response.status,
+      payload?.message ?? `Request failed with status ${response.status}`,
+      payload?.code,
     );
   }
 
@@ -78,11 +221,7 @@ export function newIdempotencyKey(): string {
 // ---------------------------------------------------------------------------
 
 export type ExamQuestionType =
-  | "MCQ"
-  | "TRUE_FALSE"
-  | "SHORT_ANSWER"
-  | "ESSAY"
-  | "MATCHING";
+  "MCQ" | "TRUE_FALSE" | "SHORT_ANSWER" | "ESSAY" | "MATCHING";
 
 export interface ExamOption {
   id: string;
@@ -173,8 +312,12 @@ export interface StudentAttemptSummary {
 }
 
 export interface LoginResult {
+  /**
+   * Kept in React memory only — never written to localStorage/sessionStorage.
+   * The refresh token is deliberately absent: it lives solely in the HttpOnly
+   * cookie, so no script on the page can read it.
+   */
   accessToken: string;
-  refreshToken: string;
   user: { id: string; name: string; role: string };
 }
 
@@ -277,12 +420,172 @@ export interface CreateCourseInput {
   language: string;
   price?: number;
   currency?: string;
+  /** Prep grade (prep-1 | prep-2 | prep-3). */
+  grade?: string;
 }
 
 export interface CreatedCourse {
   id: string;
   title: string;
   slug: string;
+  status: string;
+}
+
+/** Teacher-side course row (GET /api/v1/teacher/courses). */
+export interface TeacherCourse {
+  id: string;
+  title: string;
+  slug: string;
+  shortDescription?: string | null;
+  description?: string | null;
+  thumbnailUrl?: string | null;
+  visibility?: string;
+  level?: string | null;
+  language?: string;
+  price?: number | string;
+  currency?: string;
+  grade: string | null;
+  status: string;
+  publishedAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface TeacherSectionLesson {
+  id: string;
+  title: string;
+  type: string;
+  orderIndex: number;
+  status: string;
+}
+
+export interface TeacherSection {
+  id: string;
+  title: string;
+  orderIndex: number;
+  lessons?: TeacherSectionLesson[];
+}
+
+/** Full lesson row from the teacher API (includes attached exam/assignment). */
+export interface TeacherLessonDetail {
+  id: string;
+  title: string;
+  type: string;
+  status: string;
+  slug?: string;
+  description?: string | null;
+  duration?: number | null;
+  orderIndex?: number;
+  isFree?: boolean;
+  videoId?: string | null;
+  lockStatus?: string;
+  unlockType?: string;
+  sectionId: string;
+  section: { id: string; courseId: string };
+  exam?: {
+    id: string;
+    title: string;
+    status: string;
+    timerMinutes: number;
+  } | null;
+  assignment?: {
+    id: string;
+    title: string;
+    status: string;
+    timerMinutes: number;
+  } | null;
+}
+
+export interface CreateExamInput {
+  title: string;
+  description?: string;
+  instructions?: string;
+  timerMinutes?: number;
+  passingScore?: number;
+  maxAttempts?: number;
+  shuffleQuestions?: boolean;
+  shuffleOptions?: boolean;
+  showResults?: boolean;
+  showCorrectAnswers?: boolean;
+}
+
+export interface CreatedExam {
+  id: string;
+  lessonId: string;
+  title: string;
+  status: string;
+}
+
+export interface UpdateExamInput {
+  title?: string;
+  description?: string;
+  instructions?: string;
+  timerMinutes?: number;
+  passingScore?: number;
+  maxAttempts?: number;
+  shuffleQuestions?: boolean;
+  shuffleOptions?: boolean;
+  showResults?: boolean;
+  showCorrectAnswers?: boolean;
+  status?: string;
+}
+
+export interface CreateExamQuestionInput {
+  type: ExamQuestionType;
+  text: string;
+  explanation?: string;
+  points?: number;
+  position?: number;
+  options?: Array<{ id: string; text: string }>;
+  correctAnswer?: unknown;
+}
+
+export interface CreatedExamQuestion {
+  id: string;
+  examId: string;
+  type: string;
+}
+
+export interface CreateAssignmentInput {
+  title: string;
+  description?: string;
+  instructions?: string;
+  timerMinutes?: number;
+  passingScore?: number;
+  maxAttempts?: number;
+  allowLateSubmission?: boolean;
+}
+
+export interface CreatedAssignment {
+  id: string;
+  lessonId: string;
+  title: string;
+  status: string;
+}
+
+export interface UpdateAssignmentInput {
+  title?: string;
+  description?: string;
+  instructions?: string;
+  timerMinutes?: number;
+  passingScore?: number;
+  maxAttempts?: number;
+  allowLateSubmission?: boolean;
+  status?: string;
+}
+
+export interface AttachYouTubeInput {
+  lessonId: string;
+  title: string;
+  providerVideoId: string;
+  description?: string;
+}
+
+export interface AttachedVideo {
+  id: string;
+  lessonId: string;
+  provider: string;
+  providerVideoId: string;
   status: string;
 }
 
@@ -294,6 +597,7 @@ export interface StructureLesson {
   duration: number | null;
   lockStatus: string;
   unlockType: string;
+  isFree?: boolean;
 }
 
 export interface StructureSection {
@@ -413,6 +717,46 @@ export interface GradeSubmissionResult {
   score: number;
 }
 
+export interface ProgressionUnlockInfo {
+  unlockType: string;
+  unlockTargetId: string;
+  /** Server grant time — present only on student-granted unlocks. */
+  unlockedAt?: string | null;
+  /** The server's own explanation of the constraint. */
+  description: string;
+}
+
+export interface ProgressionItem {
+  id: string;
+  title: string;
+  type: string;
+  /** Present in the server envelope; optional here for older responses. */
+  orderIndex?: number;
+  lockStatus: string;
+  isLocked: boolean;
+  isUnlocked: boolean;
+  isAvailable: boolean;
+  unlockInfo?: ProgressionUnlockInfo | null;
+}
+
+export interface CourseProgression {
+  courseId: string;
+  userId: string;
+  progression: ProgressionItem[];
+}
+
+export interface TeacherStudent {
+  id: string;
+  name: string;
+  phone: string | null;
+  grade: string | null;
+  status: string;
+  enrollments: Array<{
+    status: string;
+    course: { id: string; title: string };
+  }>;
+}
+
 export interface StudentFile {
   user: {
     id: string;
@@ -479,11 +823,6 @@ export interface PublicCourseCard {
   teacher: { name: string };
 }
 
-export interface PublicCourseList {
-  courses: PublicCourseCard[];
-  nextCursor: string | null;
-}
-
 export interface LessonVideo {
   id: string;
   title: string;
@@ -509,7 +848,12 @@ export interface StudentLesson {
     lockStatus: string;
   };
   assignment: { id: string; title: string } | null;
-  exam: { id: string; title: string; timerMinutes: number; status: string } | null;
+  exam: {
+    id: string;
+    title: string;
+    timerMinutes: number;
+    status: string;
+  } | null;
   videos: LessonVideo[];
 }
 
@@ -562,6 +906,41 @@ export interface GradeAttemptResult {
   gradedAt: string;
 }
 
+export interface AiCriterionResult {
+  criterion_id: string;
+  earned: number;
+  max: number;
+  evidence: string | null;
+  evidence_type: "SUPPORTED" | "PARTIAL" | "ABSENT";
+  feedback_ar: string;
+}
+
+export interface AiEvaluation {
+  score: number;
+  maxScore: number;
+  feedback: string;
+  criteria: AiCriterionResult[];
+  knowledgeGap: string[];
+  needsTeacherReview: boolean;
+  reviewSignal: number;
+  sanadRequestId: string;
+  sanadSubmissionId: string;
+  evaluatedAt: string;
+}
+
+export interface AskSanadPassage {
+  chunk_id: string;
+  source_id: string;
+  branch: string;
+  text: string;
+  score: number;
+}
+
+export interface AskSanadResult {
+  passages: AskSanadPassage[];
+  branch: string;
+}
+
 // ---------------------------------------------------------------------------
 // Endpoint functions
 // ---------------------------------------------------------------------------
@@ -571,12 +950,16 @@ export const api = {
     apiFetch<LoginResult>("/api/auth/login", {
       method: "POST",
       body: { phone, password },
+      // A wrong password must never be mistaken for an expired session and
+      // kick off a silent refresh attempt.
+      skipAuthRetry: true,
     }),
 
   register: (input: RegisterInput) =>
     apiFetch<LoginResult>("/api/auth/register", {
       method: "POST",
       body: input,
+      skipAuthRetry: true,
     }),
 
   getStudentExamView: (token: string, examId: string) =>
@@ -612,10 +995,9 @@ export const api = {
     }),
 
   getMyAttempts: (token: string, examId: string) =>
-    apiFetch<StudentAttemptSummary[]>(
-      `/api/v1/exams/${examId}/attempts/me`,
-      { token },
-    ),
+    apiFetch<StudentAttemptSummary[]>(`/api/v1/exams/${examId}/attempts/me`, {
+      token,
+    }),
 
   listExams: (token: string) =>
     apiFetch<ExamListResult>("/api/v1/exams?status=PUBLISHED", { token }),
@@ -630,10 +1012,9 @@ export const api = {
     apiFetch<StudentLesson>(`/api/v1/student/lessons/${lessonId}`, { token }),
 
   getTeacherExam: (token: string, examId: string) =>
-    apiFetch<TeacherExamDetail>(
-      `/api/v1/exams/${examId}?questions=true`,
-      { token },
-    ),
+    apiFetch<TeacherExamDetail>(`/api/v1/exams/${examId}?questions=true`, {
+      token,
+    }),
 
   getGradingQueue: (token: string, examId: string, status?: string) =>
     apiFetch<GradingQueueResult>(
@@ -674,21 +1055,109 @@ export const api = {
       body: input,
     }),
 
-  getCourseStructureBySlug: (slug: string) =>
-    apiFetch<CourseStructure>(
-      `/api/v1/public/courses/${slug}/structure`,
+  listTeacherCourses: (token: string) =>
+    apiFetch<TeacherCourse[]>("/api/v1/teacher/courses", { token }),
+
+  getTeacherCourse: (token: string, courseId: string) =>
+    apiFetch<TeacherCourse>(`/api/v1/teacher/courses/${courseId}`, { token }),
+
+  updateTeacherCourse: (
+    token: string,
+    courseId: string,
+    input: Partial<CreateCourseInput>,
+  ) =>
+    apiFetch<TeacherCourse>(`/api/v1/teacher/courses/${courseId}`, {
+      token,
+      method: "PATCH",
+      body: input,
+    }),
+
+  publishCourse: (token: string, courseId: string) =>
+    apiFetch<TeacherCourse>(`/api/v1/teacher/courses/${courseId}/publish`, {
+      token,
+      method: "POST",
+      body: {},
+    }),
+
+  unpublishCourse: (token: string, courseId: string) =>
+    apiFetch<TeacherCourse>(`/api/v1/teacher/courses/${courseId}/unpublish`, {
+      token,
+      method: "POST",
+      body: {},
+    }),
+
+  listSections: (token: string, courseId: string) =>
+    apiFetch<TeacherSection[]>(`/api/v1/teacher/courses/${courseId}/sections`, {
+      token,
+    }),
+
+  createSection: (
+    token: string,
+    courseId: string,
+    input: { title: string; orderIndex?: number },
+  ) =>
+    apiFetch<TeacherSection>(`/api/v1/teacher/courses/${courseId}/sections`, {
+      token,
+      method: "POST",
+      body: input,
+    }),
+
+  createLesson: (
+    token: string,
+    sectionId: string,
+    input: { title: string; type: string; description?: string },
+  ) =>
+    apiFetch<TeacherLessonDetail>(
+      `/api/v1/teacher/sections/${sectionId}/lessons`,
+      { token, method: "POST", body: input },
     ),
 
+  getTeacherLesson: (token: string, lessonId: string) =>
+    apiFetch<TeacherLessonDetail>(`/api/v1/teacher/lessons/${lessonId}`, {
+      token,
+    }),
+
+  updateTeacherLesson: (
+    token: string,
+    lessonId: string,
+    input: { title?: string; description?: string },
+  ) =>
+    apiFetch<TeacherLessonDetail>(`/api/v1/teacher/lessons/${lessonId}`, {
+      token,
+      method: "PATCH",
+      body: input,
+    }),
+
+  publishLesson: (token: string, lessonId: string) =>
+    apiFetch<TeacherLessonDetail>(
+      `/api/v1/teacher/lessons/${lessonId}/publish`,
+      { token, method: "POST", body: {} },
+    ),
+
+  unpublishLesson: (token: string, lessonId: string) =>
+    apiFetch<TeacherLessonDetail>(
+      `/api/v1/teacher/lessons/${lessonId}/unpublish`,
+      { token, method: "POST", body: {} },
+    ),
+
+  deleteLesson: (token: string, lessonId: string) =>
+    apiFetch<null>(`/api/v1/teacher/lessons/${lessonId}`, {
+      token,
+      method: "DELETE",
+    }),
+
+  getCourseStructureBySlug: (slug: string) =>
+    apiFetch<CourseStructure>(`/api/v1/public/courses/${slug}/structure`),
+
   listPublicCourses: (search?: string) =>
-    apiFetch<PublicCourseList>(
+    apiFetch<PublicCourseCard[]>(
       `/api/v1/public/courses${search ? `?search=${encodeURIComponent(search)}` : ""}`,
     ),
 
   getStudentCourseStructure: (token: string, courseId: string) =>
-    apiFetch<CourseStructure>(
-      `/api/v1/student/courses/${courseId}/structure`,
-      { token },
-    ),
+    apiFetch<CourseStructure>(`/api/v1/student/courses/${courseId}/structure`, {
+      token,
+    }),
 
   enrollCourse: (token: string, courseId: string) =>
     apiFetch<{ id: string; status: string }>(
@@ -714,10 +1183,9 @@ export const api = {
     ),
 
   getAssignmentTimer: (token: string, assignmentId: string) =>
-    apiFetch<AssignmentTimer>(
-      `/api/v1/assignments/${assignmentId}/timer`,
-      { token },
-    ),
+    apiFetch<AssignmentTimer>(`/api/v1/assignments/${assignmentId}/timer`, {
+      token,
+    }),
 
   submitAssignment: (
     token: string,
@@ -762,6 +1230,112 @@ export const api = {
       { token, method: "POST", body: input },
     ),
 
+  evaluateWithAI: (
+    token: string,
+    assignmentId: string,
+    input: {
+      answer: string;
+      question?: string;
+      grading: {
+        reference_answer: string;
+        max_score: number;
+        rubric_version: string;
+        criteria: { id: string; description: string; max_score: number }[];
+      };
+      sourceIds?: string[];
+      branches?: string[];
+    },
+  ) =>
+    apiFetch<{ success: boolean; data: AiEvaluation; message: string }>(
+      `/api/v1/assignments/${assignmentId}/evaluate-ai`,
+      { token, method: "POST", body: input },
+    ),
+
+  askSanad: (
+    token: string,
+    assignmentId: string,
+    input: { question: string; branch?: string },
+  ) =>
+    apiFetch<{ success: boolean; data: AskSanadResult }>(
+      `/api/v1/assignments/${assignmentId}/ask-sanad`,
+      { token, method: "POST", body: input },
+    ),
+
   getStudentFile: (token: string, studentId: string) =>
     apiFetch<StudentFile>(`/api/users/${studentId}`, { token }),
+
+  listStudents: (token: string) =>
+    apiFetch<TeacherStudent[]>("/api/users/students", { token }),
+
+  getStudentProgression: (token: string, courseId: string) =>
+    apiFetch<CourseProgression>(`/api/v1/progression/courses/${courseId}`, {
+      token,
+    }),
+
+  createExam: (token: string, lessonId: string, input: CreateExamInput) =>
+    apiFetch<CreatedExam>(`/api/v1/exams/lessons/${lessonId}/exams`, {
+      token,
+      method: "POST",
+      body: input,
+    }),
+
+  updateExam: (token: string, examId: string, input: UpdateExamInput) =>
+    apiFetch<CreatedExam>(`/api/v1/exams/${examId}`, {
+      token,
+      method: "PATCH",
+      body: input,
+    }),
+
+  publishExam: (token: string, examId: string) =>
+    apiFetch<CreatedExam>(`/api/v1/exams/${examId}/publish`, {
+      token,
+      method: "POST",
+      body: {},
+    }),
+
+  addExamQuestion: (
+    token: string,
+    examId: string,
+    input: CreateExamQuestionInput,
+  ) =>
+    apiFetch<CreatedExamQuestion>(`/api/v1/exams/${examId}/questions`, {
+      token,
+      method: "POST",
+      body: input,
+    }),
+
+  createAssignment: (
+    token: string,
+    lessonId: string,
+    input: CreateAssignmentInput,
+  ) =>
+    apiFetch<CreatedAssignment>(
+      `/api/v1/assignments/lessons/${lessonId}/assignments`,
+      { token, method: "POST", body: input },
+    ),
+
+  updateAssignment: (
+    token: string,
+    assignmentId: string,
+    input: UpdateAssignmentInput,
+  ) =>
+    apiFetch<CreatedAssignment>(`/api/v1/assignments/${assignmentId}`, {
+      token,
+      method: "PATCH",
+      body: input,
+    }),
+
+  publishAssignment: (token: string, assignmentId: string) =>
+    apiFetch<CreatedAssignment>(`/api/v1/assignments/${assignmentId}/publish`, {
+      token,
+      method: "POST",
+      body: {},
+    }),
+
+  attachYouTube: (token: string, input: AttachYouTubeInput) =>
+    apiFetch<AttachedVideo>("/api/video/youtube", {
+      token,
+      method: "POST",
+      body: input,
+    }),
 };

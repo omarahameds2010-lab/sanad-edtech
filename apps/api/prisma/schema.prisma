@@ -14,74 +14,75 @@ datasource db {
 // ============================================
 
 model Tenant {
-  id        String   @id @default(uuid())
+  id        String       @id @default(uuid())
   name      String
-  slug      String   @unique
+  slug      String       @unique
   planId    String?
   status    TenantStatus @default(ACTIVE)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
 
-  domains             TenantDomain[]
-  config              TenantConfig?
-  users               User[]
-  courses             Course[]
-  sections            Section[]
-  lessons             Lesson[]
-  videos              Video[]
-  resources           Resource[]
-  enrollments         Enrollment[]
-  exams               Exam[]
-  examQuestions       ExamQuestion[]
-  examAttempts        ExamAttempt[]
-  assignments         Assignment[]
+  domains               TenantDomain[]
+  config                TenantConfig?
+  users                 User[]
+  courses               Course[]
+  sections              Section[]
+  lessons               Lesson[]
+  videos                Video[]
+  resources             Resource[]
+  enrollments           Enrollment[]
+  exams                 Exam[]
+  examQuestions         ExamQuestion[]
+  examAttempts          ExamAttempt[]
+  assignments           Assignment[]
   assignmentSubmissions AssignmentSubmission[]
-  orders              Order[]
-  orderItems          OrderItem[]
-  paymentIntents      PaymentIntent[]
-  payments            Payment[]
-  paymentAttempts     PaymentAttempt[]
-  refunds             Refund[]
-  vouchers            Voucher[]
-  voucherRedemptions  VoucherRedemption[]
-  ledgerEntries       LedgerEntry[]
-  webhookEvents       WebhookEvent[]
-  idempotencyKeys     IdempotencyKey[]
-  reconciliationRuns  ReconciliationRun[]
-  reconciliationItems ReconciliationItem[]
-  paymentRiskEvents   PaymentRiskEvent[]
-  settlements         Settlement[]
-  settlementItems     SettlementItem[]
-  paymentAuditLogs    PaymentAuditLog[]
-  auditLogs           AuditLog[]
-  outboxEvents        OutboxEvent[]
-  entitlements        Entitlement[]
-  subscription        Subscription?
+  orders                Order[]
+  orderItems            OrderItem[]
+  paymentIntents        PaymentIntent[]
+  payments              Payment[]
+  paymentAttempts       PaymentAttempt[]
+  refunds               Refund[]
+  vouchers              Voucher[]
+  voucherRedemptions    VoucherRedemption[]
+  ledgerEntries         LedgerEntry[]
+  webhookEvents         WebhookEvent[]
+  idempotencyKeys       IdempotencyKey[]
+  reconciliationRuns    ReconciliationRun[]
+  reconciliationItems   ReconciliationItem[]
+  paymentRiskEvents     PaymentRiskEvent[]
+  settlements           Settlement[]
+  settlementItems       SettlementItem[]
+  paymentAuditLogs      PaymentAuditLog[]
+  auditLogs             AuditLog[]
+  outboxEvents          OutboxEvent[]
+  entitlements          Entitlement[]
+  subscription          Subscription?
+  studentLessonUnlocks  StudentLessonUnlock[]
 
   @@map("tenants")
 }
 
 model TenantDomain {
-  id          String   @id @default(uuid())
-  tenantId    String
-  domain      String   @unique
-  isPrimary   Boolean  @default(false)
-  verifiedAt  DateTime?
-  createdAt   DateTime @default(now())
+  id         String    @id @default(uuid())
+  tenantId   String
+  domain     String    @unique
+  isPrimary  Boolean   @default(false)
+  verifiedAt DateTime?
+  createdAt  DateTime  @default(now())
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
-  @@map("tenant_domains")
   @@index([tenantId])
   @@index([domain])
+  @@map("tenant_domains")
 }
 
 model TenantConfig {
-  id          String   @id @default(uuid())
-  tenantId    String   @unique
-  config      Json
-  version     Int      @default(1)
-  updatedAt   DateTime @updatedAt
+  id        String   @id @default(uuid())
+  tenantId  String   @unique
+  config    Json
+  version   Int      @default(1)
+  updatedAt DateTime @updatedAt
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
@@ -101,25 +102,26 @@ enum TenantStatus {
 // ============================================
 
 model User {
-  id           String   @id @default(uuid())
+  id           String     @id @default(uuid())
   tenantId     String
   role         UserRole
   name         String
   phone        String?
-  email        String?  @unique
+  email        String?    @unique
   passwordHash String
   grade        String?
   status       UserStatus @default(ACTIVE)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
 
-  tenant                Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant                Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   devices               Device[]
   sessions              Session[]
   enrollments           Enrollment[]
   progress              LessonProgress[]
-  examAttempts          ExamAttempt[]      @relation("ExamAttemptStudent")
-  gradedExamAttempts    ExamAttempt[]      @relation("ExamAttemptGrader")
+  studentLessonUnlocks  StudentLessonUnlock[]
+  examAttempts          ExamAttempt[]          @relation("ExamAttemptStudent")
+  gradedExamAttempts    ExamAttempt[]          @relation("ExamAttemptGrader")
   assignmentSubmissions AssignmentSubmission[] @relation("AssignmentStudent")
   gradedAssignments     AssignmentSubmission[] @relation("AssignmentGrader")
   orders                Order[]
@@ -130,46 +132,69 @@ model User {
   auditLogs             AuditLog[]
   outboxEvents          OutboxEvent[]
   entitlements          Entitlement[]
-  courses             Course[]        @relation("CourseTeacher")
+  courses               Course[]               @relation("CourseTeacher")
 
-  @@map("users")
-  @@index([tenantId])
   @@unique([tenantId, phone])
   @@unique([tenantId, email])
+  @@index([tenantId])
+  @@map("users")
 }
 
 model Device {
-  id          String   @id @default(uuid())
+  id          String    @id @default(uuid())
   tenantId    String
   userId      String
   fingerprint String
-  lastSeen    DateTime @default(now())
+  lastSeen    DateTime  @default(now())
   revokedAt   DateTime?
-  createdAt   DateTime @default(now())
+  createdAt   DateTime  @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@map("devices")
+  @@unique([tenantId, fingerprint])
   @@index([tenantId])
   @@index([userId])
-  @@unique([tenantId, fingerprint])
+  @@map("devices")
 }
 
 model Session {
-  id                String   @id @default(uuid())
-  tenantId          String
-  userId            String
-  deviceId          String?
-  refreshTokenHash  String   @unique
-  createdAt         DateTime @default(now())
-  expiresAt         DateTime
-  revokedAt         DateTime?
+  id       String  @id @default(uuid())
+  tenantId String
+  userId   String
+  deviceId String?
+
+  // Rotation chain. One login = one family. Every refresh issues a NEW row in
+  // the same family and revokes the row it superseded, so replaying ANY
+  // earlier token (not just the most recent) lands on a revoked row — an
+  // unambiguous theft signal that revokes the whole family.
+  familyId String @default(uuid())
+
+  // Argon2id hash of the refresh token. The raw token never touches the DB:
+  // a leaked dump yields no usable session. Kept @unique so a hash can never
+  // alias another session.
+  refreshTokenHash   String  @unique
+  // sha256 of the SAME token — deterministic, therefore indexable and
+  // searchable. Argon2id is salted and unsearchable, which is exactly why the
+  // previous implementation's `findUnique({ where: { refreshTokenHash } })`
+  // could never match anything and refresh was 100% broken.
+  refreshTokenLookup String? @unique
+  // Chain link to the successor row — the audit trail of a rotation chain.
+  replacedById       String?
+
+  createdAt     DateTime  @default(now())
+  expiresAt     DateTime
+  revokedAt     DateTime?
+  // ROTATED | THEFT_DETECTED | LOGOUT | USER_REVOKED
+  revokedReason String?
+  lastRotatedAt DateTime?
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@map("sessions")
   @@index([tenantId])
   @@index([userId])
+  @@index([familyId])
+  @@index([replacedById])
+  @@map("sessions")
 }
 
 enum UserRole {
@@ -192,43 +217,43 @@ enum UserStatus {
 // ============================================
 
 model Course {
-  id          String        @id @default(uuid())
-  tenantId    String
-  title       String
-  slug        String
+  id               String       @id @default(uuid())
+  tenantId         String
+  title            String
+  slug             String
   shortDescription String?
-  description String?
-  thumbnailUrl String?
-  visibility  String        @default("PUBLIC")
-  level       String?
-  language    String        @default("ar")
-  grade       String?
-  price       Decimal       @db.Decimal(10, 2)
-  currency    String        @default("EGP")
-  status      CourseStatus  @default(DRAFT)
-  publishedAt DateTime?
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
-  teacherId   String?
+  description      String?
+  thumbnailUrl     String?
+  visibility       String       @default("PUBLIC")
+  level            String?
+  language         String       @default("ar")
+  grade            String?
+  price            Decimal      @db.Decimal(10, 2)
+  currency         String       @default("EGP")
+  status           CourseStatus @default(DRAFT)
+  publishedAt      DateTime?
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+  teacherId        String?
 
-  tenant     Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  teacher    User?         @relation("CourseTeacher", fields: [teacherId], references: [id], onDelete: SetNull)
-  sections   Section[]
+  tenant      Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  teacher     User?        @relation("CourseTeacher", fields: [teacherId], references: [id], onDelete: SetNull)
+  sections    Section[]
   enrollments Enrollment[]
 
-  @@map("courses")
   @@unique([tenantId, slug])
   @@index([tenantId])
   @@index([slug])
   @@index([status])
   @@index([tenantId, status])
   @@index([tenantId, createdAt])
+  @@map("courses")
 }
 
 model Section {
   id         String   @id @default(uuid())
   tenantId   String
-  courseId  String
+  courseId   String
   title      String
   orderIndex Int
   createdAt  DateTime @default(now())
@@ -237,52 +262,52 @@ model Section {
   course  Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
   lessons Lesson[]
 
-  @@map("sections")
   @@index([tenantId])
   @@index([courseId])
   @@index([tenantId, courseId])
+  @@map("sections")
 }
 
 model Lesson {
-  id                String            @id @default(uuid())
-  tenantId          String
-  sectionId         String
-  type              LessonType
-  title             String
-  slug              String
-  description       String?
-  videoId           String?
-  duration          Int?
-  orderIndex        Int
-  isFree            Boolean           @default(false)
-  releaseAt         DateTime?
-  status            LessonStatus      @default(DRAFT)
+  id          String       @id @default(uuid())
+  tenantId    String
+  sectionId   String
+  type        LessonType
+  title       String
+  slug        String
+  description String?
+  videoId     String?
+  duration    Int?
+  orderIndex  Int
+  isFree      Boolean      @default(false)
+  releaseAt   DateTime?
+  status      LessonStatus @default(DRAFT)
 
   // Content Progression Fields
-  unlockType        ContentUnlockType @default(NONE)
-  unlockTargetId    String?           // ID of assignment/exam/lesson that unlocks next
-  lockStatus        ContentLockStatus @default(LOCKED)
-  assignmentId      String?           // Reference to Assignment if this lesson has one
-  examId            String?           // Reference to Exam if this lesson has one
-  assignmentTimerMinutes      Int?    // 300 minutes default
-  examTimerMinutes            Int?    // 70 minutes default
-  assignmentPassingScore      Int?    // Optional passing score for assignment
-  examPassingScore            Int?    // Optional passing score for exam
-  isPrerequisite              Boolean @default(false) // If true, must complete before next
+  unlockType             ContentUnlockType @default(NONE)
+  unlockTargetId         String? // ID of assignment/exam/lesson that unlocks next
+  lockStatus             ContentLockStatus @default(LOCKED)
+  assignmentId           String? // Reference to Assignment if this lesson has one
+  examId                 String? // Reference to Exam if this lesson has one
+  assignmentTimerMinutes Int? // 300 minutes default
+  examTimerMinutes       Int? // 70 minutes default
+  assignmentPassingScore Int? // Optional passing score for assignment
+  examPassingScore       Int? // Optional passing score for exam
+  isPrerequisite         Boolean           @default(false) // If true, must complete before next
 
-  createdAt         DateTime          @default(now())
-  updatedAt         DateTime          @updatedAt
-  publishedAt       DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  publishedAt DateTime?
 
-  tenant   Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  section  Section         @relation(fields: [sectionId], references: [id], onDelete: Cascade)
-  progress LessonProgress[]
-  videos   Video[]
-  resources Resource[]
-  assignment Assignment?
-  exam     Exam?
+  tenant         Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  section        Section               @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  progress       LessonProgress[]
+  studentUnlocks StudentLessonUnlock[]
+  videos         Video[]
+  resources      Resource[]
+  assignment     Assignment?
+  exam           Exam?
 
-  @@map("lessons")
   @@index([tenantId])
   @@index([sectionId])
   @@index([slug])
@@ -292,6 +317,7 @@ model Lesson {
   @@index([tenantId, sectionId])
   @@index([tenantId, status])
   @@index([tenantId, createdAt])
+  @@map("lessons")
 }
 
 // ============================================
@@ -299,30 +325,30 @@ model Lesson {
 // ============================================
 
 model Resource {
-  id           String   @id @default(uuid())
+  id           String  @id @default(uuid())
   tenantId     String
   lessonId     String
   title        String
-  type         String   // PDF | FILE | LINK
+  type         String // PDF | FILE | LINK
   assetId      String?
   url          String?
   mimeType     String?
   size         BigInt?
   position     Int
-  downloadable Boolean  @default(false)
+  downloadable Boolean @default(false)
 
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   lesson Lesson @relation(fields: [lessonId], references: [id], onDelete: Cascade)
 
-  @@map("resources")
+  @@unique([tenantId, id])
   @@index([tenantId])
   @@index([lessonId])
-  @@unique([tenantId, id])
   @@index([tenantId, lessonId])
   @@index([tenantId, type])
+  @@map("resources")
 }
 
 // ============================================
@@ -330,31 +356,31 @@ model Resource {
 // ============================================
 
 model Assignment {
-  id                  String        @id @default(uuid())
+  id                  String           @id @default(uuid())
   tenantId            String
-  lessonId            String        @unique
+  lessonId            String           @unique
   title               String
   description         String?
   instructions        String?
-  timerMinutes        Int           @default(300) // 5 hours default
-  passingScore        Int?          // percentage 0-100
-  maxAttempts         Int           @default(1)
-  allowLateSubmission Boolean       @default(true)
-  latePenaltyPercent  Int?          @default(0)
+  timerMinutes        Int              @default(300) // 5 hours default
+  passingScore        Int? // percentage 0-100
+  maxAttempts         Int              @default(1)
+  allowLateSubmission Boolean          @default(true)
+  latePenaltyPercent  Int?             @default(0)
   status              AssignmentStatus @default(DRAFT)
-  createdAt           DateTime      @default(now())
-  updatedAt           DateTime      @updatedAt
+  createdAt           DateTime         @default(now())
+  updatedAt           DateTime         @updatedAt
 
-  tenant   Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  lesson   Lesson       @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  tenant      Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  lesson      Lesson                 @relation(fields: [lessonId], references: [id], onDelete: Cascade)
   submissions AssignmentSubmission[]
 
-  @@map("assignments")
   @@index([tenantId])
   @@index([lessonId])
   @@index([status])
   @@index([tenantId, status])
   @@index([tenantId, lessonId])
+  @@map("assignments")
 }
 
 enum AssignmentStatus {
@@ -368,30 +394,30 @@ enum AssignmentStatus {
 // ============================================
 
 model AssignmentSubmission {
-  id              String              @id @default(uuid())
-  tenantId        String
-  assignmentId    String
-  studentId       String
-  content         String?             // text submission
-  attachments     Json?               // file URLs, metadata
-  status          SubmissionStatus    @default(SUBMITTED)
-  score           Int?                // percentage 0-100
-  gradedBy        String?             // teacher ID
-  gradedAt        DateTime?
-  feedback        String?
-  submittedAt     DateTime            @default(now())
+  id           String           @id @default(uuid())
+  tenantId     String
+  assignmentId String
+  studentId    String
+  content      String? // text submission
+  attachments  Json? // file URLs, metadata
+  status       SubmissionStatus @default(SUBMITTED)
+  score        Int? // percentage 0-100
+  gradedBy     String? // teacher ID
+  gradedAt     DateTime?
+  feedback     String?
+  submittedAt  DateTime         @default(now())
 
-  tenant      Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  assignment  Assignment     @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
-  student     User           @relation("AssignmentStudent", fields: [studentId], references: [id], onDelete: Cascade)
-  grader      User?          @relation("AssignmentGrader", fields: [gradedBy], references: [id], onDelete: SetNull)
+  tenant     Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  assignment Assignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  student    User       @relation("AssignmentStudent", fields: [studentId], references: [id], onDelete: Cascade)
+  grader     User?      @relation("AssignmentGrader", fields: [gradedBy], references: [id], onDelete: SetNull)
 
-  @@map("assignment_submissions")
+  @@unique([assignmentId, studentId])
   @@index([tenantId])
   @@index([assignmentId])
   @@index([studentId])
   @@index([status])
-  @@unique([assignmentId, studentId])
+  @@map("assignment_submissions")
 }
 
 enum SubmissionStatus {
@@ -407,34 +433,34 @@ enum SubmissionStatus {
 // ============================================
 
 model Exam {
-  id                  String       @id @default(uuid())
-  tenantId            String
-  lessonId            String       @unique
-  title               String
-  description         String?
-  instructions        String?
-  timerMinutes        Int          @default(70)
-  passingScore        Int          @default(60) // percentage 0-100
-  maxAttempts         Int          @default(1)
-  shuffleQuestions    Boolean      @default(false)
-  shuffleOptions      Boolean      @default(false)
-  showResults         Boolean      @default(true)
-  showCorrectAnswers  Boolean      @default(false)
-  status              ExamStatus   @default(DRAFT)
-  createdAt           DateTime     @default(now())
-  updatedAt           DateTime     @updatedAt
+  id                 String     @id @default(uuid())
+  tenantId           String
+  lessonId           String     @unique
+  title              String
+  description        String?
+  instructions       String?
+  timerMinutes       Int        @default(70)
+  passingScore       Int        @default(60) // percentage 0-100
+  maxAttempts        Int        @default(1)
+  shuffleQuestions   Boolean    @default(false)
+  shuffleOptions     Boolean    @default(false)
+  showResults        Boolean    @default(true)
+  showCorrectAnswers Boolean    @default(false)
+  status             ExamStatus @default(DRAFT)
+  createdAt          DateTime   @default(now())
+  updatedAt          DateTime   @updatedAt
 
-  tenant     Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  lesson     Lesson         @relation(fields: [lessonId], references: [id], onDelete: Cascade)
-  questions  ExamQuestion[]
-  attempts   ExamAttempt[]
+  tenant    Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  lesson    Lesson         @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  questions ExamQuestion[]
+  attempts  ExamAttempt[]
 
-  @@map("exams")
   @@index([tenantId])
   @@index([lessonId])
   @@index([status])
   @@index([tenantId, status])
   @@index([tenantId, lessonId])
+  @@map("exams")
 }
 
 enum ExamStatus {
@@ -448,26 +474,26 @@ enum ExamStatus {
 // ============================================
 
 model ExamQuestion {
-  id              String            @id @default(uuid())
-  tenantId        String
-  examId          String
-  type            ExamQuestionType
-  text            String
-  explanation     String?
-  points          Int               @default(1)
-  position        Int
-  options         Json?             // for MCQ, True/False
-  correctAnswer   Json?             // answer key
-  createdAt       DateTime          @default(now())
-  updatedAt       DateTime          @updatedAt
+  id            String           @id @default(uuid())
+  tenantId      String
+  examId        String
+  type          ExamQuestionType
+  text          String
+  explanation   String?
+  points        Int              @default(1)
+  position      Int
+  options       Json? // for MCQ, True/False
+  correctAnswer Json? // answer key
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
 
-  tenant   Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  exam     Exam          @relation(fields: [examId], references: [id], onDelete: Cascade)
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  exam   Exam   @relation(fields: [examId], references: [id], onDelete: Cascade)
 
-  @@map("exam_questions")
   @@index([tenantId])
   @@index([examId])
   @@index([position])
+  @@map("exam_questions")
 }
 
 enum ExamQuestionType {
@@ -483,38 +509,38 @@ enum ExamQuestionType {
 // ============================================
 
 model ExamAttempt {
-  id                  String           @id @default(uuid())
-  tenantId            String
-  examId              String
-  studentId           String
-  attemptNumber       Int
-  status              AttemptStatus    @default(IN_PROGRESS)
-  startedAt           DateTime         @default(now())
-  submittedAt         DateTime?
+  id                   String        @id @default(uuid())
+  tenantId             String
+  examId               String
+  studentId            String
+  attemptNumber        Int
+  status               AttemptStatus @default(IN_PROGRESS)
+  startedAt            DateTime      @default(now())
+  submittedAt          DateTime?
   timeRemainingSeconds Int?
-  score               Int?             // percentage 0-100
-  passed              Boolean?
-  answers             Json?            // student answers
-  gradingData         Json?            // grading details
-  gradedAt            DateTime?
-  gradedBy            String?          // teacher ID
-  createdAt           DateTime         @default(now())
-  updatedAt           DateTime         @updatedAt
+  score                Int? // percentage 0-100
+  passed               Boolean?
+  answers              Json? // student answers
+  gradingData          Json? // grading details
+  gradedAt             DateTime?
+  gradedBy             String? // teacher ID
+  createdAt            DateTime      @default(now())
+  updatedAt            DateTime      @updatedAt
 
-  tenant  Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  exam    Exam          @relation(fields: [examId], references: [id], onDelete: Cascade)
-  student User          @relation("ExamAttemptStudent", fields: [studentId], references: [id], onDelete: Cascade)
-  grader  User?         @relation("ExamAttemptGrader", fields: [gradedBy], references: [id], onDelete: SetNull)
+  tenant  Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  exam    Exam   @relation(fields: [examId], references: [id], onDelete: Cascade)
+  student User   @relation("ExamAttemptStudent", fields: [studentId], references: [id], onDelete: Cascade)
+  grader  User?  @relation("ExamAttemptGrader", fields: [gradedBy], references: [id], onDelete: SetNull)
 
-  @@map("exam_attempts")
+  @@unique([examId, studentId, attemptNumber])
   @@index([tenantId])
   @@index([examId])
   @@index([studentId])
   @@index([status])
-  @@unique([examId, studentId, attemptNumber])
   @@index([tenantId, examId])
   @@index([tenantId, studentId])
   @@index([tenantId, status])
+  @@map("exam_attempts")
 }
 
 enum AttemptStatus {
@@ -530,41 +556,41 @@ enum AttemptStatus {
 // ============================================
 
 model Video {
-  id                  String       @id @default(uuid())
-  tenantId            String
-  lessonId            String
-  title               String
-  description         String?
-  status              VideoStatus  @default(UPLOADING)
-  provider            String
-  providerVideoId     String?
-  providerUploadUrl   String?
-  uploadUrlExpiresAt  DateTime?
-  duration            Int?
-  width               Int?
-  height              Int?
-  fileSize            BigInt?
-  mimeType            String?
-  thumbnailUrl        String?
-  hlsManifestUrl      String?
-  dashManifestUrl     String?
-  errorMessage        String?
-  uploadedBy          String
-  uploadedAt          DateTime?
-  processedAt         DateTime?
-  publishedAt         DateTime?
-  createdAt           DateTime     @default(now())
-  updatedAt           DateTime     @updatedAt
+  id                 String      @id @default(uuid())
+  tenantId           String
+  lessonId           String
+  title              String
+  description        String?
+  status             VideoStatus @default(UPLOADING)
+  provider           String
+  providerVideoId    String?
+  providerUploadUrl  String?
+  uploadUrlExpiresAt DateTime?
+  duration           Int?
+  width              Int?
+  height             Int?
+  fileSize           BigInt?
+  mimeType           String?
+  thumbnailUrl       String?
+  hlsManifestUrl     String?
+  dashManifestUrl    String?
+  errorMessage       String?
+  uploadedBy         String
+  uploadedAt         DateTime?
+  processedAt        DateTime?
+  publishedAt        DateTime?
+  createdAt          DateTime    @default(now())
+  updatedAt          DateTime    @updatedAt
 
-  tenant Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  lesson Lesson  @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  lesson Lesson @relation(fields: [lessonId], references: [id], onDelete: Cascade)
 
-  @@map("videos")
+  @@unique([tenantId, providerVideoId])
   @@index([tenantId])
   @@index([lessonId])
   @@index([status])
   @@index([providerVideoId])
-  @@unique([tenantId, providerVideoId])
+  @@map("videos")
 }
 
 enum VideoStatus {
@@ -627,49 +653,77 @@ enum ContentLockStatus {
 // ============================================
 
 model Enrollment {
-  id         String          @id @default(uuid())
-  tenantId   String
-  userId     String
-  courseId   String
-  startsAt   DateTime
-  expiresAt  DateTime?
-  status     EnrollmentStatus @default(ACTIVE)
-  source     String
-  createdAt  DateTime        @default(now())
+  id        String           @id @default(uuid())
+  tenantId  String
+  userId    String
+  courseId  String
+  startsAt  DateTime
+  expiresAt DateTime?
+  status    EnrollmentStatus @default(ACTIVE)
+  source    String
+  createdAt DateTime         @default(now())
 
-  tenant Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  course Course  @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  course Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
 
-  @@map("enrollments")
+  @@unique([userId, courseId])
   @@index([tenantId])
   @@index([userId])
   @@index([courseId])
-  @@unique([userId, courseId])
   @@index([tenantId, userId])
   @@index([tenantId, courseId])
   @@index([tenantId, status])
+  @@map("enrollments")
 }
 
 model LessonProgress {
-  id             String   @id @default(uuid())
+  id             String    @id @default(uuid())
   tenantId       String
   userId         String
   lessonId       String
-  watchedSeconds Int      @default(0)
+  watchedSeconds Int       @default(0)
   lastPosition   Int?
   completedAt    DateTime?
-  updatedAt      DateTime @updatedAt
+  updatedAt      DateTime  @updatedAt
 
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
   lesson Lesson @relation(fields: [lessonId], references: [id], onDelete: Cascade)
 
-  @@map("lesson_progress")
   @@unique([tenantId, userId, lessonId])
   @@index([tenantId])
   @@index([userId])
   @@index([tenantId, lessonId])
   @@index([tenantId, completedAt])
+  @@map("lesson_progress")
+}
+
+// Per-student content unlocks (audit 2026-10-16 §6.1). Progression used to
+// flip Lesson.lockStatus for the whole tenant, so one student entering an
+// assignment unlocked the exam lesson FOR EVERYONE. These rows are the
+// per-student grants: the entry event creates a row keyed by
+// (tenantId, userId, lessonId), and the unique constraint below makes the
+// operation idempotent under retries and concurrent requests.
+model StudentLessonUnlock {
+  id         String            @id @default(uuid())
+  tenantId   String
+  userId     String
+  lessonId   String
+  unlockType ContentUnlockType
+  sourceId   String? // assignmentId | examId | null (manual/other)
+  unlockedAt DateTime          @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lesson Lesson @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, userId, lessonId])
+  @@index([tenantId])
+  @@index([userId])
+  @@index([lessonId])
+  @@index([tenantId, userId])
+  @@index([tenantId, lessonId])
+  @@map("student_lesson_unlocks")
 }
 
 enum EnrollmentStatus {
@@ -683,25 +737,25 @@ enum EnrollmentStatus {
 // ============================================
 
 model AuditLog {
-  id            String   @id @default(uuid())
-  tenantId      String
+  id           String   @id @default(uuid())
+  tenantId     String
   actorUserId  String?
-  action        String
-  resourceType  String
-  resourceId    String?
-  metadata      Json?
-  ip            String?
-  userAgent     String?
-  createdAt     DateTime @default(now())
+  action       String
+  resourceType String
+  resourceId   String?
+  metadata     Json?
+  ip           String?
+  userAgent    String?
+  createdAt    DateTime @default(now())
 
-  tenant     Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  actorUser  User?   @relation(fields: [actorUserId], references: [id], onDelete: SetNull)
+  tenant    Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  actorUser User?  @relation(fields: [actorUserId], references: [id], onDelete: SetNull)
 
-  @@map("audit_logs")
   @@index([tenantId])
   @@index([actorUserId])
   @@index([resourceType, resourceId])
   @@index([createdAt])
+  @@map("audit_logs")
 }
 
 // ============================================
@@ -709,27 +763,27 @@ model AuditLog {
 // ============================================
 
 model OutboxEvent {
-  id            String   @id @default(uuid())
+  id            String    @id @default(uuid())
   tenantId      String
   userId        String?
-  eventType    String
-  eventVersion Int      @default(1)
+  eventType     String
+  eventVersion  Int       @default(1)
   aggregateType String
   aggregateId   String
   payload       Json
-  createdAt     DateTime @default(now())
+  createdAt     DateTime  @default(now())
   publishedAt   DateTime?
-  retryCount    Int      @default(0)
+  retryCount    Int       @default(0)
   lastError     String?
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+  user   User?  @relation(fields: [userId], references: [id], onDelete: SetNull)
 
-  @@map("outbox_events")
   @@index([tenantId])
   @@index([userId])
   @@index([publishedAt])
   @@index([createdAt])
+  @@map("outbox_events")
 }
 
 // ============================================
@@ -737,28 +791,28 @@ model OutboxEvent {
 // ============================================
 
 model Entitlement {
-  id            String   @id @default(uuid())
-  tenantId      String
-  userId        String
-  resourceType  String
-  resourceId    String
-  source        String
-  startsAt      DateTime?
-  expiresAt     DateTime?
-  status        EntitlementStatus @default(ACTIVE)
-  metadata      Json?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id           String            @id @default(uuid())
+  tenantId     String
+  userId       String
+  resourceType String
+  resourceId   String
+  source       String
+  startsAt     DateTime?
+  expiresAt    DateTime?
+  status       EntitlementStatus @default(ACTIVE)
+  metadata     Json?
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@map("entitlements")
   @@index([tenantId])
   @@index([userId])
   @@index([resourceType, resourceId])
   @@index([status])
   @@index([expiresAt])
+  @@map("entitlements")
 }
 
 enum EntitlementStatus {
@@ -773,24 +827,23 @@ enum EntitlementStatus {
 // ============================================
 
 model PlaybackSession {
-  id                String   @id @default(uuid())
-  tenantId          String
-  studentId         String
-  deviceId          String
-  lessonId          String
-  videoId           String
-  watermarkSeed     BigInt
-  watermarkPayload  Json
-  ipHash            String
-  userAgentHash     String
-  startedAt         DateTime @default(now())
-  lastHeartbeatAt   DateTime @default(now())
-  endedAt           DateTime?
-  status            PlaybackSessionStatus @default(ACTIVE)
-  riskScore         Int      @default(0)
-  riskLevel         RiskLevel @default(LOW)
+  id               String                @id @default(uuid())
+  tenantId         String
+  studentId        String
+  deviceId         String
+  lessonId         String
+  videoId          String
+  watermarkSeed    BigInt
+  watermarkPayload Json
+  ipHash           String
+  userAgentHash    String
+  startedAt        DateTime              @default(now())
+  lastHeartbeatAt  DateTime              @default(now())
+  endedAt          DateTime?
+  status           PlaybackSessionStatus @default(ACTIVE)
+  riskScore        Int                   @default(0)
+  riskLevel        RiskLevel             @default(LOW)
 
-  @@map("playback_sessions")
   @@index([tenantId])
   @@index([studentId])
   @@index([deviceId])
@@ -798,20 +851,20 @@ model PlaybackSession {
   @@index([videoId])
   @@index([status])
   @@index([startedAt])
+  @@map("playback_sessions")
 }
 
 model CaptureEvent {
-  id                    String   @id @default(uuid())
-  tenantId              String
-  studentId             String
-  deviceId              String
-  playbackSessionId     String
-  videoId               String
-  eventType             CaptureEventType
-  detectedAt            DateTime @default(now())
-  metadata              Json?
+  id                String           @id @default(uuid())
+  tenantId          String
+  studentId         String
+  deviceId          String
+  playbackSessionId String
+  videoId           String
+  eventType         CaptureEventType
+  detectedAt        DateTime         @default(now())
+  metadata          Json?
 
-  @@map("capture_events")
   @@index([tenantId])
   @@index([studentId])
   @@index([deviceId])
@@ -819,26 +872,27 @@ model CaptureEvent {
   @@index([videoId])
   @@index([eventType])
   @@index([detectedAt])
+  @@map("capture_events")
 }
 
 model SecurityEvent {
-  id            String   @id @default(uuid())
-  tenantId      String
-  userId        String?
-  eventType     String
-  severity      SecurityEventSeverity
-  requestId     String?
-  ipHash        String?
-  deviceId      String?
-  metadata      Json?
-  createdAt     DateTime @default(now())
+  id        String                @id @default(uuid())
+  tenantId  String
+  userId    String?
+  eventType String
+  severity  SecurityEventSeverity
+  requestId String?
+  ipHash    String?
+  deviceId  String?
+  metadata  Json?
+  createdAt DateTime              @default(now())
 
-  @@map("security_events")
   @@index([tenantId])
   @@index([userId])
   @@index([eventType])
   @@index([severity])
   @@index([createdAt])
+  @@map("security_events")
 }
 
 enum PlaybackSessionStatus {
@@ -874,25 +928,25 @@ enum SecurityEventSeverity {
 // ============================================
 
 model Subscription {
-  id                    String   @id @default(uuid())
-  tenantId              String   @unique
-  planId                String
-  status                SubscriptionStatus @default(TRIALING)
-  currentPeriodStart    DateTime
-  currentPeriodEnd      DateTime
-  cancelAtPeriodEnd     Boolean  @default(false)
-  cancelledAt           DateTime?
-  trialEnd              DateTime?
-  metadata              Json?
-  createdAt             DateTime @default(now())
-  updatedAt             DateTime @updatedAt
+  id                 String             @id @default(uuid())
+  tenantId           String             @unique
+  planId             String
+  status             SubscriptionStatus @default(TRIALING)
+  currentPeriodStart DateTime
+  currentPeriodEnd   DateTime
+  cancelAtPeriodEnd  Boolean            @default(false)
+  cancelledAt        DateTime?
+  trialEnd           DateTime?
+  metadata           Json?
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
-  @@map("subscriptions")
   @@index([tenantId])
   @@index([planId])
   @@index([status])
+  @@map("subscriptions")
 }
 
 enum SubscriptionStatus {
@@ -909,54 +963,54 @@ enum SubscriptionStatus {
 // ============================================
 
 model Order {
-  id              String      @id @default(uuid())
-  tenantId        String
-  userId          String
-  number          String
-  currency        String      @default("EGP")
-  subtotalMinor   BigInt
-  discountMinor   BigInt      @default(0)
-  totalMinor      BigInt
-  status          OrderStatus @default(PENDING)
-  expiresAt       DateTime?
-  metadata        Json?
-  createdAt       DateTime    @default(now())
-  updatedAt       DateTime    @updatedAt
+  id            String      @id @default(uuid())
+  tenantId      String
+  userId        String
+  number        String
+  currency      String      @default("EGP")
+  subtotalMinor BigInt
+  discountMinor BigInt      @default(0)
+  totalMinor    BigInt
+  status        OrderStatus @default(PENDING)
+  expiresAt     DateTime?
+  metadata      Json?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
 
-  tenant          Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  user            User              @relation(fields: [userId], references: [id], onDelete: Cascade)
-  items           OrderItem[]
-  payments        Payment[]
-  paymentIntents  PaymentIntent[]
-  refunds         Refund[]
+  tenant         Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user           User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items          OrderItem[]
+  payments       Payment[]
+  paymentIntents PaymentIntent[]
+  refunds        Refund[]
 
-  @@map("orders")
+  @@unique([tenantId, number])
   @@index([tenantId])
   @@index([userId])
   @@index([status])
-  @@unique([tenantId, number])
+  @@map("orders")
 }
 
 model OrderItem {
-  id              String   @id @default(uuid())
-  tenantId        String
-  orderId         String
-  resourceType    String
-  resourceId      String
-  name            String
-  quantity        Int      @default(1)
-  unitPriceMinor  BigInt
-  totalMinor      BigInt
-  metadata        Json?
-  createdAt       DateTime @default(now())
+  id             String   @id @default(uuid())
+  tenantId       String
+  orderId        String
+  resourceType   String
+  resourceId     String
+  name           String
+  quantity       Int      @default(1)
+  unitPriceMinor BigInt
+  totalMinor     BigInt
+  metadata       Json?
+  createdAt      DateTime @default(now())
 
-  tenant          Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  order           Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  order  Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
 
-  @@map("order_items")
   @@index([tenantId])
   @@index([orderId])
   @@index([resourceType, resourceId])
+  @@map("order_items")
 }
 
 enum OrderStatus {
@@ -968,67 +1022,67 @@ enum OrderStatus {
 }
 
 model PaymentIntent {
-  id                  String             @id @default(uuid())
-  tenantId            String
-  orderId             String
-  userId              String
-  amountMinor         BigInt
-  currency            String             @default("EGP")
-  requestedMethod     PaymentMethod?
-  status              PaymentIntentStatus @default(CREATED)
-  provider            String?
-  externalIntentId    String?
-  idempotencyKey      String?
-  expiresAt           DateTime?
-  metadata            Json?
-  createdAt           DateTime           @default(now())
-  updatedAt           DateTime           @updatedAt
+  id               String              @id @default(uuid())
+  tenantId         String
+  orderId          String
+  userId           String
+  amountMinor      BigInt
+  currency         String              @default("EGP")
+  requestedMethod  PaymentMethod?
+  status           PaymentIntentStatus @default(CREATED)
+  provider         String?
+  externalIntentId String?
+  idempotencyKey   String?
+  expiresAt        DateTime?
+  metadata         Json?
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
 
-  tenant              Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  order               Order              @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  user                User               @relation(fields: [userId], references: [id], onDelete: Cascade)
-  attempts            PaymentAttempt[]
-  payments            Payment[]
+  tenant   Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  order    Order            @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  user     User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  attempts PaymentAttempt[]
+  payments Payment[]
 
-  @@map("payment_intents")
+  @@unique([tenantId, idempotencyKey])
   @@index([tenantId])
   @@index([orderId])
   @@index([userId])
   @@index([status])
-  @@unique([tenantId, idempotencyKey])
+  @@map("payment_intents")
 }
 
 model Payment {
-  id                      String            @id @default(uuid())
-  tenantId                String
-  orderId                 String
-  userId                  String
-  paymentIntentId         String?
-  provider                String
-  paymentMethod           PaymentMethod
-  status                  PaymentStatus     @default(CREATED)
-  amountMinor             BigInt
-  currency                String            @default("EGP")
-  providerTransactionId   String?
-  idempotencyKey          String?
-  confirmedAt             DateTime?
-  failedAt                DateTime?
-  refundedAt              DateTime?
-  failureCode             String?
-  failureReason           String?
-  metadata                Json?
-  createdAt               DateTime          @default(now())
-  updatedAt               DateTime          @updatedAt
+  id                    String        @id @default(uuid())
+  tenantId              String
+  orderId               String
+  userId                String
+  paymentIntentId       String?
+  provider              String
+  paymentMethod         PaymentMethod
+  status                PaymentStatus @default(CREATED)
+  amountMinor           BigInt
+  currency              String        @default("EGP")
+  providerTransactionId String?
+  idempotencyKey        String?
+  confirmedAt           DateTime?
+  failedAt              DateTime?
+  refundedAt            DateTime?
+  failureCode           String?
+  failureReason         String?
+  metadata              Json?
+  createdAt             DateTime      @default(now())
+  updatedAt             DateTime      @updatedAt
 
-  tenant                  Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  order                   Order              @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  user                    User               @relation(fields: [userId], references: [id], onDelete: Cascade)
-  paymentIntent           PaymentIntent?     @relation(fields: [paymentIntentId], references: [id], onDelete: SetNull)
-  attempts                PaymentAttempt[]
-  refunds                 Refund[]
-  ledgerEntries           LedgerEntry[]
+  tenant        Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  order         Order            @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  user          User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  paymentIntent PaymentIntent?   @relation(fields: [paymentIntentId], references: [id], onDelete: SetNull)
+  attempts      PaymentAttempt[]
+  refunds       Refund[]
+  ledgerEntries LedgerEntry[]
 
-  @@map("payments")
+  @@unique([provider, providerTransactionId])
   @@index([tenantId])
   @@index([orderId])
   @@index([userId])
@@ -1036,70 +1090,70 @@ model Payment {
   @@index([providerTransactionId])
   @@index([status])
   @@index([idempotencyKey])
-  @@unique([provider, providerTransactionId])
+  @@map("payments")
 }
 
 model PaymentAttempt {
-  id                      String                    @id @default(uuid())
-  tenantId                String
-  paymentId               String
-  paymentIntentId         String?
-  attemptNumber           Int
-  provider                String
-  paymentMethod           PaymentMethod
-  status                  PaymentAttemptStatus      @default(INITIATED)
-  amountMinor             BigInt
-  currency                String                  @default("EGP")
-  externalReference       String?
-  initiatedAt             DateTime                @default(now())
-  completedAt             DateTime?
-  failureCode             String?
-  failureReason           String?
-  metadata                Json?
-  createdAt               DateTime                @default(now())
-  updatedAt               DateTime                @updatedAt
+  id                String               @id @default(uuid())
+  tenantId          String
+  paymentId         String
+  paymentIntentId   String?
+  attemptNumber     Int
+  provider          String
+  paymentMethod     PaymentMethod
+  status            PaymentAttemptStatus @default(INITIATED)
+  amountMinor       BigInt
+  currency          String               @default("EGP")
+  externalReference String?
+  initiatedAt       DateTime             @default(now())
+  completedAt       DateTime?
+  failureCode       String?
+  failureReason     String?
+  metadata          Json?
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
 
-  tenant                  Tenant                  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  payment                 Payment                 @relation(fields: [paymentId], references: [id], onDelete: Cascade)
-  paymentIntent           PaymentIntent?          @relation(fields: [paymentIntentId], references: [id], onDelete: SetNull)
+  tenant        Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  payment       Payment        @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  paymentIntent PaymentIntent? @relation(fields: [paymentIntentId], references: [id], onDelete: SetNull)
 
-  @@map("payment_attempts")
+  @@unique([paymentId, attemptNumber])
   @@index([tenantId])
   @@index([paymentId])
   @@index([paymentIntentId])
   @@index([provider])
   @@index([status])
-  @@unique([paymentId, attemptNumber])
+  @@map("payment_attempts")
 }
 
 model Refund {
-  id                      String         @id @default(uuid())
-  tenantId                String
-  paymentId               String
-  orderId                 String
-  userId                  String
-  requestedBy             String
-  amountMinor             BigInt
-  currency                String         @default("EGP")
-  reason                  String?
-  providerRefundId        String?
-  status                  RefundStatus   @default(PENDING)
-  processedAt             DateTime?
-  metadata                Json?
-  createdAt               DateTime       @default(now())
-  updatedAt               DateTime       @updatedAt
+  id               String       @id @default(uuid())
+  tenantId         String
+  paymentId        String
+  orderId          String
+  userId           String
+  requestedBy      String
+  amountMinor      BigInt
+  currency         String       @default("EGP")
+  reason           String?
+  providerRefundId String?
+  status           RefundStatus @default(PENDING)
+  processedAt      DateTime?
+  metadata         Json?
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
 
-  tenant                  Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  payment                 Payment        @relation(fields: [paymentId], references: [id], onDelete: Cascade)
-  order                   Order          @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  user                    User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tenant  Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  payment Payment @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  order   Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@map("refunds")
   @@index([tenantId])
   @@index([paymentId])
   @@index([orderId])
   @@index([userId])
   @@index([status])
+  @@map("refunds")
 }
 
 enum PaymentMethod {
@@ -1157,23 +1211,22 @@ enum RefundStatus {
 // ============================================
 
 model LedgerEntry {
-  id              String            @id @default(uuid())
-  tenantId        String
-  paymentId       String?
-  orderId         String?
-  refundId        String?
-  accountCode     String
-  entryType       LedgerEntryType
-  amountMinor     BigInt
-  currency        String            @default("EGP")
-  reference       String?
-  metadata        Json?
-  createdAt       DateTime          @default(now())
+  id          String          @id @default(uuid())
+  tenantId    String
+  paymentId   String?
+  orderId     String?
+  refundId    String?
+  accountCode String
+  entryType   LedgerEntryType
+  amountMinor BigInt
+  currency    String          @default("EGP")
+  reference   String?
+  metadata    Json?
+  createdAt   DateTime        @default(now())
 
-  tenant          Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  payment         Payment?          @relation(fields: [paymentId], references: [id], onDelete: SetNull)
+  tenant  Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  payment Payment? @relation(fields: [paymentId], references: [id], onDelete: SetNull)
 
-  @@map("ledger_entries")
   @@index([tenantId])
   @@index([paymentId])
   @@index([orderId])
@@ -1181,6 +1234,7 @@ model LedgerEntry {
   @@index([accountCode])
   @@index([entryType])
   @@index([createdAt])
+  @@map("ledger_entries")
 }
 
 enum LedgerEntryType {
@@ -1193,29 +1247,30 @@ enum LedgerEntryType {
 // ============================================
 
 model WebhookEvent {
-  id                    String             @id @default(uuid())
-  tenantId              String?
-  provider              String
-  externalEventId       String
-  eventType             String
-  signatureVerified     Boolean            @default(false)
-  payloadHash           String
-  receivedAt            DateTime           @default(now())
-  processedAt           DateTime?
-  processingStatus      WebhookProcessingStatus @default(PENDING)
-  errorCode             String?
-  metadata              Json?
-  createdAt             DateTime           @default(now())
+  id                String                  @id @default(uuid())
+  tenantId          String?
+  provider          String
+  externalEventId   String
+  eventType         String
+  signatureVerified Boolean                 @default(false)
+  payloadHash       String
+  rawPayload        Json?
+  receivedAt        DateTime                @default(now())
+  processedAt       DateTime?
+  processingStatus  WebhookProcessingStatus @default(PENDING)
+  errorCode         String?
+  metadata          Json?
+  createdAt         DateTime                @default(now())
 
-  tenant                Tenant?            @relation(fields: [tenantId], references: [id], onDelete: SetNull)
+  tenant Tenant? @relation(fields: [tenantId], references: [id], onDelete: SetNull)
 
-  @@map("webhook_events")
+  @@unique([provider, externalEventId])
   @@index([tenantId])
   @@index([provider])
   @@index([externalEventId])
   @@index([receivedAt])
   @@index([processingStatus])
-  @@unique([provider, externalEventId])
+  @@map("webhook_events")
 }
 
 enum WebhookProcessingStatus {
@@ -1227,25 +1282,25 @@ enum WebhookProcessingStatus {
 }
 
 model IdempotencyKey {
-  id              String   @id @default(uuid())
-  tenantId        String
-  userId          String?
-  key             String
-  operation       String
-  requestHash     String
-  responseHash    String?
-  status          IdempotencyStatus @default(PENDING)
-  createdAt       DateTime @default(now())
-  expiresAt       DateTime
+  id           String            @id @default(uuid())
+  tenantId     String
+  userId       String?
+  key          String
+  operation    String
+  requestHash  String
+  responseHash String?
+  status       IdempotencyStatus @default(PENDING)
+  createdAt    DateTime          @default(now())
+  expiresAt    DateTime
 
-  tenant          Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
-  @@map("idempotency_keys")
+  @@unique([tenantId, key])
   @@index([tenantId])
   @@index([userId])
   @@index([key])
   @@index([operation])
-  @@unique([tenantId, key])
+  @@map("idempotency_keys")
 }
 
 enum IdempotencyStatus {
@@ -1259,47 +1314,47 @@ enum IdempotencyStatus {
 // ============================================
 
 model Voucher {
-  id              String         @id @default(uuid())
-  tenantId        String
-  codeHash        String
-  discountType    VoucherDiscountType
-  discountValue   Int
-  maxUses         Int            @default(1)
-  usedCount       Int            @default(0)
-  courseId        String?
-  expiresAt       DateTime?
-  disabledAt      DateTime?
-  metadata        Json?
-  createdAt       DateTime       @default(now())
-  updatedAt       DateTime       @updatedAt
+  id            String              @id @default(uuid())
+  tenantId      String
+  codeHash      String
+  discountType  VoucherDiscountType
+  discountValue Int
+  maxUses       Int                 @default(1)
+  usedCount     Int                 @default(0)
+  courseId      String?
+  expiresAt     DateTime?
+  disabledAt    DateTime?
+  metadata      Json?
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
 
-  tenant          Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  redemptions     VoucherRedemption[]
+  tenant      Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  redemptions VoucherRedemption[]
 
-  @@map("vouchers")
+  @@unique([tenantId, codeHash])
   @@index([tenantId])
   @@index([courseId])
-  @@unique([tenantId, codeHash])
+  @@map("vouchers")
 }
 
 model VoucherRedemption {
-  id              String   @id @default(uuid())
-  tenantId        String
-  voucherId       String
-  userId          String
-  orderId         String?
-  redeemedAt      DateTime @default(now())
-  metadata        Json?
+  id         String   @id @default(uuid())
+  tenantId   String
+  voucherId  String
+  userId     String
+  orderId    String?
+  redeemedAt DateTime @default(now())
+  metadata   Json?
 
-  tenant          Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  voucher         Voucher  @relation(fields: [voucherId], references: [id], onDelete: Cascade)
+  tenant  Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  voucher Voucher @relation(fields: [voucherId], references: [id], onDelete: Cascade)
 
-  @@map("voucher_redemptions")
+  @@unique([voucherId, userId])
   @@index([tenantId])
   @@index([voucherId])
   @@index([userId])
   @@index([orderId])
-  @@unique([voucherId, userId])
+  @@map("voucher_redemptions")
 }
 
 enum VoucherDiscountType {
@@ -1312,60 +1367,60 @@ enum VoucherDiscountType {
 // ============================================
 
 model ReconciliationRun {
-  id              String                  @id @default(uuid())
+  id              String               @id @default(uuid())
   tenantId        String
   provider        String
-  status          ReconciliationStatus    @default(PENDING)
+  status          ReconciliationStatus @default(PENDING)
   startedAt       DateTime
   completedAt     DateTime?
-  totalRecords    Int                     @default(0)
-  matchedCount    Int                     @default(0)
-  mismatchedCount Int                     @default(0)
-  errorCount      Int                     @default(0)
+  totalRecords    Int                  @default(0)
+  matchedCount    Int                  @default(0)
+  mismatchedCount Int                  @default(0)
+  errorCount      Int                  @default(0)
   metadata        Json?
-  createdAt       DateTime                @default(now())
-  updatedAt       DateTime                @updatedAt
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
 
-  tenant          Tenant                  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  items           ReconciliationItem[]
+  tenant Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  items  ReconciliationItem[]
 
-  @@map("reconciliation_runs")
   @@index([tenantId])
   @@index([provider])
   @@index([status])
   @@index([startedAt])
+  @@map("reconciliation_runs")
 }
 
 model ReconciliationItem {
-  id                      String                     @id @default(uuid())
-  tenantId                String
-  runId                   String
-  provider                String
-  internalPaymentId       String?
-  providerTransactionId   String?
-  status                  ReconciliationItemStatus   @default(UNKNOWN)
-  internalAmountMinor     BigInt?
-  providerAmountMinor     BigInt?
-  internalStatus          String?
-  providerStatus          String?
-  mismatchDetails         Json?
-  resolvedAt              DateTime?
-  resolvedBy              String?
-  resolution              String?
-  metadata                Json?
-  createdAt               DateTime                   @default(now())
-  updatedAt               DateTime                   @updatedAt
+  id                    String                   @id @default(uuid())
+  tenantId              String
+  runId                 String
+  provider              String
+  internalPaymentId     String?
+  providerTransactionId String?
+  status                ReconciliationItemStatus @default(UNKNOWN)
+  internalAmountMinor   BigInt?
+  providerAmountMinor   BigInt?
+  internalStatus        String?
+  providerStatus        String?
+  mismatchDetails       Json?
+  resolvedAt            DateTime?
+  resolvedBy            String?
+  resolution            String?
+  metadata              Json?
+  createdAt             DateTime                 @default(now())
+  updatedAt             DateTime                 @updatedAt
 
-  tenant                  Tenant                     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  run                     ReconciliationRun          @relation(fields: [runId], references: [id], onDelete: Cascade)
+  tenant Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  run    ReconciliationRun @relation(fields: [runId], references: [id], onDelete: Cascade)
 
-  @@map("reconciliation_items")
   @@index([tenantId])
   @@index([runId])
   @@index([provider])
   @@index([internalPaymentId])
   @@index([providerTransactionId])
   @@index([status])
+  @@map("reconciliation_items")
 }
 
 enum ReconciliationStatus {
@@ -1393,25 +1448,25 @@ enum ReconciliationItemStatus {
 // ============================================
 
 model PaymentRiskEvent {
-  id              String   @id @default(uuid())
-  tenantId        String
-  paymentId       String?
-  userId          String?
-  eventType       String
-  severity        RiskSeverity
-  score           Int
-  details         Json?
-  createdAt       DateTime @default(now())
+  id        String       @id @default(uuid())
+  tenantId  String
+  paymentId String?
+  userId    String?
+  eventType String
+  severity  RiskSeverity
+  score     Int
+  details   Json?
+  createdAt DateTime     @default(now())
 
-  tenant          Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
-  @@map("payment_risk_events")
   @@index([tenantId])
   @@index([paymentId])
   @@index([userId])
   @@index([eventType])
   @@index([severity])
   @@index([createdAt])
+  @@map("payment_risk_events")
 }
 
 enum RiskSeverity {
@@ -1426,55 +1481,55 @@ enum RiskSeverity {
 // ============================================
 
 model Settlement {
-  id                      String            @id @default(uuid())
-  tenantId                String
-  teacherId               String
-  periodStart             DateTime
-  periodEnd               DateTime
-  grossAmountMinor        BigInt
-  platformFeeMinor        BigInt
-  refundAdjustmentMinor   BigInt            @default(0)
-  netAmountMinor          BigInt
-  currency                String            @default("EGP")
-  status                  SettlementStatus  @default(CALCULATED)
-  payoutReference         String?
-  paidAt                  DateTime?
-  metadata                Json?
-  createdAt               DateTime          @default(now())
-  updatedAt               DateTime          @updatedAt
+  id                    String           @id @default(uuid())
+  tenantId              String
+  teacherId             String
+  periodStart           DateTime
+  periodEnd             DateTime
+  grossAmountMinor      BigInt
+  platformFeeMinor      BigInt
+  refundAdjustmentMinor BigInt           @default(0)
+  netAmountMinor        BigInt
+  currency              String           @default("EGP")
+  status                SettlementStatus @default(CALCULATED)
+  payoutReference       String?
+  paidAt                DateTime?
+  metadata              Json?
+  createdAt             DateTime         @default(now())
+  updatedAt             DateTime         @updatedAt
 
-  tenant                  Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  teacher                 User              @relation(fields: [teacherId], references: [id], onDelete: Cascade)
-  items                   SettlementItem[]
+  tenant  Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  teacher User             @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  items   SettlementItem[]
 
-  @@map("settlements")
   @@index([tenantId])
   @@index([teacherId])
   @@index([status])
   @@index([periodStart, periodEnd])
+  @@map("settlements")
 }
 
 model SettlementItem {
-  id              String   @id @default(uuid())
-  tenantId        String
-  settlementId    String
-  orderId         String
-  paymentId       String
-  courseId        String
+  id               String   @id @default(uuid())
+  tenantId         String
+  settlementId     String
+  orderId          String
+  paymentId        String
+  courseId         String
   grossAmountMinor BigInt
-  feeMinor        BigInt
-  netAmountMinor  BigInt
-  createdAt       DateTime @default(now())
+  feeMinor         BigInt
+  netAmountMinor   BigInt
+  createdAt        DateTime @default(now())
 
-  tenant          Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  settlement      Settlement @relation(fields: [settlementId], references: [id], onDelete: Cascade)
+  tenant     Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  settlement Settlement @relation(fields: [settlementId], references: [id], onDelete: Cascade)
 
-  @@map("settlement_items")
   @@index([tenantId])
   @@index([settlementId])
   @@index([orderId])
   @@index([paymentId])
   @@index([courseId])
+  @@map("settlement_items")
 }
 
 enum SettlementStatus {
@@ -1492,28 +1547,28 @@ enum SettlementStatus {
 // ============================================
 
 model PaymentAuditLog {
-  id              String   @id @default(uuid())
-  tenantId        String
-  actorId         String?
-  paymentId       String?
-  action          String
-  resourceType    String?
-  resourceId      String?
-  previousState   String?
-  nextState       String?
-  reason          String?
-  requestId       String?
-  ipHash          String?
-  metadata        Json?
-  createdAt       DateTime @default(now())
+  id            String   @id @default(uuid())
+  tenantId      String
+  actorId       String?
+  paymentId     String?
+  action        String
+  resourceType  String?
+  resourceId    String?
+  previousState String?
+  nextState     String?
+  reason        String?
+  requestId     String?
+  ipHash        String?
+  metadata      Json?
+  createdAt     DateTime @default(now())
 
-  tenant          Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
-  @@map("payment_audit_logs")
   @@index([tenantId])
   @@index([actorId])
   @@index([paymentId])
   @@index([action])
   @@index([resourceType, resourceId])
   @@index([createdAt])
+  @@map("payment_audit_logs")
 }

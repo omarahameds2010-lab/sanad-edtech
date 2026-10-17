@@ -4,23 +4,20 @@ import {
   Get,
   Headers,
   Param,
+  Patch,
   Post,
   Query,
   Request,
   UseGuards,
 } from "@nestjs/common";
 import { ExamsService } from "./exams.service";
-import { ProgressionService } from "../progression/progression.service";
 import { JwtAuthGuard } from "../../auth/guards/jwt-auth.guard";
 import { RequirePermission } from "../../authorization/authorization.decorators";
 
 @Controller("v1/exams")
 @UseGuards(JwtAuthGuard)
 export class ExamsController {
-  constructor(
-    private examsService: ExamsService,
-    private progressionService: ProgressionService,
-  ) {}
+  constructor(private examsService: ExamsService) {}
 
   @Post("lessons/:lessonId/exams")
   @RequirePermission({
@@ -37,6 +34,55 @@ export class ExamsController {
       req.tenantId,
       req.user.sub,
       lessonId,
+      dto,
+    );
+    return { data: result };
+  }
+
+  @Patch(":examId")
+  @RequirePermission({
+    action: "update",
+    resourceType: "exam",
+    resourceIdParam: "examId",
+  })
+  async update(
+    @Request() req,
+    @Param("examId") examId: string,
+    @Body() dto: any,
+  ) {
+    const result = await this.examsService.updateExam(
+      req.tenantId,
+      examId,
+      dto,
+    );
+    return { data: result };
+  }
+
+  @Post(":examId/publish")
+  @RequirePermission({
+    action: "publish",
+    resourceType: "exam",
+    resourceIdParam: "examId",
+  })
+  async publish(@Request() req, @Param("examId") examId: string) {
+    const result = await this.examsService.publishExam(req.tenantId, examId);
+    return { data: result };
+  }
+
+  @Post(":examId/questions")
+  @RequirePermission({
+    action: "update",
+    resourceType: "exam",
+    resourceIdParam: "examId",
+  })
+  async addQuestion(
+    @Request() req,
+    @Param("examId") examId: string,
+    @Body() dto: any,
+  ) {
+    const result = await this.examsService.addQuestion(
+      req.tenantId,
+      examId,
       dto,
     );
     return { data: result };
@@ -99,23 +145,28 @@ export class ExamsController {
   async enter(
     @Request() req,
     @Param("examId") examId: string,
-    @Body() body: { lessonId: string },
     @Headers("idempotency-key") idempotencyKey: string,
   ) {
-    const attempt = await this.examsService.startExamAttempt(
+    const result = await this.examsService.startExamAttempt(
       req.tenantId,
       req.user.sub,
       examId,
       idempotencyKey,
     );
-    // ENTER_EXAM → unlock next lesson (idempotent progression event)
-    const unlocked = await this.progressionService.handleEnterExam(
-      req.tenantId,
-      req.user.sub,
-      examId,
-      body.lessonId,
-      idempotencyKey,
-    );
+    // Progression runs ONCE inside the service (audit 2026-10-16 §6.1 — the
+    // controller used to call it a second time and always got 0 unlocks).
+    // The ?? guard keeps pre-fix cached responses from breaking the web shape.
+    const unlocked = result.unlocked ?? { unlocked: 0, lessonIds: [] };
+    const attempt = {
+      attemptId: result.attemptId,
+      examId: result.examId,
+      attemptNumber: result.attemptNumber,
+      startedAt: result.startedAt,
+      expiresAt: result.expiresAt,
+      timeRemainingSeconds: result.timeRemainingSeconds,
+      timerMinutes: result.timerMinutes,
+      questions: result.questions,
+    };
     return { data: { attempt, unlocked } };
   }
 
@@ -165,7 +216,10 @@ export class ExamsController {
       req.tenantId,
       req.user.sub,
       examId,
-      { answers: body.answers, idempotencyKey: headerKey ?? body.idempotencyKey },
+      {
+        answers: body.answers,
+        idempotencyKey: headerKey ?? body.idempotencyKey,
+      },
     );
     return { data: result };
   }

@@ -2,9 +2,7 @@ import { Module } from "@nestjs/common";
 import { ConfigModule } from "@nestjs/config";
 import { TerminusModule } from "@nestjs/terminus";
 import { LoggerModule } from "nestjs-pino";
-import { APP_INTERCEPTOR } from "@nestjs/core";
 import { HealthController } from "./common/health.controller";
-import { TenantContextInterceptor } from "./common/interceptors/tenant-context.interceptor";
 import { PrismaModule } from "./common/prisma/prisma.module";
 import { TenantModule } from "./modules/tenants/tenant.module";
 import { AuthModule } from "./modules/auth/auth.module";
@@ -52,11 +50,5 @@ import { CoursesModule } from "./modules/courses/courses.module";
     CoursesModule,
   ],
   controllers: [HealthController],
-  providers: [
-    {
-      provide: APP_INTERCEPTOR,
-      useClass: TenantContextInterceptor,
-    },
-  ],
 })
 export class AppModule {}

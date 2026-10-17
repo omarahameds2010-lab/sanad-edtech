@@ -1,0 +1,47 @@
+# Pre-commit gate (Husky v9 — plain shell).
+#
+# Purpose: never let code with a broken TypeScript, a duplicate property or a
+# duplicate token reach master. The motion.ts duplicate-property trap already
+# took a server down once.
+#
+# WHY THIS IS SCOPED AND NOT `pnpm build`
+# ----------------------------------------
+# A root `pnpm build` runs Turborepo across every workspace, which includes
+# packages/design-system — and its tsup build has 24 PRE-EXISTING errors that
+# predate this work and are explicitly out of scope (docs/HANDOFF.md §5:
+# "packages/design-system ... لا تلمسه"). Running it here would make the hook
+# fail on every commit forever, so the gate would be silenced within a day.
+#
+# `npm test` (what `husky init` writes by default) is equally wrong here: it
+# fans out to the web suite, which has 8 pre-existing failures from the
+# 3001 -> 3002 port drift in apps/web/app/lib/api.ts. That would block every
+# commit too.
+#
+# So the gate checks what actually builds green:
+#   1. lint-staged  — eslint on staged API sources
+#   2. tsc --noEmit — a FULL typecheck (not just staged files), which is what
+#                     actually catches duplicate properties
+#   3. nest build   — validates decorators + the DI graph, which tsc does not
+
+echo "[pre-commit] lint-staged (staged API sources)"
+pnpm exec lint-staged
+if [ $? -ne 0 ]; then
+  echo "[pre-commit] FAILED: lint-staged"
+  exit 1
+fi
+
+echo "[pre-commit] typecheck: api (full project, not just staged files)"
+pnpm --filter api exec tsc --noEmit -p tsconfig.json
+if [ $? -ne 0 ]; then
+  echo "[pre-commit] FAILED: TypeScript errors in apps/api. Fix locally, then commit."
+  exit 1
+fi
+
+echo "[pre-commit] build: api (decorator + DI graph validation)"
+pnpm --filter api run build
+if [ $? -ne 0 ]; then
+  echo "[pre-commit] FAILED: apps/api build. Fix locally, then commit."
+  exit 1
+fi
+
+echo "[pre-commit] OK"

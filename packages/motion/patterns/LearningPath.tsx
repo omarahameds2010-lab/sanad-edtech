@@ -39,7 +39,7 @@ export const LearningPath = forwardRef<HTMLDivElement, LearningPathProps>(
           <defs>
             <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
               <path d="M 0 0 L 10 3.5 L 0 7 Z" fill="var(--color-border-main)" />
-            </defs>
+            </marker>
           </defs>
           {connections.map((conn, i) => {
             const from = nodes.find(n => n.id === conn.from);

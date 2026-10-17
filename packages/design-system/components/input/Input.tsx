@@ -24,18 +24,7 @@ const sizeStyles = {
   sm: { padding: '8px 12px', fontSize: '13px', height: '36px', borderRadius: 'var(--radius-sm)' },
   md: { padding: '10px 14px', fontSize: '14px', height: '40px', borderRadius: 'var(--radius-md)' },
   lg: { padding: '14px 16px', fontSize: '16px', height: '48px', borderRadius: 'var(--radius-lg)' },
-};
-
-export interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
-  label?: string;
-  helperText?: string;
-  error?: string;
-  leftIcon?: React.ReactNode;
-  rightIcon?: React.ReactNode;
-  size?: 'sm' | 'md' | 'lg';
-  fullWidth?: boolean;
-  disableAnimation?: boolean;
-}
+} as const;
 
 const Input = forwardRef<HTMLInputElement, InputProps>(
   (
@@ -73,10 +62,6 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
       borderRadius: 'var(--radius-md)',
       outline: 'none',
       transition: 'all var(--motion-fast) var(--ease-standard)',
-      backgroundColor: 'var(--color-bg-primary)',
-      color: 'var(--color-text-primary)',
-      width: fullWidth ? '100%' : 'auto',
-      ...sizeStyles[size],
     };
 
     const hasError = !!error;
@@ -84,6 +69,8 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
     const inputStyles = {
       ...baseStyles,
       ...sizeStyles[size],
+      paddingLeft: leftIcon ? '40px' : undefined,
+      paddingRight: rightIcon ? '40px' : undefined,
       borderColor: error ? 'var(--color-error)' : 'var(--color-border-main)',
       boxShadow: error ? '0 0 0 2px var(--color-error-bg)' : 'none',
     };
@@ -125,12 +112,7 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
             aria-describedby={`${errorId || ''} ${helperId || ''}`.trim() || undefined}
             aria-required={required}
             style={{
-              ...baseStyles,
-              ...sizeStyles[size],
-              paddingLeft: leftIcon ? '40px' : undefined,
-              paddingRight: rightIcon ? '40px' : undefined,
-              borderColor: error ? 'var(--color-error)' : 'var(--color-border-main)',
-              boxShadow: error ? '0 0 0 2px var(--color-error-bg)' : 'none',
+              ...inputStyles,
             } as React.CSSProperties}
             {...props}
             onFocus={(e) => {

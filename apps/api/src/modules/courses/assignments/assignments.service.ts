@@ -15,6 +15,8 @@ import {
 } from "@prisma/client";
 import { IdempotencyService } from "../../payments/security/idempotency.service";
 import { ProgressionService } from "../progression/progression.service";
+import { SanadClient, SanadError, SanadGrading } from "./sanad.client";
+import { resolveBranchSources } from "./sanad.scope";
 
 @Injectable()
 export class AssignmentsService {
@@ -25,6 +27,10 @@ export class AssignmentsService {
     private prisma: PrismaService,
     private idempotencyService: IdempotencyService,
     private progressionService: ProgressionService,
+    // Optional for backward-compatible unit construction; the NestJS module
+    // always provides SanadClient. evaluateAssignmentWithAI throws honestly
+    // when it is absent instead of fabricating a score.
+    private sanad?: SanadClient,
   ) {}
 
   // ==================== TEACHER METHODS ====================
@@ -254,7 +260,9 @@ export class AssignmentsService {
     userId: string,
     assignmentId: string,
   ) {
-    const assignment = await this.getAssignment(tenantId, assignmentId, true);
+    // Student view: never load other students' submissions. Fetch the
+    // assignment alone, then query ONLY this student's rows (leak fix 2026-10-16).
+    const assignment = await this.getAssignment(tenantId, assignmentId);
 
     // Check enrollment
     const lesson = await this.prisma.lesson.findUnique({
@@ -274,10 +282,12 @@ export class AssignmentsService {
       throw new ForbiddenException("Not enrolled in this course");
     }
 
-    // Get student's submissions
-    const submissions = assignment.submissions.filter(
-      (s) => s.studentId === userId,
-    );
+    // ONLY this student's submissions — previously every student's content,
+    // score and feedback leaked into the response via `...assignment`.
+    const submissions = await this.prisma.assignmentSubmission.findMany({
+      where: { tenantId, assignmentId, studentId: userId },
+      orderBy: { submittedAt: "desc" },
+    });
     const attemptCount = submissions.length;
 
     // Check if can attempt
@@ -428,6 +438,19 @@ export class AssignmentsService {
       },
     });
 
+    // Trigger progression ONCE: ENTER_ASSIGNMENT → unlock the linked exam
+    // lesson for THIS student (audit 2026-10-16 §6.1 — this used to be a
+    // tenant-wide flip AND the controller called it a second time). It runs
+    // before the idempotent response is stored so retries return the same
+    // unlock data.
+    const unlocked = await this.progressionService.handleEnterAssignment(
+      tenantId,
+      userId,
+      assignmentId,
+      lesson.id,
+      `${idempotencyKey}:progression`,
+    );
+
     const response = {
       attemptId: submission.id,
       assignmentId,
@@ -435,6 +458,7 @@ export class AssignmentsService {
       expiresAt,
       timeRemainingSeconds: assignment.timerMinutes * 60,
       timerMinutes: assignment.timerMinutes,
+      unlocked,
     };
 
     // Store idempotency response
@@ -442,15 +466,6 @@ export class AssignmentsService {
       tenantId,
       idempotencyKey,
       response,
-    );
-
-    // Trigger progression: ENTER_ASSIGNMENT → unlock linked exam
-    await this.progressionService.handleEnterAssignment(
-      tenantId,
-      userId,
-      assignmentId,
-      lesson.id,
-      `${idempotencyKey}:progression`,
     );
 
     return response;
@@ -612,6 +627,9 @@ export class AssignmentsService {
     assignmentId: string,
     answer: string,
     question?: string,
+    grading?: SanadGrading,
+    sourceIds?: string[],
+    branches?: string[],
   ) {
     // Build idempotency key to cache AI evaluation results
     // Use answer directly as part of key (no hashCode needed - strings work as keys)
@@ -622,41 +640,112 @@ export class AssignmentsService {
       tenantId,
       studentId,
       idempotencyKey,
-      'assignment:ai-eval',
+      "assignment:ai-eval",
       { answer, question },
     );
 
     // Return cached result if available
-    if (idempotencyResult.isNew === false && idempotencyResult.response !== undefined) {
+    if (
+      idempotencyResult.isNew === false &&
+      idempotencyResult.response !== undefined
+    ) {
       return {
         success: true,
         data: idempotencyResult.response,
-        message: 'Answer evaluated successfully by AI (cached)',
+        message: "Answer evaluated successfully by AI (cached)",
       };
     }
 
-    // Dev mode: Use HashEmbedding + FakeLLM (no API keys needed)
-    // In production, this would call the real SANAD AI service with proper auth
+    // Real SANAD call — no fake defaults. The teacher dashboard must send
+    // the rubric + reference answer, plus either explicit knowledge sources
+    // or branch names (resolved server-side to sources; single source of
+    // truth in sanad.scope.ts). SANAD returns 422 when rubric sum !=
+    // max_score or the resolved source list is empty.
+    const resolvedSourceIds = sourceIds?.length
+      ? sourceIds
+      : [...new Set((branches ?? []).flatMap((b) => resolveBranchSources(b)))];
+    if (!grading || !resolvedSourceIds.length) {
+      throw new BadRequestException(
+        "AI evaluation requires grading {reference_answer, max_score, rubric_version, criteria[]} and sourceIds or branches",
+      );
+    }
+    if (!this.sanad) {
+      throw new InternalServerErrorException(
+        "AI evaluation service is not configured",
+      );
+    }
+
+    let result;
+    try {
+      result = await this.sanad.evaluateSubmission({
+        tenantId,
+        questionText: question ?? "",
+        studentAnswer: answer,
+        grading,
+        sourceIds: resolvedSourceIds,
+      });
+    } catch (e) {
+      if (e instanceof SanadError && (e.status === 401 || e.status === 422)) {
+        throw new BadRequestException(`SANAD rejected evaluation: ${e.detail}`);
+      }
+      throw new InternalServerErrorException(
+        "AI evaluation service temporarily unavailable, please retry",
+      );
+    }
+
+    // Suggested score only — the official grade is set exclusively by
+    // POST submissions/:submissionId/grade after teacher review.
     const evaluation = {
-      score: Math.floor(Math.random() * 30) + 70, // Random 70-100 for dev
-      feedback:
-        'AI evaluation would be performed here in production. Student answer analyzed for strengths, knowledge gaps, and suggested next steps.',
-      knowledgeGap: question ? ['pending AI analysis'] : [],
-      strengths: question ? ['attempted question'] : [],
-      suggestedNextStep:
-        'Review the relevant material and try again, or proceed to the next lesson',
-      model: 'HashEmbedding + FakeLLM (dev mode)',
-      tokensUsed: 0,
+      score: result.suggested_score,
+      maxScore: result.max_score,
+      feedback: result.feedback_ar,
+      criteria: result.criteria,
+      knowledgeGap: result.knowledge_gaps,
+      needsTeacherReview: result.needs_teacher_review,
+      reviewSignal: result.review_signal,
+      sanadRequestId: result.request_id,
+      sanadSubmissionId: result.sanad_submission_id,
+      model: result.provenance,
       evaluatedAt: new Date(),
     };
 
-    // Store result via checkAndStore's completed path
-    // We already cached via checkAndStore, so the result should be available
-    // If not, we'll still return the evaluation
     return {
       success: true,
       data: evaluation,
-      message: 'Answer evaluated successfully by AI',
+      message: "Answer evaluated successfully by AI",
+    };
+  }
+
+  /**
+   * "Ask SANAD" evidence explorer — pure extractive retrieval, no LLM.
+   * The branch sub-filter resolves server-side to explicit source_ids
+   * (sanad.scope.ts); unknown/empty scopes return [] instead of
+   * searching everything by accident.
+   */
+  async askSanad(
+    tenantId: string,
+    assignmentId: string,
+    question: string,
+    branch?: string,
+  ) {
+    // tenantId/assignmentId are accepted for signature consistency and
+    // future per-tenant source mapping; scope currently comes from branch.
+    const sourceIds = resolveBranchSources(branch);
+    if (!sourceIds.length) {
+      return { success: true, data: { passages: [], branch: branch ?? "all" } };
+    }
+    if (!this.sanad) {
+      throw new InternalServerErrorException(
+        "AI evaluation service is not configured",
+      );
+    }
+    const result = await this.sanad.queryExtract(question, {
+      topK: 5,
+      sourceIds,
+    });
+    return {
+      success: true,
+      data: { ...result, branch: branch ?? "all" },
     };
   }
 

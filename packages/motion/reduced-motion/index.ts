@@ -9,7 +9,12 @@ import { useEffect, useState } from 'react';
 /**
  * Hook to detect reduced motion preference
  */
-export function useReducedMotion(): boolean {
+export function useReducedMotion(): boolean;
+/**
+ * Hook for conditional animation based on reduced motion preference
+ */
+export function useReducedMotion<T>(normalValue: T, reducedValue: T): T;
+export function useReducedMotion<T>(normalValue?: T, reducedValue?: T): boolean | T {
   const [reduced, setReduced] = useState(false);
 
   useEffect(() => {
@@ -24,18 +29,8 @@ export function useReducedMotion(): boolean {
     return () => mediaQuery.removeEventListener('change', handler);
   }, []);
 
-  return reduced;
-}
-
-/**
- * Hook for conditional animation based on reduced motion preference
- */
-export function useReducedMotion<T>(
-  normalValue: T,
-  reducedValue: T
-): T {
-  const reduced = useReducedMotion();
-  return reduced ? reducedValue : normalValue;
+  if (normalValue === undefined) return reduced;
+  return reduced ? (reducedValue as T) : (normalValue as T);
 }
 
 /**

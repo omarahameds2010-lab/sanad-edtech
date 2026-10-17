@@ -6,7 +6,6 @@ import { StudentCoursesController } from "./courses.controller";
 import { SectionsController } from "./courses.controller";
 import { TeacherLessonsController } from "./courses.controller";
 import { StudentLessonsController } from "./courses.controller";
-import { StudentEnrollmentsController } from "./courses.controller";
 import { ProgressController } from "./progress/progress.controller";
 import { TeacherResourcesController } from "./courses.controller";
 import { StudentResourcesController } from "./courses.controller";
@@ -45,7 +44,6 @@ import { ResourcesModule } from "./resources/resources.module";
     SectionsController,
     TeacherLessonsController,
     StudentLessonsController,
-    StudentEnrollmentsController,
     ProgressController,
     TeacherResourcesController,
     StudentResourcesController,

@@ -26,6 +26,30 @@ export class VideoController {
   ) {}
 
   /**
+   * Attach a YouTube UNLISTED video (urgent teacher path — no upload).
+   */
+  @Post("youtube")
+  @RequirePermission({ action: "create", resourceType: "video" })
+  @HttpCode(HttpStatus.CREATED)
+  async attachYouTube(
+    @Request() req,
+    @Body()
+    body: {
+      lessonId: string;
+      title: string;
+      providerVideoId: string;
+      description?: string;
+    },
+  ) {
+    const result = await this.videoService.attachYouTubeVideo(
+      req.tenantId,
+      req.user.sub,
+      body,
+    );
+    return { data: result };
+  }
+
+  /**
    * Create video and get signed upload URL
    */
   @Post("lessons/:lessonId/videos")

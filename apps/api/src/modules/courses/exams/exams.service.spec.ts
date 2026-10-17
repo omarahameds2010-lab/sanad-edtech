@@ -50,7 +50,9 @@ describe("ExamsService", () => {
       getStatus: jest.fn().mockResolvedValue(null),
     };
     progressionService = {
-      handleEnterExam: jest.fn().mockResolvedValue({ unlocked: 1 }),
+      handleEnterExam: jest
+        .fn()
+        .mockResolvedValue({ unlocked: 1, lessonIds: ["lessonNext"] }),
     };
 
     service = new ExamsService(prisma, idempotencyService, progressionService);
@@ -233,6 +235,19 @@ describe("ExamsService", () => {
         "l1",
         "key1:progression",
       );
+      // Single progression call: the unlock result travels inside the SAME
+      // idempotent response (audit 2026-10-16 §6.1 — the controller used to
+      // call progression a second time and always reported 0 unlocks).
+      expect(result.unlocked).toEqual({
+        unlocked: 1,
+        lessonIds: ["lessonNext"],
+      });
+      // Unlocks are computed BEFORE the response is cached
+      expect(
+        progressionService.handleEnterExam.mock.invocationCallOrder[0],
+      ).toBeLessThan(
+        idempotencyService.markCompleted.mock.invocationCallOrder[0],
+      );
       expect(idempotencyService.markCompleted).toHaveBeenCalled();
     });
   });
@@ -341,6 +356,122 @@ describe("ExamsService", () => {
       const result = await service.publishExam(tenantId, "e1");
       expect(result.status).toBe("PUBLISHED");
       expect(prisma.exam.update).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("addQuestion", () => {
+    beforeEach(() => {
+      prisma.examQuestion = {
+        count: jest.fn().mockResolvedValue(2),
+        create: jest.fn(({ data }: any) =>
+          Promise.resolve({ id: "q3", ...data }),
+        ),
+      };
+    });
+
+    it("throws NotFoundException for unknown exams", async () => {
+      prisma.exam.findFirst.mockResolvedValue(null);
+      await expect(
+        service.addQuestion(tenantId, "nope", { type: "MCQ", text: "Q?" }),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it("rejects invalid question types and empty text", async () => {
+      prisma.exam.findFirst.mockResolvedValue({ id: "e1" });
+      await expect(
+        service.addQuestion(tenantId, "e1", {
+          type: "NOPE" as any,
+          text: "Q?",
+        }),
+      ).rejects.toThrow(BadRequestException);
+      await expect(
+        service.addQuestion(tenantId, "e1", { type: "MCQ", text: "  " }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it("creates the question with server-side defaults", async () => {
+      prisma.exam.findFirst.mockResolvedValue({ id: "e1" });
+      const result = await service.addQuestion(tenantId, "e1", {
+        type: "MCQ",
+        text: "2+2?",
+        options: [{ id: "a", text: "4" }],
+        correctAnswer: { correctOptionId: "a" },
+      });
+      expect(prisma.examQuestion.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            tenantId,
+            examId: "e1",
+            type: "MCQ",
+            points: 1,
+            position: 2,
+          }),
+        }),
+      );
+      expect(result.id).toBe("q3");
+    });
+  });
+
+  describe("getStudentExamView", () => {
+    // Security regression (leak fix 2026-10-16): the student view used to
+    // spread the full exam, including EVERY attempt's answers, score and
+    // gradingData. It must query only the caller's attempts.
+    const examRow = {
+      id: "e1",
+      lessonId: "l1",
+      timerMinutes: 70,
+      maxAttempts: 2,
+      questions: [],
+      // Deliberately no `attempts` key: the view must not depend on it.
+    };
+
+    beforeEach(() => {
+      prisma.exam.findFirst.mockResolvedValue({ ...examRow });
+      prisma.lesson.findUnique.mockResolvedValue({
+        id: "l1",
+        section: { courseId: "c1" },
+      });
+      prisma.enrollment.findFirst.mockResolvedValue({ id: "en1" });
+    });
+
+    it("queries ONLY the calling student's attempts", async () => {
+      prisma.examAttempt.findMany.mockResolvedValue([]);
+
+      const result = await service.getStudentExamView(tenantId, userId, "e1");
+
+      expect(prisma.examAttempt.findMany).toHaveBeenCalledWith({
+        where: { tenantId, examId: "e1", studentId: userId },
+        orderBy: { attemptNumber: "desc" },
+      });
+      expect(result).not.toHaveProperty("attempts");
+      expect(result.studentAttemptCount).toBe(0);
+    });
+
+    it("never requests attempts via the exam include", async () => {
+      prisma.examAttempt.findMany.mockResolvedValue([]);
+
+      await service.getStudentExamView(tenantId, userId, "e1");
+
+      expect(prisma.exam.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({
+          include: expect.objectContaining({ attempts: false }),
+        }),
+      );
+    });
+
+    it("computes remaining time from the student's own IN_PROGRESS attempt", async () => {
+      const startedAt = new Date();
+      startedAt.setMinutes(startedAt.getMinutes() - 5);
+      prisma.examAttempt.findMany.mockResolvedValue([
+        { id: "at1", studentId: userId, status: "IN_PROGRESS", startedAt },
+      ]);
+
+      const result = await service.getStudentExamView(tenantId, userId, "e1");
+
+      expect(result.activeAttempt).toEqual(
+        expect.objectContaining({ id: "at1" }),
+      );
+      expect(result.timeRemainingSeconds).toBeGreaterThan(64 * 60);
     });
   });
 });

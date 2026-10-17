@@ -1,229 +1,271 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@/app/lib/auth";
 import {
   api,
   ApiError,
   type AssignmentListItem,
+  type AssignmentSubmissionSummary,
   type EnrollmentItem,
   type ExamListItem,
+  type ProgressionItem,
+  type PublicCourseCard,
+  type StudentAttemptSummary,
 } from "@/app/lib/api";
-import { computeCourseProgress, firstNameOf } from "@/app/lib/dashboard";
+import {
+  buildActivityEvents,
+  buildAgenda,
+  bucketEventsByDay,
+  computeBadges,
+  computeCourseProgress,
+  countOpenContent,
+  enrolledCoursesLabel,
+  findResumeTarget,
+  firstNameOf,
+  latestFeedback,
+  overallPercent,
+  streakDays,
+  type CourseFeed,
+} from "@/app/lib/dashboard";
+import {
+  AgendaTimeline,
+  BadgeShelf,
+  ChainSimulator,
+  DashboardSkeleton,
+  EmptyCourses,
+  FeedbackCard,
+  PassportCard,
+  ProgressOrbit,
+  ResumeCard,
+  SignalChart,
+  StatStrip,
+} from "./components/command-center/widgets";
 
-function useAnimatedNumber(target: number): number {
-  const [value, setValue] = useState(0);
-  useEffect(() => {
-    if (
-      typeof window !== "undefined" &&
-      window.matchMedia("(prefers-reduced-motion: reduce)").matches
-    ) {
-      setValue(target);
-      return;
-    }
-    let raf = 0;
-    const start = performance.now();
-    const duration = 1200;
-    const tick = (now: number) => {
-      const t = Math.min(1, (now - start) / duration);
-      const eased = 1 - Math.pow(1 - t, 3);
-      setValue(Math.round(eased * target));
-      if (t < 1) raf = requestAnimationFrame(tick);
-    };
-    raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
-  }, [target]);
-  return value;
-}
-
-function PassportCard({
-  title,
-  href,
-  percent,
-}: {
-  title: string;
-  href: string;
-  percent: number | null;
-}) {
-  const shown = useAnimatedNumber(percent ?? 0);
-  return (
-    <Link
-      href={href}
-      style={{
-        display: "block",
-        borderRadius: 20,
-        padding: "16px 18px",
-        background: "rgba(255, 255, 255, 0.04)",
-        border: "1px solid rgba(255, 255, 255, 0.07)",
-        color: "#F4F4F6",
-        textDecoration: "none",
-      }}
-    >
-      <div style={{ fontWeight: 700, marginBottom: 10 }}>{title}</div>
-      {percent === null ? (
-        <div style={{ fontSize: 12, color: "rgba(244, 244, 246, 0.55)" }}>
-          جاري حساب التقدم…
-        </div>
-      ) : (
-        <>
-          <div
-            style={{
-              height: 4,
-              borderRadius: 4,
-              background: "rgba(255, 255, 255, 0.1)",
-              overflow: "hidden",
-              marginBottom: 6,
-            }}
-          >
-            <div
-              style={{
-                height: "100%",
-                width: `${shown}%`,
-                background: "var(--tenant-accent)",
-                borderRadius: 4,
-              }}
-            />
-          </div>
-          <div
-            dir="ltr"
-            style={{
-              fontSize: 12,
-              color: "rgba(244, 244, 246, 0.7)",
-              fontVariantNumeric: "tabular-nums",
-            }}
-          >
-            {shown}%
-          </div>
-        </>
-      )}
-    </Link>
-  );
-}
-
-const CHAIN_NODES = ["واجب", "امتحان", "الدرس التالي"];
-
-function ChainSimulator() {
-  const [stage, setStage] = useState(0);
-
-  function advance(from: number) {
-    setStage(from >= 2 ? 0 : from + 1);
-  }
-
-  return (
-    <div>
-      <div style={{ display: "flex", alignItems: "center", gap: 0, margin: "12px 0" }}>
-        {CHAIN_NODES.map((label, i) => {
-          const done = i < stage;
-          const active = i === stage;
-          return (
-            <div key={label} style={{ flex: 1, display: "flex", alignItems: "center" }}>
-              <button
-                type="button"
-                onClick={() => advance(i)}
-                title={label}
-                aria-label={`${label} — ${done ? "مفتوح" : active ? "الحالي" : "مقفل"}`}
-                style={{
-                  width: 44,
-                  height: 44,
-                  borderRadius: "50%",
-                  border: `1px solid ${done || active ? "var(--tenant-accent)" : "rgba(255,255,255,0.2)"}`,
-                  background: done
-                    ? "var(--tenant-accent)"
-                    : active
-                      ? "rgba(4, 120, 87, 0.18)"
-                      : "transparent",
-                  color: "#F4F4F6",
-                  fontSize: 18,
-                  cursor: "pointer",
-                  flexShrink: 0,
-                  boxShadow: done
-                    ? "0 0 14px 2px rgba(4, 120, 87, 0.45)"
-                    : "none",
-                  transition: "all 300ms ease",
-                }}
-              >
-                {done || active ? "🔓" : "🔒"}
-              </button>
-              <div style={{ textAlign: "center", flex: 1 }}>
-                <div style={{ fontSize: 11, color: "rgba(244,244,246,0.75)", fontWeight: 700 }}>
-                  {label}
-                </div>
-              </div>
-              {i < CHAIN_NODES.length - 1 && (
-                <div
-                  style={{
-                    flex: 1,
-                    height: 2,
-                    borderRadius: 2,
-                    background: i < stage ? "var(--tenant-accent)" : "rgba(255,255,255,0.12)",
-                    boxShadow: i < stage ? "0 0 8px 1px rgba(4,120,87,0.4)" : "none",
-                    transition: "all 300ms ease",
-                  }}
-                />
-              )}
-            </div>
-          );
-        })}
-      </div>
-      <p style={{ fontSize: 12, lineHeight: 1.9, color: "rgba(244, 244, 246, 0.6)", margin: 0 }}>
-        محاكاة توضيحية — اضغط أي عقدة: تقدمك الحقيقي يعتمد كليًا على الدخول
-        والتفاعل، والسيرفر وحده يملك التوقيت. التلاعب بساعة المتصفح لا يجدي.
-      </p>
-    </div>
-  );
-}
-
-interface CourseProgressRow {
-  courseId: string;
-  title: string;
-  percent: number | null;
+interface DashData {
+  enrollments: EnrollmentItem[];
+  exams: ExamListItem[];
+  assignments: AssignmentListItem[];
+  publicCourses: PublicCourseCard[];
+  progressionByCourse: Record<string, ProgressionItem[]>;
+  attemptsByExam: Record<string, StudentAttemptSummary[]>;
+  submissionsByAssignment: Record<string, AssignmentSubmissionSummary[]>;
 }
 
 export default function StudentDashboard() {
   const { token, userName } = useAuth();
-  const [enrollments, setEnrollments] = useState<EnrollmentItem[] | null>(null);
-  const [progress, setProgress] = useState<Record<string, number | null>>({});
-  const [assignments, setAssignments] = useState<AssignmentListItem[]>([]);
-  const [exams, setExams] = useState<ExamListItem[]>([]);
+  const [data, setData] = useState<DashData | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [focus, setFocus] = useState(false);
+
+  // Focus mode is toggled from the dock; the event keeps both in sync.
+  useEffect(() => {
+    function onFocus(e: Event) {
+      setFocus(Boolean((e as CustomEvent).detail));
+    }
+    window.addEventListener("sanad:focus", onFocus);
+    return () => window.removeEventListener("sanad:focus", onFocus);
+  }, []);
 
   useEffect(() => {
     if (!token) return;
     let cancelled = false;
     (async () => {
       try {
-        const [enr, asg, exm] = await Promise.all([
+        const [enr, asg, exm, publics] = await Promise.all([
           api.getMyEnrollments(token),
           api.listAssignments(token).then((r) => r.assignments),
           api.listExams(token).then((r) => r.exams),
+          api.listPublicCourses().catch(() => [] as PublicCourseCard[]),
         ]);
-        if (cancelled) return;
-        setEnrollments(enr);
-        setAssignments(asg);
-        setExams(exm);
-
-        const settled = await Promise.allSettled(
+        const progSettled = await Promise.allSettled(
           enr.map((e) => api.getStudentProgression(token, e.course.id)),
         );
+        const attemptsSettled = await Promise.allSettled(
+          exm.map((e) => api.getMyAttempts(token, e.id)),
+        );
+        const subsSettled = await Promise.allSettled(
+          asg.map((a) => api.getMySubmissions(token, a.id)),
+        );
         if (cancelled) return;
-        const next: Record<string, number | null> = {};
-        settled.forEach((s, i) => {
-          next[enr[i].course.id] =
-            s.status === "fulfilled"
-              ? computeCourseProgress(s.value.progression).percent
-              : null;
+
+        const progressionByCourse: Record<string, ProgressionItem[]> = {};
+        progSettled.forEach((s, i) => {
+          const enrollment = enr[i];
+          if (s.status === "fulfilled" && enrollment) {
+            progressionByCourse[enrollment.course.id] = s.value.progression;
+          }
         });
-        setProgress(next);
+        const attemptsByExam: Record<string, StudentAttemptSummary[]> = {};
+        attemptsSettled.forEach((s, i) => {
+          const exam = exm[i];
+          if (s.status === "fulfilled" && exam) {
+            attemptsByExam[exam.id] = s.value;
+          }
+        });
+        const submissionsByAssignment: Record<
+          string,
+          AssignmentSubmissionSummary[]
+        > = {};
+        subsSettled.forEach((s, i) => {
+          const assignment = asg[i];
+          if (s.status === "fulfilled" && assignment) {
+            submissionsByAssignment[assignment.id] = s.value;
+          }
+        });
+
+        setData({
+          enrollments: enr,
+          exams: exm,
+          assignments: asg,
+          publicCourses: publics,
+          progressionByCourse,
+          attemptsByExam,
+          submissionsByAssignment,
+        });
       } catch (e) {
-        if (!cancelled)
+        if (!cancelled) {
           setError(e instanceof ApiError ? e.message : "تعذر تحميل اللوحة");
+        }
       }
     })();
     return () => {
       cancelled = true;
     };
   }, [token]);
+
+  const derived = useMemo(() => {
+    if (!data) return null;
+    const {
+      enrollments,
+      exams,
+      assignments,
+      publicCourses,
+      progressionByCourse,
+      attemptsByExam,
+      submissionsByAssignment,
+    } = data;
+
+    const courses: CourseFeed[] = enrollments.map((e) => ({
+      courseId: e.course.id,
+      courseTitle: e.course.title,
+      items: progressionByCourse[e.course.id] ?? [],
+    }));
+    const percents = courses.map((c) => computeCourseProgress(c.items).percent);
+    const overall = overallPercent(percents);
+    const openContent = courses.reduce(
+      (sum, c) => sum + countOpenContent(c.items),
+      0,
+    );
+    const submissionsCount =
+      Object.values(attemptsByExam).reduce((n, rows) => n + rows.length, 0) +
+      Object.values(submissionsByAssignment).reduce(
+        (n, rows) => n + rows.length,
+        0,
+      );
+
+    const events = buildActivityEvents({
+      courses,
+      enrollments: enrollments.map((e) => ({
+        startsAt: e.startsAt,
+        label: e.course.title,
+      })),
+      attempts: exams.flatMap((ex) =>
+        (attemptsByExam[ex.id] ?? []).map((a) => ({
+          submittedAt: a.submittedAt,
+          label: ex.title,
+        })),
+      ),
+      submissions: assignments.flatMap((as) =>
+        (submissionsByAssignment[as.id] ?? []).map((s) => ({
+          submittedAt: s.submittedAt,
+          label: as.title,
+        })),
+      ),
+    });
+    const now = new Date();
+    const dayBuckets = bucketEventsByDay(events, now, 7);
+    const streak = streakDays(events, now);
+
+    const grants = courses.flatMap((c) =>
+      c.items
+        .map((i) => i.unlockInfo?.unlockedAt)
+        .filter((at): at is string => Boolean(at))
+        .map((at) => ({ at })),
+    );
+    const badges = computeBadges({
+      attempts: exams.flatMap((ex) =>
+        (attemptsByExam[ex.id] ?? []).map((a) => ({
+          submittedAt: a.submittedAt,
+          passed: a.passed,
+        })),
+      ),
+      submissions: assignments.flatMap((as) =>
+        (submissionsByAssignment[as.id] ?? []).map((s) => ({
+          submittedAt: s.submittedAt,
+        })),
+      ),
+      grants,
+      streak,
+    });
+
+    const resume = findResumeTarget(courses);
+
+    const courseTitleByLessonId: Record<string, string> = {};
+    const courseIdByLessonId: Record<string, string> = {};
+    for (const c of courses)
+      for (const i of c.items) {
+        courseTitleByLessonId[i.id] = c.courseTitle;
+        courseIdByLessonId[i.id] = c.courseId;
+      }
+
+    const agenda = buildAgenda({
+      exams,
+      assignments,
+      attemptsByExam,
+      submissionsByAssignment,
+      courseTitleByLessonId,
+    });
+
+    const feedback = latestFeedback(assignments, submissionsByAssignment);
+    let feedbackTeacher: string | null = null;
+    let feedbackCourse: string | null = null;
+    if (feedback) {
+      const courseId = courseIdByLessonId[feedback.lessonId];
+      if (courseId) {
+        feedbackTeacher =
+          publicCourses.find((p) => p.id === courseId)?.teacher?.name ?? null;
+        feedbackCourse =
+          enrollments.find((e) => e.course.id === courseId)?.course.title ??
+          null;
+      }
+    }
+
+    const courseRows = enrollments.map((e) => {
+      const items = progressionByCourse[e.course.id];
+      return {
+        courseId: e.course.id,
+        title: e.course.title,
+        href: `/student/courses/${e.course.id}`,
+        percent: items ? computeCourseProgress(items).percent : null,
+      };
+    });
+
+    return {
+      overall,
+      openContent,
+      submissionsCount,
+      dayBuckets,
+      badges,
+      resume,
+      agenda,
+      feedback,
+      feedbackTeacher,
+      feedbackCourse,
+      courseRows,
+    };
+  }, [data]);
 
   if (!token) {
     return (
@@ -243,132 +285,136 @@ export default function StudentDashboard() {
     );
   }
 
-  if (enrollments === null) {
+  if (!data || !derived) {
     return (
-      <div className="card">
-        <p>جاري تحميل لوحتك…</p>
+      <div className="cc-root">
+        <div className="cc-ambient" aria-hidden="true">
+          <span className="cc-orb cc-orb--a" />
+          <span className="cc-orb cc-orb--b" />
+        </div>
+        <DashboardSkeleton />
       </div>
     );
   }
 
-  const rows: CourseProgressRow[] = enrollments.map((e) => ({
-    courseId: e.course.id,
-    title: e.course.title,
-    percent: progress[e.course.id] ?? null,
-  }));
+  const hasCourses = data.enrollments.length > 0;
+  const heroCtaHref = derived.resume
+    ? `/student/lessons/${derived.resume.lessonId}`
+    : "/student/courses";
 
   return (
-    <div className="lp-dash-bento">
-      {/* mesh orbs */}
-      <div
-        aria-hidden
-        style={{
-          position: "fixed",
-          top: -120,
-          insetInlineEnd: -120,
-          width: 420,
-          height: 420,
-          borderRadius: "50%",
-          background: "rgba(4, 120, 87, 0.05)",
-          filter: "blur(140px)",
-          pointerEvents: "none",
-          zIndex: 0,
-        }}
-      />
-      <div
-        aria-hidden
-        style={{
-          position: "fixed",
-          bottom: -140,
-          insetInlineStart: -140,
-          width: 460,
-          height: 460,
-          borderRadius: "50%",
-          background: "rgba(79, 70, 229, 0.04)",
-          filter: "blur(140px)",
-          pointerEvents: "none",
-          zIndex: 0,
-        }}
-      />
-
-      {/* 01 — welcome */}
-      <section className="lp-dash-panel lp-dash-wide" style={{ padding: 28 }}>
-        <p style={{ margin: 0, fontSize: 13, color: "rgba(244,244,246,0.6)" }}>
-          مسارك منظم — وكل خطوة محسوبة
-        </p>
-        <h1 style={{ margin: "6px 0 8px", fontSize: 30, color: "#F4F4F6" }}>
-          أهلاً {firstNameOf(userName)}، جاهز لخطوتك التالية اليوم؟
-        </h1>
-        <p style={{ margin: 0, fontSize: 14, color: "rgba(244,244,246,0.65)" }}>
-          {enrollments.length === 0
-            ? "اختر كورسك الأول وابدأ الرحلة."
-            : `مسجل في ${enrollments.length} ${enrollments.length === 1 ? "كورس" : "كورسات"} — أكمل من حيث توقفت.`}
-        </p>
-        <div style={{ marginTop: 16 }}>
-          <Link
-            href="/student/courses"
-            style={{
-              display: "inline-block",
-              background: "var(--tenant-accent)",
-              color: "#ffffff",
-              borderRadius: 999,
-              padding: "12px 28px",
-              fontWeight: 800,
-              textDecoration: "none",
-            }}
-          >
-            {enrollments.length === 0 ? "تصفح الكورسات" : "أكمل التعلم"}
-          </Link>
-        </div>
-      </section>
-
-      {/* 03 — integrity clock & tasks (tall) */}
-      <aside className="lp-dash-panel lp-dash-tall" style={{ padding: 24 }}>
-        <h2 style={{ fontSize: 15, margin: "0 0 4px", color: "#F4F4F6" }}>
-          المهمات والمواعيد
-        </h2>
-        <p style={{ fontSize: 12, color: "rgba(244,244,246,0.55)", margin: "0 0 12px" }}>
-          الواجبات: {assignments.length} · الاختبارات: {exams.length}
-        </p>
-        <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
-          <Link
-            href="/student/assignments"
-            style={{ flex: 1, textAlign: "center", fontSize: 13, fontWeight: 700, color: "#fff", background: "rgba(255,255,255,0.08)", borderRadius: 12, padding: "10px", textDecoration: "none" }}
-          >
-            واجباتي
-          </Link>
-          <Link
-            href="/student/exams"
-            style={{ flex: 1, textAlign: "center", fontSize: 13, fontWeight: 700, color: "#fff", background: "rgba(255,255,255,0.08)", borderRadius: 12, padding: "10px", textDecoration: "none" }}
-          >
-            اختباراتي
-          </Link>
-        </div>
-        <ChainSimulator />
-      </aside>
-
-      {/* 02 — passports */}
-      <section className="lp-dash-panel lp-dash-wide" style={{ padding: 24 }}>
-        <h2 style={{ fontSize: 15, margin: "0 0 12px", color: "#F4F4F6" }}>
-          جوازاتك الدراسية
-        </h2>
-        {rows.length === 0 ? (
-          <p style={{ fontSize: 13, color: "rgba(244,244,246,0.6)" }}>
-            لست مسجلًا في أي كورس بعد — <Link href="/courses">تصفح الكورسات</Link>.
-          </p>
-        ) : (
-          <div style={{ display: "grid", gap: 12 }}>
-            {rows.map((r) => (
-              <PassportCard
-                key={r.courseId}
-                title={r.title}
-                href={`/student/courses/${r.courseId}`}
-                percent={r.percent}
-              />
-            ))}
+    <div className="cc-root">
+      <div className="cc-ambient" aria-hidden="true">
+        <span className="cc-orb cc-orb--a" />
+        <span className="cc-orb cc-orb--b" />
+      </div>
+      <div className={`cc-bento${focus ? " cc-bento--focus" : ""}`}>
+        <section className="cc-card cc-hero cc-keep">
+          <div className="cc-hero-inner">
+            <span className="cc-eyebrow">مسارك منظم — وكل خطوة محسوبة</span>
+            <h1 className="cc-hero-title">
+              أهلاً {firstNameOf(userName)}، جاهز لخطوتك التالية؟
+            </h1>
+            <p className="cc-hero-sub">
+              {hasCourses
+                ? `مسجل في ${enrolledCoursesLabel(data.enrollments.length)} — أكمل من حيث توقفت.`
+                : "اختر كورسك الأول وابدأ الرحلة."}
+            </p>
+            <Link
+              href={hasCourses ? heroCtaHref : "/courses"}
+              className="cc-cta cc-cta--glow"
+            >
+              {hasCourses ? "أكمل التعلم" : "تصفح الكورسات"}
+            </Link>
           </div>
+        </section>
+
+        {hasCourses ? (
+          <>
+            <section className="cc-card cc-orbit">
+              <h2 className="cc-card-title">تقدمك الكلي</h2>
+              <ProgressOrbit percent={derived.overall} note="مفتوح من مسارك" />
+            </section>
+
+            <section className="cc-card cc-stats">
+              <StatStrip
+                stats={[
+                  { label: "كورساتي", value: data.enrollments.length },
+                  { label: "دروس مفتوحة", value: derived.openContent },
+                  { label: "تسليماتي", value: derived.submissionsCount },
+                ]}
+              />
+            </section>
+
+            <section className="cc-card cc-resume cc-keep">
+              <ResumeCard target={derived.resume} />
+            </section>
+
+            <section className="cc-card cc-agenda">
+              <div className="cc-agenda-head">
+                <h2 className="cc-card-title">المهام والمواعيد</h2>
+                <div className="cc-agenda-actions">
+                  <Link href="/student/assignments" className="cc-ghost-btn">
+                    واجباتي
+                  </Link>
+                  <Link href="/student/exams" className="cc-ghost-btn">
+                    اختباراتي
+                  </Link>
+                </div>
+              </div>
+              <AgendaTimeline items={derived.agenda} />
+            </section>
+
+            <section className="cc-card cc-chart">
+              <div className="cc-chart-head">
+                <h2 className="cc-card-title">إشارة التعلم</h2>
+                <span className="cc-chart-sub">
+                  آخر ٧ أيام — من سجل السيرفر
+                </span>
+              </div>
+              <SignalChart buckets={derived.dayBuckets} />
+            </section>
+
+            <section className="cc-card cc-passports">
+              <h2 className="cc-card-title">جوازاتك الدراسية</h2>
+              <div className="cc-passport-list">
+                {derived.courseRows.map((r) => (
+                  <PassportCard
+                    key={r.courseId}
+                    title={r.title}
+                    href={r.href}
+                    percent={r.percent}
+                  />
+                ))}
+              </div>
+            </section>
+
+            <section className="cc-card cc-badges">
+              <h2 className="cc-card-title">رف الإنجازات</h2>
+              <BadgeShelf badges={derived.badges} />
+            </section>
+
+            {derived.feedback && (
+              <section className="cc-card cc-feedback">
+                <FeedbackCard
+                  entry={derived.feedback}
+                  teacherName={derived.feedbackTeacher}
+                  courseTitle={derived.feedbackCourse}
+                />
+              </section>
+            )}
+
+            <section className="cc-card cc-chain">
+              <h2 className="cc-card-title">شفافية التقدم</h2>
+              <ChainSimulator />
+            </section>
+          </>
+        ) : (
+          <section className="cc-card cc-empty">
+            <EmptyCourses />
+          </section>
         )}
-      </section>
+      </div>
     </div>
   );
 }

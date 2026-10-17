@@ -1,6 +1,14 @@
-'use client';
+"use client";
 
-import { createContext, useContext, useEffect, useState, useCallback, useRef, useMemo } from 'react';
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+  useCallback,
+  useRef,
+  useMemo,
+} from "react";
 
 export interface CommandAction {
   id: string;
@@ -34,7 +42,11 @@ export function useCommandPalette() {
   return useContext(CommandPaletteContext);
 }
 
-export function CommandPaletteProvider({ children }: { children: React.ReactNode }) {
+export function CommandPaletteProvider({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   const [isOpen, setIsOpen] = useState(false);
   const [actions, setActions] = useState<CommandAction[]>([]);
   const actionsRef = useRef<CommandAction[]>([]);
@@ -58,21 +70,27 @@ export function CommandPaletteProvider({ children }: { children: React.ReactNode
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+      if ((e.ctrlKey || e.metaKey) && e.key === "k") {
         e.preventDefault();
         toggle();
       }
-      if (e.key === 'Escape' && isOpen) {
+      if (e.key === "Escape" && isOpen) {
         close();
       }
     };
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
   }, [isOpen, toggle, close]);
 
+  // Duplicate @types/react copies in this workspace break the Provider JSX
+  // type; the cast keeps the real runtime component unchanged.
+  const PaletteProvider = CommandPaletteContext.Provider as any;
+
   return (
-    <CommandPaletteContext.Provider value={{ isOpen, open, close, toggle, registerAction, unregisterAction }}>
-      {children}
+    <PaletteProvider
+      value={{ isOpen, open, close, toggle, registerAction, unregisterAction }}
+    >
+      {children as any}
       {isOpen && (
         <CommandPaletteUI
           actions={actions}
@@ -83,7 +101,7 @@ export function CommandPaletteProvider({ children }: { children: React.ReactNode
           }}
         />
       )}
-    </CommandPaletteContext.Provider>
+    </PaletteProvider>
   );
 }
 
@@ -96,7 +114,7 @@ function CommandPaletteUI({
   onClose: () => void;
   onPerform: (action: CommandAction) => void;
 }) {
-  const [query, setQuery] = useState('');
+  const [query, setQuery] = useState("");
   const [selectedIndex, setSelectedIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
@@ -130,21 +148,24 @@ function CommandPaletteUI({
   }, [query]);
 
   useEffect(() => {
-    listRef.current?.querySelectorAll('[data-index]').item(selectedIndex)?.scrollIntoView({ block: 'nearest' });
+    listRef.current
+      ?.querySelectorAll("[data-index]")
+      .item(selectedIndex)
+      ?.scrollIntoView({ block: "nearest" });
   }, [selectedIndex]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'ArrowDown') {
+    if (e.key === "ArrowDown") {
       e.preventDefault();
       setSelectedIndex((i) => Math.min(i + 1, filtered.length - 1));
-    } else if (e.key === 'ArrowUp') {
+    } else if (e.key === "ArrowUp") {
       e.preventDefault();
       setSelectedIndex((i) => Math.max(i - 1, 0));
-    } else if (e.key === 'Enter') {
+    } else if (e.key === "Enter") {
       e.preventDefault();
       const action = filtered[selectedIndex];
       if (action) onPerform(action);
-    } else if (e.key === 'Escape') {
+    } else if (e.key === "Escape") {
       onClose();
     }
   };
@@ -154,50 +175,66 @@ function CommandPaletteUI({
   return (
     <div
       style={{
-        position: 'fixed',
+        position: "fixed",
         inset: 0,
-        background: 'rgba(0,0,0,0.6)',
+        background: "rgba(6, 8, 10, 0.68)",
+        backdropFilter: "blur(6px)",
+        WebkitBackdropFilter: "blur(6px)",
         zIndex: 100,
-        display: 'flex',
-        alignItems: 'flex-start',
-        justifyContent: 'center',
-        paddingTop: '15vh',
+        display: "flex",
+        alignItems: "flex-start",
+        justifyContent: "center",
+        paddingTop: "15vh",
       }}
       onClick={onClose}
     >
       <div
         style={{
-          width: '100%',
+          width: "100%",
           maxWidth: 560,
-          background: 'var(--bg-surface)',
-          borderRadius: 'var(--radius-card)',
-          border: '1px solid var(--border-subtle)',
-          boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)',
-          overflow: 'hidden',
+          background: "rgba(20, 23, 28, 0.92)",
+          backdropFilter: "blur(24px)",
+          WebkitBackdropFilter: "blur(24px)",
+          borderRadius: 24,
+          border: "1px solid rgba(255, 255, 255, 0.1)",
+          boxShadow: "0 32px 80px -24px rgba(0, 0, 0, 0.8)",
+          overflow: "hidden",
         }}
         onClick={(e) => e.stopPropagation()}
       >
-        <div style={{ padding: 'var(--space-md)', borderBottom: '1px solid var(--border-subtle)' }}>
+        <div
+          style={{
+            padding: "var(--space-md)",
+            borderBottom: "1px solid rgba(255, 255, 255, 0.08)",
+          }}
+        >
           <input
             ref={inputRef}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder="ابحث عن أمر أو إجراء..."
+            className="cp-input"
             style={{
-              width: '100%',
-              background: 'transparent',
-              border: 'none',
-              color: 'var(--text-primary)',
+              width: "100%",
+              background: "transparent",
+              border: "none",
+              color: "#F4F4F6",
               fontSize: 16,
-              outline: 'none',
+              outline: "none",
             }}
           />
         </div>
 
-        <div ref={listRef} style={{ maxHeight: 320, overflowY: 'auto' }}>
+        <div ref={listRef} style={{ maxHeight: 320, overflowY: "auto" }}>
           {filtered.length === 0 ? (
-            <div style={{ padding: 'var(--space-lg)', textAlign: 'center', color: 'var(--text-muted)' }}>
+            <div
+              style={{
+                padding: "var(--space-lg)",
+                textAlign: "center",
+                color: "rgba(244, 244, 246, 0.5)",
+              }}
+            >
               لا توجد نتائج
             </div>
           ) : (
@@ -205,11 +242,11 @@ function CommandPaletteUI({
               <div key={category}>
                 <div
                   style={{
-                    padding: '6px 16px',
+                    padding: "6px 16px",
                     fontSize: 11,
                     fontWeight: 600,
-                    color: 'var(--text-muted)',
-                    background: 'var(--bg-base)',
+                    color: "rgba(244, 244, 246, 0.45)",
+                    background: "rgba(255, 255, 255, 0.03)",
                   }}
                 >
                   {category}
@@ -223,18 +260,41 @@ function CommandPaletteUI({
                       data-index={idx}
                       onClick={() => onPerform(action)}
                       style={{
-                        width: '100%',
-                        textAlign: 'right',
-                        padding: '10px 16px',
-                        background: idx === selectedIndex ? 'var(--color-action)15' : 'transparent',
-                        border: 'none',
-                        borderInlineStart: idx === selectedIndex ? `2px solid var(--color-action)` : '2px solid transparent',
-                        cursor: 'pointer',
+                        width: "100%",
+                        textAlign: "start",
+                        padding: "10px 16px",
+                        background:
+                          idx === selectedIndex
+                            ? "rgba(4, 120, 87, 0.15)"
+                            : "transparent",
+                        border: "none",
+                        borderInlineStart:
+                          idx === selectedIndex
+                            ? `2px solid var(--color-action)`
+                            : "2px solid transparent",
+                        cursor: "pointer",
                       }}
                     >
-                      <div style={{ fontWeight: 500, color: 'var(--text-primary)' }}>{action.title}</div>
+                      <div
+                        style={{
+                          fontWeight: 500,
+                          color:
+                            idx === selectedIndex
+                              ? "#FFFFFF"
+                              : "rgba(244, 244, 246, 0.85)",
+                        }}
+                      >
+                        {action.title}
+                      </div>
                       {action.description && (
-                        <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{action.description}</div>
+                        <div
+                          style={{
+                            fontSize: 12,
+                            color: "rgba(244, 244, 246, 0.5)",
+                          }}
+                        >
+                          {action.description}
+                        </div>
                       )}
                     </button>
                   );
@@ -246,12 +306,12 @@ function CommandPaletteUI({
 
         <div
           style={{
-            padding: '8px 16px',
-            borderTop: '1px solid var(--border-subtle)',
+            padding: "8px 16px",
+            borderTop: "1px solid rgba(255, 255, 255, 0.08)",
             fontSize: 11,
-            color: 'var(--text-muted)',
-            display: 'flex',
-            gap: 'var(--space-md)',
+            color: "rgba(244, 244, 246, 0.45)",
+            display: "flex",
+            gap: "var(--space-md)",
           }}
         >
           <span>↑↓ للتنقل</span>

@@ -5,15 +5,28 @@
   "packageManager": "pnpm@9.15.0",
   "scripts": {
     "dev": "turbo run dev",
+    "dev:web": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/dev-web.ps1",
+    "dev:api": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/dev-api.ps1",
+    "ports": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/ports.ps1",
+    "ports:kill": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/ports.ps1 -Kill",
     "build": "turbo run build",
     "test": "turbo run test",
     "lint": "turbo run lint",
     "format": "turbo run format",
     "clean": "turbo run clean && rm -rf node_modules",
-    "export:openapi": "ts-node -r tsconfig-paths/register apps/api/scripts/export-openapi.ts"
+    "export:openapi": "ts-node -r tsconfig-paths/register apps/api/scripts/export-openapi.ts",
+    "prepare": "husky",
+    "precommit:check": "pnpm --filter api exec tsc --noEmit -p tsconfig.json && pnpm --filter api run build"
+  },
+  "lint-staged": {
+    "*.{ts,tsx,js,mjs,json,css,md}": "prettier --check",
+    "apps/api/src/**/*.ts": "eslint --fix --no-error-on-unmatched-pattern"
   },
   "devDependencies": {
     "@apidevtools/swagger-parser": "^13.1.0",
+    "husky": "^9.1.7",
+    "lint-staged": "^17.6.0",
+    "prettier": "^3.0.0",
     "turbo": "^2.0.0",
     "typescript": "^5.3.3"
   },

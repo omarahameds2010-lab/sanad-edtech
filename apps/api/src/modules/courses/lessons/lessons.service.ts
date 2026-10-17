@@ -5,6 +5,7 @@ import {
   ForbiddenException,
 } from "@nestjs/common";
 import { PrismaService } from "../../tenants/prisma.service";
+import { applyTenantContext } from "../../../common/prisma/tenant-context";
 import { LessonType, VideoStatus } from "@prisma/client";
 
 @Injectable()
@@ -37,6 +38,9 @@ export class LessonsService {
       orderIndex?: number;
       isFree?: boolean;
       releaseAt?: Date;
+      /** Authoring default is UNLOCKED — the teacher publishes freely;
+       *  lock states are authored later (progression extension points). */
+      lockStatus?: "LOCKED" | "UNLOCKED";
     },
   ) {
     const section = await this.prisma.section.findFirst({
@@ -66,6 +70,7 @@ export class LessonsService {
         orderIndex,
         isFree: dto.isFree ?? false,
         releaseAt: dto.releaseAt,
+        lockStatus: dto.lockStatus ?? "UNLOCKED",
       },
     });
   }
@@ -152,14 +157,17 @@ export class LessonsService {
       }
     }
 
-    await this.prisma.$transaction(
-      items.map((item) =>
-        this.prisma.lesson.update({
+    // Atomic reorder in one transaction, with the tenant context set for
+    // RLS (interactive tx clients are not auto-wrapped by PrismaService).
+    await this.prisma.$transaction(async (tx) => {
+      await applyTenantContext(tx, tenantId);
+      for (const item of items) {
+        await tx.lesson.update({
           where: { id: item.id },
           data: { orderIndex: item.position },
-        }),
-      ),
-    );
+        });
+      }
+    });
 
     return this.listLessons(tenantId, sectionId);
   }
@@ -209,7 +217,14 @@ export class LessonsService {
       throw new ForbiddenException("Not enrolled in this course");
     }
 
-    const isLocked = lesson.lockStatus === "LOCKED";
+    // Per-student unlock overlay (audit 2026-10-16 §6.1): a grant created by
+    // the ENTER flow overrides the authored lock state for THIS student.
+    const grant = await this.prisma.studentLessonUnlock.findFirst({
+      where: { tenantId, userId, lessonId },
+      select: { id: true },
+    });
+    const effectiveLockStatus = grant ? "UNLOCKED" : lesson.lockStatus;
+    const isLocked = effectiveLockStatus === "LOCKED";
 
     return {
       lesson: {
@@ -224,7 +239,7 @@ export class LessonsService {
       access: {
         isLocked,
         unlockType: lesson.unlockType,
-        lockStatus: lesson.lockStatus,
+        lockStatus: effectiveLockStatus,
       },
       assignment: lesson.assignment ?? null,
       exam: lesson.exam ?? null,

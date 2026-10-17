@@ -1,11 +1,11 @@
 /**
  * Theme System - Main Export
- * 
+ *
  * Central export point for the theme system.
  */
 
-export * from './theme';
-export * from './theme.css';
+export * from "./theme";
+//export * from './theme.css';
 
 // Re-export types
 export type {
@@ -14,7 +14,7 @@ export type {
   ResolvedTheme,
   TenantThemeConfig,
   SubjectTheme,
-} from './theme';
+} from "./theme";
 
 // Re-export functions
 export {
@@ -25,4 +25,4 @@ export {
   getSubjectThemeCSSVars,
   generateTenantTheme,
   generateCSSVariables,
-} from './theme';
+} from "./theme";

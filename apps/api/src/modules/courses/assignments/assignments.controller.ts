@@ -4,23 +4,20 @@ import {
   Get,
   Headers,
   Param,
+  Patch,
   Post,
   Query,
   Request,
   UseGuards,
 } from "@nestjs/common";
 import { AssignmentsService } from "./assignments.service";
-import { ProgressionService } from "../progression/progression.service";
 import { JwtAuthGuard } from "../../auth/guards/jwt-auth.guard";
 import { RequirePermission } from "../../authorization/authorization.decorators";
 
 @Controller("v1/assignments")
 @UseGuards(JwtAuthGuard)
 export class AssignmentsController {
-  constructor(
-    private assignmentsService: AssignmentsService,
-    private progressionService: ProgressionService,
-  ) {}
+  constructor(private assignmentsService: AssignmentsService) {}
 
   @Post("lessons/:lessonId/assignments")
   @RequirePermission({
@@ -42,18 +39,48 @@ export class AssignmentsController {
     return { data: result };
   }
 
+  @Patch(":assignmentId")
+  @RequirePermission({
+    action: "update",
+    resourceType: "assignment",
+    resourceIdParam: "assignmentId",
+  })
+  async update(
+    @Request() req,
+    @Param("assignmentId") assignmentId: string,
+    @Body() dto: any,
+  ) {
+    const result = await this.assignmentsService.updateAssignment(
+      req.tenantId,
+      assignmentId,
+      dto,
+    );
+    return { data: result };
+  }
+
+  @Post(":assignmentId/publish")
+  @RequirePermission({
+    action: "publish",
+    resourceType: "assignment",
+    resourceIdParam: "assignmentId",
+  })
+  async publish(@Request() req, @Param("assignmentId") assignmentId: string) {
+    const result = await this.assignmentsService.publishAssignment(
+      req.tenantId,
+      assignmentId,
+    );
+    return { data: result };
+  }
+
   @Get()
   @RequirePermission({ action: "read", resourceType: "assignment" })
   async list(@Request() req, @Query() query: any) {
-    const result = await this.assignmentsService.listAssignments(
-      req.tenantId,
-      {
-        lessonId: query.lessonId,
-        status: query.status,
-        cursor: query.cursor,
-        limit: query.limit ? Number(query.limit) : undefined,
-      },
-    );
+    const result = await this.assignmentsService.listAssignments(req.tenantId, {
+      lessonId: query.lessonId,
+      status: query.status,
+      cursor: query.cursor,
+      limit: query.limit ? Number(query.limit) : undefined,
+    });
     return { data: result };
   }
 
@@ -63,10 +90,7 @@ export class AssignmentsController {
     resourceType: "assignment",
     resourceIdParam: "assignmentId",
   })
-  async get(
-    @Request() req,
-    @Param("assignmentId") assignmentId: string,
-  ) {
+  async get(@Request() req, @Param("assignmentId") assignmentId: string) {
     const result = await this.assignmentsService.getAssignment(
       req.tenantId,
       assignmentId,
@@ -101,23 +125,26 @@ export class AssignmentsController {
   async enter(
     @Request() req,
     @Param("assignmentId") assignmentId: string,
-    @Body() body: { lessonId: string },
     @Headers("idempotency-key") idempotencyKey: string,
   ) {
-    const attempt = await this.assignmentsService.startAssignmentAttempt(
+    const result = await this.assignmentsService.startAssignmentAttempt(
       req.tenantId,
       req.user.sub,
       assignmentId,
       idempotencyKey,
     );
-    // ENTER_ASSIGNMENT → unlock linked exam (idempotent progression event)
-    const unlocked = await this.progressionService.handleEnterAssignment(
-      req.tenantId,
-      req.user.sub,
-      assignmentId,
-      body.lessonId,
-      idempotencyKey,
-    );
+    // Progression runs ONCE inside the service (audit 2026-10-16 §6.1 — the
+    // controller used to call it a second time and always got 0 unlocks).
+    // The ?? guard keeps pre-fix cached responses from breaking the web shape.
+    const unlocked = result.unlocked ?? { unlocked: 0, lessonIds: [] };
+    const attempt = {
+      attemptId: result.attemptId,
+      assignmentId: result.assignmentId,
+      startedAt: result.startedAt,
+      expiresAt: result.expiresAt,
+      timeRemainingSeconds: result.timeRemainingSeconds,
+      timerMinutes: result.timerMinutes,
+    };
     return { data: { attempt, unlocked } };
   }
 
@@ -127,10 +154,7 @@ export class AssignmentsController {
     resourceType: "assignment",
     resourceIdParam: "assignmentId",
   })
-  async timer(
-    @Request() req,
-    @Param("assignmentId") assignmentId: string,
-  ) {
+  async timer(@Request() req, @Param("assignmentId") assignmentId: string) {
     const result = await this.assignmentsService.getAssignmentTimer(
       req.tenantId,
       req.user.sub,
@@ -166,7 +190,8 @@ export class AssignmentsController {
   async submit(
     @Request() req,
     @Param("assignmentId") assignmentId: string,
-    @Body() body: { content?: string; attachments?: any[]; idempotencyKey?: string },
+    @Body()
+    body: { content?: string; attachments?: any[]; idempotencyKey?: string },
     @Headers("idempotency-key") headerKey: string,
   ) {
     const result = await this.assignmentsService.submitAssignment(
@@ -226,17 +251,50 @@ export class AssignmentsController {
   async evaluateWithAI(
     @Request() req,
     @Param("assignmentId") assignmentId: string,
-    @Body() dto: { answer: string; question?: string },
+    @Body()
+    dto: {
+      answer: string;
+      question?: string;
+      grading?: {
+        reference_answer: string;
+        max_score: number;
+        rubric_version: string;
+        criteria: { id: string; description: string; max_score: number }[];
+      };
+      sourceIds?: string[];
+      branches?: string[];
+    },
   ) {
-    // Call SANAD AI engine for evaluation
-    // In dev mode (no API keys), uses HashEmbedding + FakeLLM
-    // In production, uses real embedding model + Gemini/Anthropic
+    // Teacher dashboard sends the rubric + knowledge scope it displays.
+    // SANAD grades against them; the official grade stays with
+    // POST submissions/:submissionId/grade after teacher review.
     const result = await this.assignmentsService.evaluateAssignmentWithAI(
       req.tenantId,
       req.user.sub,
       assignmentId,
       dto.answer,
       dto.question,
+      dto.grading,
+      dto.sourceIds,
+      dto.branches,
+    );
+    return { data: result };
+  }
+
+  @Post(":assignmentId/ask-sanad")
+  @RequirePermission({ action: "evaluate", resourceType: "assignment" })
+  async askSanad(
+    @Request() req,
+    @Param("assignmentId") assignmentId: string,
+    @Body() dto: { question: string; branch?: string },
+  ) {
+    // Evidence explorer: pure extractive retrieval scoped server-side.
+    // No LLM is called; the teacher/student gets library passages only.
+    const result = await this.assignmentsService.askSanad(
+      req.tenantId,
+      assignmentId,
+      dto.question,
+      dto.branch,
     );
     return { data: result };
   }

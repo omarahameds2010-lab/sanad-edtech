@@ -67,6 +67,7 @@ export class LedgerService {
     await tx.ledgerEntry.create({
       data: {
         tenantId,
+        paymentId: refund.paymentId,
         refundId: refund.id,
         orderId: refund.orderId,
         accountCode: "PLATFORM_RECEIVABLE",
@@ -82,6 +83,7 @@ export class LedgerService {
     await tx.ledgerEntry.create({
       data: {
         tenantId,
+        paymentId: refund.paymentId,
         refundId: refund.id,
         orderId: refund.orderId,
         accountCode: "CUSTOMER_CLEARING",

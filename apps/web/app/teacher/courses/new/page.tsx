@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/app/lib/auth";
 import { api, ApiError } from "@/app/lib/api";
+import { PREP_GRADES, isPrepGrade } from "@/app/lib/teacher-content";
 
 function slugifyLatin(input: string): string {
   return (
@@ -27,15 +28,20 @@ export default function NewCoursePage() {
   const [shortDescription, setShortDescription] = useState("");
   const [visibility, setVisibility] = useState("PUBLIC");
   const [price, setPrice] = useState("");
+  const [grade, setGrade] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
 
+  // Prefill the grade when the teacher arrives from a grade page.
+  useEffect(() => {
+    const g = new URLSearchParams(window.location.search).get("grade");
+    if (g && isPrepGrade(g)) setGrade(g);
+  }, []);
+
   if (!token) {
     return (
-      <div className="card">
-        <p>
-          سجّل الدخول أولًا. <Link href="/login">تسجيل الدخول</Link>
-        </p>
+      <div className="pub-note">
+        سجّل الدخول أولًا. <Link href="/login">تسجيل الدخول</Link>
       </div>
     );
   }
@@ -49,7 +55,10 @@ export default function NewCoursePage() {
       return;
     }
     const priceNumber = price.trim() === "" ? undefined : Number(price);
-    if (priceNumber !== undefined && (!Number.isFinite(priceNumber) || priceNumber < 0)) {
+    if (
+      priceNumber !== undefined &&
+      (!Number.isFinite(priceNumber) || priceNumber < 0)
+    ) {
       setError("السعر يجب أن يكون رقمًا موجبًا");
       return;
     }
@@ -58,11 +67,13 @@ export default function NewCoursePage() {
       const course = await api.createCourse(token as string, {
         title: title.trim(),
         slug: finalSlug,
-        shortDescription: shortDescription.trim() === "" ? undefined : shortDescription.trim(),
+        shortDescription:
+          shortDescription.trim() === "" ? undefined : shortDescription.trim(),
         visibility,
         language: "ar",
         price: priceNumber,
         currency: "EGP",
+        grade: grade === "" ? undefined : grade,
       });
       router.push(`/teacher/courses/${course.id}`);
     } catch (err) {
@@ -73,99 +84,130 @@ export default function NewCoursePage() {
   }
 
   return (
-    <div className="card" style={{ maxWidth: 560 }}>
-      <nav style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: "var(--space-sm)" }}>
-        <Link href="/teacher/courses">الكورسات</Link> › كورس جديد
-      </nav>
-      <h1 style={{ marginBottom: "var(--space-lg)" }}>كورس جديد</h1>
+    <section>
+      <Link href="/teacher/publish" className="pub-back">
+        → مساحة النشر
+      </Link>
 
-      <form onSubmit={handleSubmit}>
-        <label style={{ display: "block", marginBottom: "var(--space-md)" }}>
-          <span style={{ display: "block", fontSize: 13, marginBottom: 4 }}>
-            عنوان الكورس *
-          </span>
-          <input
-            type="text"
-            value={title}
-            onChange={(e) => {
-              setTitle(e.target.value);
-              if (!slugTouched) setSlug(slugifyLatin(e.target.value));
-            }}
-            required
-            style={{ width: "100%" }}
-          />
-        </label>
+      <header className="pub-head">
+        <p className="pub-eyebrow">كورس جديد</p>
+        <h1 className="pub-title">أنشئ كورس جديد</h1>
+        <p className="pub-sub">
+          اختار الصف، وبعد الإنشاء هتفتح مساحة الكورس مباشرة علشان ترفع الوحدات
+          والدروس والامتحانات والواجبات.
+        </p>
+      </header>
 
-        <label style={{ display: "block", marginBottom: "var(--space-md)" }}>
-          <span style={{ display: "block", fontSize: 13, marginBottom: 4 }}>
-            المعرّف (slug) — حروف إنجليزية وأرقام وشرطات *
-          </span>
-          <input
-            type="text"
-            dir="ltr"
-            value={slugTouched ? slug : slugifyLatin(title)}
-            onChange={(e) => {
-              setSlugTouched(true);
-              setSlug(e.target.value);
-            }}
-            required
-            style={{ width: "100%" }}
-          />
-        </label>
+      <article className="tc-panel" style={{ maxWidth: 680 }}>
+        <form className="pub-form" onSubmit={handleSubmit}>
+          <div>
+            <span className="pub-label">عنوان الكورس *</span>
+            <input
+              className="sc-input"
+              type="text"
+              value={title}
+              onChange={(e) => {
+                setTitle(e.target.value);
+                if (!slugTouched) setSlug(slugifyLatin(e.target.value));
+              }}
+              required
+              placeholder="مثال: اللغة العربية — الأول الإعدادي"
+            />
+          </div>
 
-        <label style={{ display: "block", marginBottom: "var(--space-md)" }}>
-          <span style={{ display: "block", fontSize: 13, marginBottom: 4 }}>
-            وصف مختصر
-          </span>
-          <input
-            type="text"
-            value={shortDescription}
-            onChange={(e) => setShortDescription(e.target.value)}
-            style={{ width: "100%" }}
-          />
-        </label>
-
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-md)", marginBottom: "var(--space-md)" }}>
-          <label style={{ display: "block" }}>
-            <span style={{ display: "block", fontSize: 13, marginBottom: 4 }}>
-              الظهور
+          <div>
+            <span className="pub-label">
+              المعرّف (slug) — حروف إنجليزية وأرقام وشرطات *
             </span>
+            <input
+              className="sc-input"
+              type="text"
+              dir="ltr"
+              value={slugTouched ? slug : slugifyLatin(title)}
+              onChange={(e) => {
+                setSlugTouched(true);
+                setSlug(e.target.value);
+              }}
+              required
+            />
+          </div>
+
+          <div>
+            <span className="pub-label">وصف مختصر</span>
+            <input
+              className="sc-input"
+              type="text"
+              value={shortDescription}
+              onChange={(e) => setShortDescription(e.target.value)}
+              placeholder="سطر واحد يوضح للطالب محتوى الكورس"
+            />
+          </div>
+
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "1fr 1fr",
+              gap: "var(--space-3)",
+            }}
+          >
+            <div>
+              <span className="pub-label">الصف الدراسي</span>
+              <select
+                className="sc-input"
+                value={grade}
+                onChange={(e) => setGrade(e.target.value)}
+              >
+                <option value="">بدون صف</option>
+                {PREP_GRADES.map((g) => (
+                  <option key={g.key} value={g.key}>
+                    {g.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <span className="pub-label">السعر (جنيه)</span>
+              <input
+                className="sc-input"
+                type="number"
+                min={0}
+                value={price}
+                onChange={(e) => setPrice(e.target.value)}
+                placeholder="0"
+              />
+            </div>
+          </div>
+
+          <div>
+            <span className="pub-label">الظهور</span>
             <select
+              className="sc-input"
               value={visibility}
               onChange={(e) => setVisibility(e.target.value)}
-              style={{ width: "100%" }}
             >
               <option value="PUBLIC">عام</option>
               <option value="PRIVATE">خاص</option>
               <option value="UNLISTED">غير مدرج</option>
             </select>
-          </label>
+          </div>
 
-          <label style={{ display: "block" }}>
-            <span style={{ display: "block", fontSize: 13, marginBottom: 4 }}>
-              السعر (جنيه)
-            </span>
-            <input
-              type="number"
-              min={0}
-              value={price}
-              onChange={(e) => setPrice(e.target.value)}
-              placeholder="0"
-              style={{ width: "100%" }}
-            />
-          </label>
-        </div>
+          {error && (
+            <p className="pub-error" style={{ marginTop: 0 }}>
+              {error}
+            </p>
+          )}
 
-        {error && (
-          <p style={{ color: "#ef4444", fontSize: 13, marginBottom: "var(--space-md)" }}>
-            {error}
-          </p>
-        )}
-
-        <button type="submit" disabled={pending} style={{ width: "100%" }}>
-          {pending ? "جاري الإنشاء…" : "إنشاء الكورس"}
-        </button>
-      </form>
-    </div>
+          <button
+            type="submit"
+            className="pub-btn pub-btn-primary"
+            disabled={pending}
+            style={{ justifySelf: "start" }}
+          >
+            {pending ? "جاري الإنشاء…" : "إنشاء الكورس"}
+          </button>
+        </form>
+      </article>
+    </section>
   );
 }

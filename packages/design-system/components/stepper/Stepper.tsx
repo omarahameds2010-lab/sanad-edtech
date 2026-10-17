@@ -1,6 +1,6 @@
 import { forwardRef, useState } from 'react';
 import { motion } from 'framer-motion';
-import { ChevronLeftIcon, ChevronRightIcon, CheckIcon } from '../../icon/icons';
+import { ChevronLeftIcon, ChevronRightIcon, CheckIcon } from '../icon/icons';
 
 export interface StepperStep {
   id: string;
@@ -83,60 +83,62 @@ const Stepper = forwardRef<HTMLDivElement, StepperProps>(
         <div style={{ marginBottom: '24px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             {steps.map((step, index) => (
-              <motion.div
-                key={step.id}
-                style={{
-                  flex: 1,
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  gap: '8px',
-                }}
-              >
+              <>
                 <motion.div
-                  initial={{ scale: 0 }}
-                  animate={{ scale: 1 }}
-                  transition={{ type: 'spring', stiffness: 300, damping: 20, delay: index * 0.1 }}
-                  style={{
-                    width: '40px',
-                    height: '40px',
-                    borderRadius: '50%',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    background: index < currentStep ? 'var(--color-success)' : index === currentStep ? 'var(--color-primary)' : 'var(--color-neutral-200)',
-                    color: index <= currentStep ? 'white' : 'var(--color-neutral-400)',
-                    fontWeight: 600,
-                    fontSize: '14px',
-                    position: 'relative',
-                    zIndex: 1,
-                    border: '3px solid var(--color-bg-primary)',
-                  }}
-                >
-                  {index < currentStep ? (
-                    <CheckIcon size={18} />
-                  ) : (
-                    <span style={{ fontWeight: 600 }}>{index + 1}</span>
-                  )}
-                </motion.div>
-                <p style={{ fontSize: '12px', textAlign: 'center', color: index <= currentStep ? 'var(--color-text-primary)' : 'var(--color-text-muted)', fontWeight: index <= currentStep ? 600 : 400 }}>
-                  {step.label}
-                </p>
-              </motion.div>
-              {index < steps.length - 1 && (
-                <motion.div
-                  initial={{ width: 0 }}
-                  animate={{ width: '100%' }}
-                  transition={{ duration: 0.5, delay: index * 0.1, ease: 'easeOut' }}
+                  key={step.id}
                   style={{
                     flex: 1,
-                    height: '2px',
-                    background: index < currentStep ? 'var(--color-success)' : 'var(--color-neutral-200)',
-                    borderRadius: '2px',
-                    marginTop: '16px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    gap: '8px',
                   }}
-                />
-              )}
+                >
+                  <motion.div
+                    initial={{ scale: 0 }}
+                    animate={{ scale: 1 }}
+                    transition={{ type: 'spring', stiffness: 300, damping: 20, delay: index * 0.1 }}
+                    style={{
+                      width: '40px',
+                      height: '40px',
+                      borderRadius: '50%',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      background: index < currentStep ? 'var(--color-success)' : index === currentStep ? 'var(--color-primary)' : 'var(--color-neutral-200)',
+                      color: index <= currentStep ? 'white' : 'var(--color-neutral-400)',
+                      fontWeight: 600,
+                      fontSize: '14px',
+                      position: 'relative',
+                      zIndex: 1,
+                      border: '3px solid var(--color-bg-primary)',
+                    }}
+                  >
+                    {index < currentStep ? (
+                      <CheckIcon size={18} />
+                    ) : (
+                      <span style={{ fontWeight: 600 }}>{index + 1}</span>
+                    )}
+                  </motion.div>
+                  <p style={{ fontSize: '12px', textAlign: 'center', color: index <= currentStep ? 'var(--color-text-primary)' : 'var(--color-text-muted)', fontWeight: index <= currentStep ? 600 : 400 }}>
+                    {step.label}
+                  </p>
+                </motion.div>
+                {index < steps.length - 1 && (
+                  <motion.div
+                    initial={{ width: 0 }}
+                    animate={{ width: '100%' }}
+                    transition={{ duration: 0.5, delay: index * 0.1, ease: 'easeOut' }}
+                    style={{
+                      flex: 1,
+                      height: '2px',
+                      background: index < currentStep ? 'var(--color-success)' : 'var(--color-neutral-200)',
+                      borderRadius: '2px',
+                      marginTop: '16px',
+                    }}
+                  />
+                )}
+              </>
             ))}
           </div>
         </div>
@@ -221,7 +223,7 @@ const Stepper = forwardRef<HTMLDivElement, StepperProps>(
               )}
             </motion.button>
           </div>
-        </div>
+        </motion.div>
       </div>
     );
   }

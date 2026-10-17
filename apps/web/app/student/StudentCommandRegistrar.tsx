@@ -1,22 +1,62 @@
-'use client';
+"use client";
 
-import { useEffect } from 'react';
-import { useCommandPalette, CommandAction } from '@/app/hooks/useCommandPalette';
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
+import {
+  useCommandPalette,
+  type CommandAction,
+} from "@/app/hooks/useCommandPalette";
 
-const studentActions: CommandAction[] = [
-  { id: 'go-dashboard', title: 'افتح لوحة الطالب', category: 'تنقل', keywords: ['go', 'dashboard'], perform: () => window.location.assign('/student') },
-  { id: 'go-courses', title: 'افتح كورساتي', category: 'تنقل', keywords: ['go', 'courses'], perform: () => window.location.assign('/student/courses') },
-  { id: 'go-assignments', title: 'افتح واجباتي', category: 'تنقل', keywords: ['go', 'assignments'], perform: () => window.location.assign('/student/assignments') },
-  { id: 'go-exams', title: 'افتح اختباراتي', category: 'تنقل', keywords: ['go', 'exams', 'attempts'], perform: () => window.location.assign('/student/exams') },
-  { id: 'continue-learning', title: 'أكمل التعلم', category: 'إجراء', keywords: ['continue', 'resume'], perform: () => window.location.assign('/student/lessons/l1') },
-];
-
+/**
+ * Student palette commands. Navigation must go through the SPA router —
+ * window.location.assign would trigger a full reload and drop the
+ * in-memory session.
+ */
 export default function StudentCommandRegistrar() {
-  const { registerAction } = useCommandPalette();
+  const { registerAction, unregisterAction } = useCommandPalette();
+  const router = useRouter();
 
   useEffect(() => {
-    studentActions.forEach(registerAction);
-  }, [registerAction]);
+    const actions: CommandAction[] = [
+      {
+        id: "go-dashboard",
+        title: "افتح لوحتي",
+        category: "تنقل",
+        keywords: ["لوحة", "dashboard"],
+        perform: () => router.push("/student"),
+      },
+      {
+        id: "go-courses",
+        title: "افتح كورساتي",
+        category: "تنقل",
+        keywords: ["كورسات", "courses"],
+        perform: () => router.push("/student/courses"),
+      },
+      {
+        id: "go-assignments",
+        title: "افتح واجباتي",
+        category: "تنقل",
+        keywords: ["واجبات", "assignments"],
+        perform: () => router.push("/student/assignments"),
+      },
+      {
+        id: "go-exams",
+        title: "افتح اختباراتي",
+        category: "تنقل",
+        keywords: ["اختبارات", "exams"],
+        perform: () => router.push("/student/exams"),
+      },
+      {
+        id: "browse-courses",
+        title: "تصفح كتالوج الكورسات",
+        category: "استكشاف",
+        keywords: ["كتالوج", "تصفح", "browse"],
+        perform: () => router.push("/courses"),
+      },
+    ];
+    actions.forEach(registerAction);
+    return () => actions.forEach((action) => unregisterAction(action.id));
+  }, [registerAction, unregisterAction, router]);
 
   return null;
 }

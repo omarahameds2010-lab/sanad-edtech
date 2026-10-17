@@ -1,6 +1,7 @@
 /**
- * Path-2 demo seed: exam loop (enter → timer → submit → next lesson)
- * plus a YouTube UNLISTED video on the first lesson.
+ * Demo seed — مساحة الأستاذ صالح حسين («جوكر اللغة العربية»)
+ * plus the full Path-2 loop on the first course:
+ * enter → server timer → submit → next lesson → teacher grading.
  *
  * Usage (Postgres must be migrated first):
  *   cd apps/api
@@ -9,10 +10,18 @@
  *   pnpm seed:path2
  *
  * Env overrides:
- *   DEMO_YOUTUBE_ID  YouTube video id for the lesson player (default: placeholder)
+ *   DEMO_TEACHER_PASSWORD  teacher login password (default in docs/DEMO.md)
+ *   DEMO_STUDENT_PASSWORD  student login password (default in docs/DEMO.md)
+ *   DEMO_YOUTUBE_ID        YouTube video id for the lesson player (default: placeholder)
+ *   PROD_TENANT_DOMAINS    comma-separated cloud hosts, e.g.
+ *                          "sanad-edtech.vercel.app,api-sanad.railway.app"
  *
- * The script is idempotent: if the demo course already exists it prints
- * the existing ids and exits without duplicating.
+ * The script ensures EVERY piece independently (no early exit): it is safe
+ * to re-run after partial runs or after seeds from older file versions —
+ * missing users, enrollment, lessons, questions, assignment, entitlements
+ * and domains are all backfilled without duplicating existing rows.
+ * (Old math-demo rows from earlier versions are not deleted; start from a
+ * fresh database if you want a clean slate.)
  */
 import { PrismaClient } from "@prisma/client";
 import * as argon2 from "argon2";
@@ -20,18 +29,54 @@ import * as argon2 from "argon2";
 const prisma = new PrismaClient();
 
 const TENANT_SLUG = "sanad-demo";
-const COURSE_SLUG = "demo-math-1";
+const TENANT_NAME = "الأستاذ صالح حسين";
+
 const TEACHER_PHONE = "01000000001";
 const STUDENT_PHONE = "01000000002";
-const TEACHER_PASSWORD = "Teacher123!";
-const STUDENT_PASSWORD = "Student123!";
+const TEACHER_NAME = "صالح حسين";
+const STUDENT_NAME = "طالب الديمو";
+// Demo credentials (documented in docs/DEMO.md). Re-runs rotate the hash to
+// this password; env override wins on cloud deploys.
+const TEACHER_PASSWORD =
+  process.env.DEMO_TEACHER_PASSWORD ?? "Joker-Arabic#2026";
+const STUDENT_PASSWORD = process.env.DEMO_STUDENT_PASSWORD ?? "Student123!";
+
+/** The three prep-grade Arabic courses of the space. */
+const COURSES = [
+  {
+    slug: "arabic-1-prep",
+    title: "اللغة العربية — الأول الإعدادي",
+    grade: "prep-1",
+    description:
+      "تأسيس قوي من أقسام الكلمة للجملة والمفعول المطلق — بأمثلة من الامتحانات وتدريبات مصححة.",
+  },
+  {
+    slug: "arabic-2-prep",
+    title: "اللغة العربية — الثاني الإعدادي",
+    grade: "prep-2",
+    description:
+      "توسّع في النحو والصرف مع تحليل النصوص وتذوقها، وتدريب على صيغ أسئلة الامتحان.",
+  },
+  {
+    slug: "arabic-3-prep",
+    title: "اللغة العربية — الثالث الإعدادي",
+    grade: "prep-3",
+    description:
+      "مراجعة مركّزة ومهارات إجابة: من القاعدة إلى الدرجة — مع تدريب مستمر قبل الشهادة.",
+  },
+] as const;
 
 async function main() {
   const tenant =
     (await prisma.tenant.findUnique({ where: { slug: TENANT_SLUG } })) ??
     (await prisma.tenant.create({
-      data: { name: "Sanad Demo", slug: TENANT_SLUG, status: "ACTIVE" },
+      data: { name: TENANT_NAME, slug: TENANT_SLUG, status: "ACTIVE" },
     }));
+
+  await prisma.tenant.update({
+    where: { id: tenant.id },
+    data: { name: TENANT_NAME, status: "ACTIVE" },
+  });
 
   await prisma.tenantDomain.upsert({
     where: { domain: "localhost" },
@@ -39,16 +84,31 @@ async function main() {
     create: { tenantId: tenant.id, domain: "localhost", isPrimary: true },
   });
 
+  // Production domains (Vercel web + Railway API hosts). Without these,
+  // Host-based tenant resolution answers 404 for every cloud request.
+  const prodDomains = (process.env.PROD_TENANT_DOMAINS ?? "")
+    .split(",")
+    .map((d) => d.trim().toLowerCase())
+    .filter((d) => d.length > 0);
+  for (const domain of prodDomains) {
+    await prisma.tenantDomain.upsert({
+      where: { domain },
+      update: { tenantId: tenant.id },
+      create: { tenantId: tenant.id, domain, isPrimary: false },
+    });
+  }
+
   const teacherPasswordHash = await argon2.hash(TEACHER_PASSWORD);
   const studentPasswordHash = await argon2.hash(STUDENT_PASSWORD);
 
+  // Re-runs refresh name + password so credential rotation is one command.
   const teacher = await prisma.user.upsert({
     where: { tenantId_phone: { tenantId: tenant.id, phone: TEACHER_PHONE } },
-    update: {},
+    update: { name: TEACHER_NAME, passwordHash: teacherPasswordHash },
     create: {
       tenantId: tenant.id,
       role: "TEACHER",
-      name: "أستاذ الديمو",
+      name: TEACHER_NAME,
       phone: TEACHER_PHONE,
       passwordHash: teacherPasswordHash,
       status: "ACTIVE",
@@ -57,195 +117,234 @@ async function main() {
 
   const student = await prisma.user.upsert({
     where: { tenantId_phone: { tenantId: tenant.id, phone: STUDENT_PHONE } },
-    update: {},
+    update: { passwordHash: studentPasswordHash },
     create: {
       tenantId: tenant.id,
       role: "STUDENT",
-      name: "طالب الديمو",
+      name: STUDENT_NAME,
       phone: STUDENT_PHONE,
       passwordHash: studentPasswordHash,
       status: "ACTIVE",
     },
   });
 
-  let course = await prisma.course.findUnique({
-    where: { tenantId_slug: { tenantId: tenant.id, slug: COURSE_SLUG } },
-  });
-  if (course) {
-    const exam = await prisma.exam.findFirst({
-      where: { tenantId: tenant.id, lesson: { section: { courseId: course.id } } },
-      include: { lesson: true },
+  const youTubeId = process.env.DEMO_YOUTUBE_ID ?? "dQw4w9WgXcQ";
+
+  async function ensureCourse(def: (typeof COURSES)[number]) {
+    const existing = await prisma.course.findUnique({
+      where: { tenantId_slug: { tenantId: tenant.id, slug: def.slug } },
     });
-    console.log("Demo course already exists — reusing:");
-    console.log(`  courseId: ${course.id}`);
-    console.log(`  examId:   ${exam?.id ?? "(none)"}`);
-    console.log(`  lessonId: ${exam?.lessonId ?? "(none)"}`);
-    return;
+    if (existing) {
+      return prisma.course.update({
+        where: { id: existing.id },
+        data: {
+          title: def.title,
+          grade: def.grade,
+          description: def.description,
+          teacherId: teacher.id,
+          status: "PUBLISHED",
+          publishedAt: existing.publishedAt ?? new Date(),
+        },
+      });
+    }
+    return prisma.course.create({
+      data: {
+        tenantId: tenant.id,
+        title: def.title,
+        slug: def.slug,
+        grade: def.grade,
+        description: def.description,
+        language: "ar",
+        price: "0",
+        currency: "EGP",
+        status: "PUBLISHED",
+        publishedAt: new Date(),
+        teacherId: teacher.id,
+      },
+    });
   }
 
-  course = await prisma.course.create({
-    data: {
-      tenantId: tenant.id,
-      title: "رياضيات الديمو — جبر",
-      slug: COURSE_SLUG,
-      description: "كورس الديمو لمسار الامتحانات",
-      language: "ar",
-      price: "0",
-      currency: "EGP",
-      status: "PUBLISHED",
-      publishedAt: new Date(),
-      teacherId: teacher.id,
-    },
-  });
+  async function ensureSection(courseId: string, title: string) {
+    const existing = await prisma.section.findFirst({
+      where: { tenantId: tenant.id, courseId, orderIndex: 0 },
+    });
+    if (existing) return existing;
+    return prisma.section.create({
+      data: { tenantId: tenant.id, courseId, title, orderIndex: 0 },
+    });
+  }
 
-  const section = await prisma.section.create({
-    data: {
-      tenantId: tenant.id,
-      courseId: course.id,
-      title: "الوحدة 1: أساسيات الجبر",
-      orderIndex: 0,
-    },
-  });
+  async function ensureLessonBySlug(
+    sectionId: string,
+    slug: string,
+    data: Record<string, any>,
+  ) {
+    const found = await prisma.lesson.findFirst({
+      where: { tenantId: tenant.id, slug },
+    });
+    if (found) return found;
+    // `any` keeps Prisma's XOR create-input union from choking on the spread.
+    const payload: any = { tenantId: tenant.id, sectionId, slug, ...data };
+    return prisma.lesson.create({ data: payload });
+  }
 
-  const lesson1 = await prisma.lesson.create({
-    data: {
-      tenantId: tenant.id,
-      sectionId: section.id,
-      type: "VIDEO",
-      title: "مقدمة في المتغيرات",
-      slug: "demo-lesson-intro",
-      description: "شاهد الشرح ثم ادخل الاختبار",
-      duration: 720,
-      orderIndex: 0,
-      status: "PUBLISHED",
-      publishedAt: new Date(),
-      lockStatus: "UNLOCKED",
-    },
-  });
-
-  const youTubeId = process.env.DEMO_YOUTUBE_ID ?? "dQw4w9WgXcQ";
-  await prisma.video.create({
-    data: {
-      tenantId: tenant.id,
-      lessonId: lesson1.id,
-      title: "شرح المتغيرات (YouTube UNLISTED)",
-      provider: "youtube",
-      providerVideoId: youTubeId,
-      status: "READY",
-      duration: 180,
-      uploadedBy: teacher.id,
-      publishedAt: new Date(),
-    },
-  });
-
-  const examLesson = await prisma.lesson.create({
-    data: {
-      tenantId: tenant.id,
-      sectionId: section.id,
-      type: "EXAM",
-      title: "اختبار: أساسيات الجبر",
-      slug: "demo-exam-algebra",
-      description: "اختبار الديمو — 3 أسئلة",
-      duration: 4200,
-      orderIndex: 1,
-      status: "PUBLISHED",
-      publishedAt: new Date(),
-      lockStatus: "UNLOCKED",
-    },
-  });
-
-  const exam = await prisma.exam.create({
-    data: {
-      tenantId: tenant.id,
-      lessonId: examLesson.id,
-      title: "اختبار: أساسيات الجبر",
-      description: "MCQ + صح/خطأ + مقالي",
-      instructions: "أجب عن كل الأسئلة ثم اضغط إنهاء الاختبار.",
-      timerMinutes: 70,
-      passingScore: 60,
-      maxAttempts: 2,
-      shuffleQuestions: false,
-      shuffleOptions: false,
-      showResults: true,
-      showCorrectAnswers: false,
-      status: "PUBLISHED",
-      questions: {
-        create: [
-          {
-            tenantId: tenant.id,
-            type: "MCQ",
-            text: "ما قيمة x في المعادلة x + 5 = 12؟",
-            points: 1,
-            position: 0,
-            options: [
-              { id: "a", text: "5" },
-              { id: "b", text: "7" },
-              { id: "c", text: "17" },
-              { id: "d", text: "60" },
-            ],
-            correctAnswer: { correctOptionId: "b" },
-          },
-          {
-            tenantId: tenant.id,
-            type: "TRUE_FALSE",
-            text: "المعادلة 2x = 10 حلها x = 5.",
-            points: 1,
-            position: 1,
-            options: [
-              { id: "true", text: "صح" },
-              { id: "false", text: "خطأ" },
-            ],
-            correctAnswer: { correctOptionId: "true" },
-          },
-          {
-            tenantId: tenant.id,
-            type: "ESSAY",
-            text: "اشرح بكلماتك ما هو المتغير في الجبر.",
-            points: 2,
-            position: 2,
-          },
-        ],
+  async function ensureVideo(lessonId: string, title: string) {
+    const existingVideo = await prisma.video.findFirst({
+      where: { tenantId: tenant.id, lessonId },
+    });
+    if (existingVideo) return;
+    // Video is unique per (tenantId, providerVideoId): the demo reuses one
+    // YouTube id across courses, so only the first lesson keeps the row.
+    const existingProviderVideo = await prisma.video.findFirst({
+      where: { tenantId: tenant.id, providerVideoId: youTubeId },
+    });
+    if (existingProviderVideo) return;
+    await prisma.video.create({
+      data: {
+        tenantId: tenant.id,
+        lessonId,
+        title,
+        provider: "youtube",
+        providerVideoId: youTubeId,
+        status: "READY",
+        duration: 180,
+        uploadedBy: teacher.id,
+        publishedAt: new Date(),
       },
-    },
+    });
+  }
+
+  // ---- The three courses of the space --------------------------------
+  const courseRows: { id: string; slug: string }[] = [];
+  for (const def of COURSES) {
+    const created = await ensureCourse(def);
+    courseRows.push({ id: created.id, slug: def.slug });
+  }
+  const course = courseRows[0];
+  const otherCourses = courseRows.slice(1);
+
+  // ---- Full Path-2 loop lives on course #1 (الأول الإعدادي) ----------
+  const section = await ensureSection(
+    course.id,
+    "الوحدة 1: من الكلمة إلى الجملة",
+  );
+  const sectionId = section.id;
+
+  const lesson1 = await ensureLessonBySlug(sectionId, "ar-lesson-intro", {
+    type: "VIDEO",
+    title: "الحصة الأولى: أقسام الكلمة",
+    description:
+      "شاهد الشرح ثم ادخل الاختبار — دخول الاختبار يفتح الدرس التالي.",
+    duration: 720,
+    orderIndex: 0,
+    status: "PUBLISHED",
+    publishedAt: new Date(),
+    lockStatus: "UNLOCKED",
   });
+
+  await ensureVideo(lesson1.id, "شرح: أقسام الكلمة (YouTube UNLISTED)");
+
+  const examLesson = await ensureLessonBySlug(sectionId, "ar-exam-nahw", {
+    type: "EXAM",
+    title: "اختبار: المهارات النحوية",
+    description: "اختبار الديمو — اختيار + صح/خطأ + مقالي يقيمه SANAD.",
+    duration: 4200,
+    orderIndex: 1,
+    status: "PUBLISHED",
+    publishedAt: new Date(),
+    lockStatus: "UNLOCKED",
+  });
+
+  let exam = await prisma.exam.findFirst({
+    where: { tenantId: tenant.id, lessonId: examLesson.id },
+  });
+  if (!exam) {
+    exam = await prisma.exam.create({
+      data: {
+        tenantId: tenant.id,
+        lessonId: examLesson.id,
+        title: "اختبار: المهارات النحوية",
+        description: "MCQ + صح/خطأ + مقالي",
+        instructions: "أجب عن كل الأسئلة ثم اضغط إنهاء الاختبار.",
+        timerMinutes: 70,
+        passingScore: 60,
+        maxAttempts: 2,
+        shuffleQuestions: false,
+        shuffleOptions: false,
+        showResults: true,
+        showCorrectAnswers: false,
+        status: "PUBLISHED",
+      },
+    });
+  }
+
+  const questionCount = await prisma.examQuestion.count({
+    where: { tenantId: tenant.id, examId: exam.id },
+  });
+  if (questionCount === 0) {
+    await prisma.examQuestion.createMany({
+      data: [
+        {
+          tenantId: tenant.id,
+          examId: exam.id,
+          type: "MCQ",
+          text: "ما إعراب كلمة (اجتهادًا) في جملة: «اجتهد الطالب اجتهادًا كبيرًا»؟",
+          points: 1,
+          position: 0,
+          options: [
+            { id: "a", text: "فاعل" },
+            { id: "b", text: "مفعول مطلق" },
+            { id: "c", text: "مفعول به" },
+            { id: "d", text: "حال" },
+          ],
+          correctAnswer: { correctOptionId: "b" },
+        },
+        {
+          tenantId: tenant.id,
+          examId: exam.id,
+          type: "TRUE_FALSE",
+          text: "المفعول المطلق مصدر منصوب، ويُبيَّن نوعه إذا وُصف.",
+          points: 1,
+          position: 1,
+          options: [
+            { id: "true", text: "صح" },
+            { id: "false", text: "خطأ" },
+          ],
+          correctAnswer: { correctOptionId: "true" },
+        },
+        {
+          tenantId: tenant.id,
+          examId: exam.id,
+          type: "ESSAY",
+          text: "استخرج المفعول المطلق من الجملة وبيّن نوعه مع السبب: «اجتهد الطالب اجتهادًا كبيرًا».",
+          points: 2,
+          position: 2,
+        },
+      ],
+    });
+  }
 
   // Entering the exam unlocks this lesson (ENTER_EXAM progression).
-  const nextLesson = await prisma.lesson.create({
-    data: {
-      tenantId: tenant.id,
-      sectionId: section.id,
-      type: "VIDEO",
-      title: "المعادلات الخطية (تُفتح بعد دخول الاختبار)",
-      slug: "demo-lesson-next",
-      orderIndex: 2,
-      status: "PUBLISHED",
-      publishedAt: new Date(),
-      lockStatus: "LOCKED",
-      unlockType: "ENTER_EXAM",
-      unlockTargetId: exam.id,
-      examId: exam.id,
-    },
-  });
-
-  await prisma.enrollment.create({
-    data: {
-      tenantId: tenant.id,
-      userId: student.id,
-      courseId: course.id,
-      startsAt: new Date(),
-      status: "ACTIVE",
-      source: "seed:path2",
-    },
+  const nextLesson = await ensureLessonBySlug(sectionId, "ar-lesson-next", {
+    type: "VIDEO",
+    title:
+      "المفعول به: الفرق بينه وبين المفعول المطلق (تُفتح بعد دخول الاختبار)",
+    orderIndex: 2,
+    status: "PUBLISHED",
+    publishedAt: new Date(),
+    lockStatus: "LOCKED",
+    unlockType: "ENTER_EXAM",
+    unlockTargetId: exam.id,
+    examId: exam.id,
   });
 
   // Assignment lesson so /student/assignments/[id] is demoable.
-  const assignmentLesson = await prisma.lesson.create({
-    data: {
-      tenantId: tenant.id,
-      sectionId: section.id,
+  const assignmentLesson = await ensureLessonBySlug(
+    sectionId,
+    "ar-assignment-analysis",
+    {
       type: "ASSIGNMENT",
-      title: "واجب: حل المعادلات",
-      slug: "demo-assignment-equations",
+      title: "واجب: إعراب وتحليل",
       description: "واجب الديمو — إجابة نصية",
       duration: 18000,
       orderIndex: 3,
@@ -253,20 +352,62 @@ async function main() {
       publishedAt: new Date(),
       lockStatus: "UNLOCKED",
     },
-  });
+  );
 
-  const assignment = await prisma.assignment.create({
-    data: {
-      tenantId: tenant.id,
-      lessonId: assignmentLesson.id,
-      title: "واجب: حل المعادلات",
-      description: "حل المعادلتين التاليتين واكتب خطواتك.",
-      instructions: "اكتب إجابتك كمتن ثم اضغط تسليم قبل انتهاء المؤقت.",
-      timerMinutes: 300,
-      maxAttempts: 1,
-      status: "PUBLISHED",
-    },
+  let assignment = await prisma.assignment.findFirst({
+    where: { tenantId: tenant.id, lessonId: assignmentLesson.id },
   });
+  if (!assignment) {
+    assignment = await prisma.assignment.create({
+      data: {
+        tenantId: tenant.id,
+        lessonId: assignmentLesson.id,
+        title: "واجب: إعراب وتحليل",
+        description:
+          "أعرب ما تحته خط، وبيّن نوع المفعول المطلق: «قرأ الطالب الدرس قراءةً متأنية».",
+        instructions: "اكتب إجابتك كمتن ثم اضغط تسليم قبل انتهاء المؤقت.",
+        timerMinutes: 300,
+        maxAttempts: 1,
+        status: "PUBLISHED",
+      },
+    });
+  }
+
+  // ---- Opening lessons for the other two courses (keep them browseable).
+  for (const row of otherCourses) {
+    const def = COURSES.find((c) => c.slug === row.slug);
+    const sec = await ensureSection(row.id, "الوحدة 1: البداية");
+    const opening = await ensureLessonBySlug(sec.id, `${row.slug}-opening`, {
+      type: "VIDEO",
+      title: "الحصة الافتتاحية: خطة العام",
+      description: "نظرة سريعة على خطة الكورس وطريقة المذاكرة.",
+      duration: 600,
+      orderIndex: 0,
+      status: "PUBLISHED",
+      publishedAt: new Date(),
+      lockStatus: "UNLOCKED",
+    });
+    await ensureVideo(
+      opening.id,
+      `شرح: خطة العام — ${def?.title ?? row.slug} (YouTube UNLISTED)`,
+    );
+  }
+
+  const existingEnrollment = await prisma.enrollment.findFirst({
+    where: { tenantId: tenant.id, userId: student.id, courseId: course.id },
+  });
+  if (!existingEnrollment) {
+    await prisma.enrollment.create({
+      data: {
+        tenantId: tenant.id,
+        userId: student.id,
+        courseId: course.id,
+        startsAt: new Date(),
+        status: "ACTIVE",
+        source: "seed:path2",
+      },
+    });
+  }
 
   // Entitlements mirror grantCourseEntitlement (course + lessons + exam +
   // assignments) so guards pass without a purchase in the demo.
@@ -282,7 +423,6 @@ async function main() {
   for (const target of entitlementTargets) {
     await prisma.entitlement.upsert({
       where: {
-        // No unique constraint on (user, type, id) — guard by lookup.
         id: `seed-${student.id}-${target.resourceType}-${target.resourceId}`,
       },
       update: { status: "ACTIVE" },
@@ -300,15 +440,32 @@ async function main() {
     });
   }
 
-  console.log("Seeded Path-2 demo:");
-  console.log(`  teacher: ${TEACHER_PHONE} / ${TEACHER_PASSWORD}`);
+  const finalQuestions = await prisma.examQuestion.count({
+    where: { tenantId: tenant.id, examId: exam.id },
+  });
+  const finalEntitlements = await prisma.entitlement.count({
+    where: { tenantId: tenant.id, userId: student.id },
+  });
+  console.log("Seed ensured the Arabic teacher space (idempotent backfill):");
+  console.log(
+    `  teacher: ${TEACHER_PHONE} / ${TEACHER_PASSWORD}  (${TEACHER_NAME})`,
+  );
   console.log(`  student: ${STUDENT_PHONE} / ${STUDENT_PASSWORD}`);
-  console.log(`  courseId: ${course.id}`);
+  for (const row of courseRows) {
+    console.log(`  course:  ${row.slug} → ${row.id}`);
+  }
   console.log(`  lessonId (video): ${lesson1.id}`);
   console.log(`  examId:   ${exam.id}  (lesson ${examLesson.id})`);
-  console.log(`  assignmentId: ${assignment.id}  (lesson ${assignmentLesson.id})`);
+  console.log(`  exam questions: ${finalQuestions}`);
+  console.log(
+    `  assignmentId: ${assignment.id}  (lesson ${assignmentLesson.id})`,
+  );
   console.log(`  nextLesson (locked): ${nextLesson.id}`);
-  console.log("Flow: login → /student/exams → enter → submit → lesson → teacher grades.");
+  console.log(`  student entitlements: ${finalEntitlements}`);
+  console.log(
+    "Flow: login → /student/exams → enter → submit → lesson → teacher grades.",
+  );
+  console.log("Space: http://localhost:3001/teachers/saleh-hussein");
 }
 
 main()

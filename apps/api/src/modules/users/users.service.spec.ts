@@ -7,7 +7,7 @@ describe("UsersService.getStudentDetail", () => {
 
   beforeEach(() => {
     prisma = {
-      user: { findFirst: jest.fn() },
+      user: { findFirst: jest.fn(), findMany: jest.fn() },
       enrollment: { findMany: jest.fn().mockResolvedValue([]) },
       examAttempt: { findMany: jest.fn().mockResolvedValue([]) },
       assignmentSubmission: { findMany: jest.fn().mockResolvedValue([]) },
@@ -51,5 +51,46 @@ describe("UsersService.getStudentDetail", () => {
     expect(result.submissions).toEqual([]);
     // Never leaks secrets
     expect((result.user as any).passwordHash).toBeUndefined();
+  });
+});
+
+describe("UsersService.listStudentsForTeacher", () => {
+  let service: UsersService;
+  let prisma: any;
+
+  beforeEach(() => {
+    prisma = {
+      user: { findMany: jest.fn() },
+    };
+    service = new UsersService(prisma);
+  });
+
+  it("returns only students enrolled in the teacher courses", async () => {
+    prisma.user.findMany.mockResolvedValue([
+      {
+        id: "u1",
+        name: "طالب",
+        phone: "01000000002",
+        enrollments: [
+          { status: "ACTIVE", course: { id: "c1", title: "رياضيات" } },
+        ],
+      },
+    ]);
+
+    const result = await service.listStudentsForTeacher("t1", "teacher1");
+
+    expect(prisma.user.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          tenantId: "t1",
+          role: "STUDENT",
+          enrollments: {
+            some: { course: { teacherId: "teacher1" } },
+          },
+        }),
+      }),
+    );
+    expect(result).toHaveLength(1);
+    expect((result[0] as any).passwordHash).toBeUndefined();
   });
 });

@@ -1,4 +1,5 @@
 import { Injectable } from "@nestjs/common";
+import { Prisma } from "@prisma/client";
 import { PrismaService } from "../tenants/prisma.service";
 
 interface OutboxEvent {
@@ -13,8 +14,19 @@ interface OutboxEvent {
 export class OutboxService {
   constructor(private prisma: PrismaService) {}
 
-  async publish(tenantId: string, event: OutboxEvent) {
-    return this.prisma.outboxEvent.create({
+  /**
+   * `tx` publishes the outbox row inside the caller's interactive transaction
+   * so it commits atomically with the business writes (decision table:
+   * transaction = source of truth). Callers without an open transaction keep
+   * the request-scoped extended client (bundle B).
+   */
+  async publish(
+    tenantId: string,
+    event: OutboxEvent,
+    tx?: Prisma.TransactionClient,
+  ) {
+    const db: any = tx ?? this.prisma;
+    return db.outboxEvent.create({
       data: {
         tenantId,
         eventType: event.eventType,

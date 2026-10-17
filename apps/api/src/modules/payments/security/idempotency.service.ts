@@ -2,11 +2,27 @@ import { Injectable, ConflictException } from "@nestjs/common";
 import { PrismaService } from "../../tenants/prisma.service";
 import { Prisma, IdempotencyStatus } from "@prisma/client";
 import * as crypto from "crypto";
+import { stableStringify } from "../../../common/serialization/json";
+
+const KEY_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
 
 @Injectable()
 export class IdempotencyService {
   constructor(private prisma: PrismaService) {}
 
+  /**
+   * Claim an idempotency key for this request.
+   *
+   * Semantics (audit 2026-10-17 review, bundle A):
+   *  - COMPLETED (not expired)  → replay the stored response.
+   *  - PENDING, same payload    → `isNew: false`; the caller decides whether to
+   *                               resume the in-flight attempt or return.
+   *  - PENDING, different body  → 409 (key reuse).
+   *  - FAILED / expired         → RENEW the same row in place. The old code
+   *                               fell through to `create` here, which is a
+   *                               guaranteed P2002 against the unique
+   *                               (tenantId, key) index and bricked the key.
+   */
   async checkAndStore(
     tenantId: string,
     userId: string | undefined,
@@ -16,21 +32,14 @@ export class IdempotencyService {
   ): Promise<{ isNew: boolean; existingId?: string; response?: any }> {
     const requestHash = this.hashRequest(requestData);
 
-    // Try to find existing
     const existing = await this.prisma.idempotencyKey.findUnique({
       where: { tenantId_key: { tenantId, key } },
     });
 
     if (existing) {
-      // Check if expired
-      if (existing.expiresAt < new Date()) {
-        // Expired - allow new request but mark old as failed
-        await this.prisma.idempotencyKey.update({
-          where: { id: existing.id },
-          data: { status: "FAILED" },
-        });
-      } else if (existing.status === "COMPLETED") {
-        // Return cached response
+      const expired = existing.expiresAt < new Date();
+
+      if (!expired && existing.status === "COMPLETED") {
         return {
           isNew: false,
           existingId: existing.id,
@@ -38,20 +47,38 @@ export class IdempotencyService {
             ? JSON.parse(existing.responseHash)
             : undefined,
         };
-      } else if (existing.status === "PENDING") {
-        // Same request still processing - could be duplicate or retry
-        // Check if request hash matches
+      }
+
+      if (!expired && existing.status === "PENDING") {
         if (existing.requestHash === requestHash) {
           return { isNew: false, existingId: existing.id };
         }
-        // Different request with same key - conflict
         throw new ConflictException(
           "Idempotency key reused with different request",
         );
       }
+
+      // A non-expired FAILED key must still belong to the same payload;
+      // anything else is key reuse.
+      if (!expired && existing.requestHash !== requestHash) {
+        throw new ConflictException(
+          "Idempotency key reused with different request",
+        );
+      }
+
+      // Renew in place: `create` would violate the unique (tenantId, key).
+      const renewed = await this.prisma.idempotencyKey.update({
+        where: { id: existing.id },
+        data: {
+          status: "PENDING",
+          requestHash,
+          responseHash: null,
+          expiresAt: new Date(Date.now() + KEY_TTL_MS),
+        },
+      });
+      return { isNew: true, existingId: renewed.id };
     }
 
-    // Create new idempotency key
     const newKey = await this.prisma.idempotencyKey.create({
       data: {
         tenantId,
@@ -60,7 +87,7 @@ export class IdempotencyService {
         operation,
         requestHash,
         status: "PENDING",
-        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours
+        expiresAt: new Date(Date.now() + KEY_TTL_MS),
       },
     });
 
@@ -72,7 +99,9 @@ export class IdempotencyService {
     key: string,
     responseData: any,
   ): Promise<void> {
-    const responseHash = JSON.stringify(responseData);
+    // stableStringify is BigInt-safe and key-order-stable; the replay path
+    // JSON.parses this column, so the output must stay valid JSON.
+    const responseHash = stableStringify(responseData);
     await this.prisma.idempotencyKey.update({
       where: { tenantId_key: { tenantId, key } },
       data: { status: "COMPLETED", responseHash },
@@ -80,8 +109,9 @@ export class IdempotencyService {
   }
 
   async markFailed(tenantId: string, key: string): Promise<void> {
-    await this.prisma.idempotencyKey.update({
-      where: { tenantId_key: { tenantId, key } },
+    // PENDING-only: never stomp a key that another attempt already completed.
+    await this.prisma.idempotencyKey.updateMany({
+      where: { tenantId, key, status: "PENDING" },
       data: { status: "FAILED" },
     });
   }
@@ -98,11 +128,10 @@ export class IdempotencyService {
   }
 
   private hashRequest(data: any): string {
-    const str =
-      typeof data === "string"
-        ? data
-        : JSON.stringify(data, Object.keys(data).sort());
-    return crypto.createHash("sha256").update(str).digest("hex");
+    return crypto
+      .createHash("sha256")
+      .update(stableStringify(data))
+      .digest("hex");
   }
 
   async cleanupExpired(): Promise<number> {

@@ -6,7 +6,13 @@ import {
   ForbiddenException,
 } from "@nestjs/common";
 import { PrismaService } from "../../tenants/prisma.service";
-import { Prisma, ExamStatus, AttemptStatus, LessonType } from "@prisma/client";
+import {
+  Prisma,
+  ExamStatus,
+  AttemptStatus,
+  LessonType,
+  ExamQuestionType,
+} from "@prisma/client";
 import { IdempotencyService } from "../../payments/security/idempotency.service";
 import { ProgressionService } from "../progression/progression.service";
 
@@ -186,6 +192,56 @@ export class ExamsService {
     return updated;
   }
 
+  /**
+   * Add a question to an exam. There is intentionally no other way to
+   * create questions — this is the single writer (teacher-only route).
+   */
+  async addQuestion(
+    tenantId: string,
+    examId: string,
+    dto: {
+      type: ExamQuestionType;
+      text: string;
+      explanation?: string;
+      points?: number;
+      position?: number;
+      options?: any[];
+      correctAnswer?: any;
+    },
+  ) {
+    const exam = await this.prisma.exam.findFirst({
+      where: { id: examId, tenantId },
+    });
+    if (!exam) {
+      throw new NotFoundException("Exam not found");
+    }
+
+    if (!Object.values(ExamQuestionType).includes(dto.type)) {
+      throw new BadRequestException("Invalid question type");
+    }
+    if (!dto.text || dto.text.trim() === "") {
+      throw new BadRequestException("Question text is required");
+    }
+
+    const position =
+      dto.position ??
+      (await this.prisma.examQuestion.count({ where: { examId } }));
+
+    return this.prisma.examQuestion.create({
+      data: {
+        tenantId,
+        examId,
+        type: dto.type,
+        text: dto.text,
+        explanation: dto.explanation,
+        points: dto.points ?? 1,
+        position,
+        options: (dto.options ?? null) as any,
+        correctAnswer: (dto.correctAnswer ?? null) as any,
+      },
+    });
+  }
+
   async publishExam(tenantId: string, examId: string) {
     const exam = await this.getExam(tenantId, examId);
 
@@ -259,7 +315,9 @@ export class ExamsService {
   // ==================== STUDENT METHODS ====================
 
   async getStudentExamView(tenantId: string, userId: string, examId: string) {
-    const exam = await this.getExam(tenantId, examId, true, true);
+    // Student view: questions only — never load the class's attempts.
+    // Fetch ONLY this student's attempts below (leak fix 2026-10-16).
+    const exam = await this.getExam(tenantId, examId, true);
 
     // Check enrollment
     const lesson = await this.prisma.lesson.findUnique({
@@ -279,8 +337,12 @@ export class ExamsService {
       throw new ForbiddenException("Not enrolled in this course");
     }
 
-    // Get student's attempts
-    const attempts = exam.attempts.filter((a) => a.studentId === userId);
+    // ONLY this student's attempts — previously every attempt's answers,
+    // score and gradingData leaked into the response via `...exam`.
+    const attempts = await this.prisma.examAttempt.findMany({
+      where: { tenantId, examId, studentId: userId },
+      orderBy: { attemptNumber: "desc" },
+    });
     const attemptCount = attempts.length;
 
     // Check if can attempt
@@ -446,6 +508,18 @@ export class ExamsService {
       },
     });
 
+    // Trigger progression ONCE: ENTER_EXAM → unlock the next lesson for THIS
+    // student (audit 2026-10-16 §6.1 — this used to be a tenant-wide flip AND
+    // the controller called it a second time). It runs before the idempotent
+    // response is stored so retries return the same unlock data.
+    const unlocked = await this.progressionService.handleEnterExam(
+      tenantId,
+      userId,
+      examId,
+      lesson.id,
+      `${idempotencyKey}:progression`,
+    );
+
     const response = {
       attemptId: attempt.id,
       examId,
@@ -463,6 +537,7 @@ export class ExamsService {
         options: q.options,
         // correctAnswer intentionally omitted
       })),
+      unlocked,
     };
 
     // Store idempotency response
@@ -470,15 +545,6 @@ export class ExamsService {
       tenantId,
       idempotencyKey,
       response,
-    );
-
-    // Trigger progression: ENTER_EXAM → unlock next lesson
-    await this.progressionService.handleEnterExam(
-      tenantId,
-      userId,
-      examId,
-      lesson.id,
-      `${idempotencyKey}:progression`,
     );
 
     return response;

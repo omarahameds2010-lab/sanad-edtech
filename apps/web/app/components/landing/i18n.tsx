@@ -1,6 +1,8 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import * as React from "react";
+import { createContext, useContext, useEffect, useRef, useState } from "react";
+import { LangSwitch } from "@lp/design-system";
 import { dict, type Dict, type Lang } from "./dict";
 
 interface LangCtx {
@@ -8,16 +10,26 @@ interface LangCtx {
   dir: "rtl" | "ltr";
   t: Dict;
   setLang: (l: Lang) => void;
+  /** True for a beat right after a language change (drives the pill spinner). */
+  switching: boolean;
 }
 
-const Ctx = createContext<LangCtx>({ lang: "ar", dir: "rtl", t: dict.ar, setLang: () => {} });
+const Ctx = createContext<LangCtx>({
+  lang: "ar",
+  dir: "rtl",
+  t: dict.ar,
+  setLang: () => {},
+  switching: false,
+});
 
 export function useLang() {
   return useContext(Ctx);
 }
 
-export function LangProvider({ children }: { children: ReactNode }) {
+export function LangProvider({ children }: { children: any }) {
   const [lang, setLangState] = useState<Lang>("ar");
+  const [switching, setSwitching] = useState(false);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     try {
@@ -27,6 +39,13 @@ export function LangProvider({ children }: { children: ReactNode }) {
       /* storage unavailable — stay Arabic */
     }
   }, []);
+
+  useEffect(
+    () => () => {
+      if (timer.current) clearTimeout(timer.current);
+    },
+    [],
+  );
 
   const dir = lang === "ar" ? "rtl" : "ltr";
 
@@ -41,81 +60,45 @@ export function LangProvider({ children }: { children: ReactNode }) {
   }, [lang, dir]);
 
   function setLang(l: Lang) {
+    if (l === lang) return;
+    setSwitching(true);
     setLangState(l);
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = setTimeout(() => setSwitching(false), 360);
   }
 
+  const ProviderComponent = Ctx.Provider as any;
+
   return (
-    <Ctx.Provider value={{ lang, dir, t: dict[lang], setLang }}>
+    <ProviderComponent value={{ lang, dir, t: dict[lang], setLang, switching }}>
       <div key={lang} className="lp-lang-enter">
         {children}
       </div>
-    </Ctx.Provider>
+    </ProviderComponent>
   );
 }
 
-/** Minimal pill switcher: العربية | EN with a sliding thumb. */
+/** Glassmorphic pill (design-system component) wired to the lang context. */
 export function LanguageSwitcher() {
-  const { lang, dir, setLang } = useLang();
-  const isAr = lang === "ar";
-
-  const thumb: React.CSSProperties = {
-    position: "absolute",
-    top: 3,
-    bottom: 3,
-    width: "calc(50% - 5px)",
-    borderRadius: 999,
-    background: "var(--ink-950)",
-    transition: "left 260ms cubic-bezier(.2,0,0,1), right 260ms cubic-bezier(.2,0,0,1)",
-    ...(dir === "ltr"
-      ? isAr
-        ? { left: 4 }
-        : { right: 4 }
-      : isAr
-        ? { right: 4 }
-        : { left: 4 }),
-  };
-
-  function btn(active: boolean): React.CSSProperties {
-    return {
-      position: "relative",
-      zIndex: 1,
-      flex: 1,
-      border: "none",
-      background: "none",
-      cursor: "pointer",
-      fontSize: 13,
-      fontWeight: 700,
-      padding: "7px 14px",
-      borderRadius: 999,
-      color: active ? "#ffffff" : "var(--ink-700)",
-      transition: "color 200ms ease",
-      whiteSpace: "nowrap",
-    };
-  }
+  const { lang, switching, setLang } = useLang();
 
   return (
-    <div
-      role="group"
-      aria-label="Language / اللغة"
-      style={{
-        position: "relative",
-        display: "flex",
-        alignItems: "center",
-        borderRadius: 999,
-        background: "rgba(255, 255, 255, 0.6)",
-        backdropFilter: "blur(12px)",
-        WebkitBackdropFilter: "blur(12px)",
-        border: "1px solid var(--paper-200)",
-        padding: 2,
-      }}
-    >
-      <span aria-hidden style={thumb} />
-      <button type="button" onClick={() => setLang("ar")} aria-pressed={isAr} style={btn(isAr)}>
-        العربية
-      </button>
-      <button type="button" onClick={() => setLang("en")} aria-pressed={!isAr} style={btn(!isAr)}>
-        EN
-      </button>
-    </div>
+    <LangSwitch
+      value={lang}
+      onChange={setLang}
+      busy={switching ? lang : null}
+      labels={{ ar: "العربية", en: "English" }}
+      ariaLabels={
+        lang === "ar"
+          ? {
+              en: "تبديل اللغة إلى الإنجليزية",
+              group: "تبديل اللغة / Language",
+            }
+          : {
+              ar: "Switch to Arabic",
+              group: "Language / تبديل اللغة",
+            }
+      }
+    />
   );
 }

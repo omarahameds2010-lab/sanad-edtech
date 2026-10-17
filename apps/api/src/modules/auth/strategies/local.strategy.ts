@@ -9,10 +9,11 @@ export class LocalStrategy extends PassportStrategy(Strategy) {
     super({
       usernameField: "phone",
       passwordField: "password",
+      passReqToCallback: true,
     });
   }
 
-  async validate(phone: string, password: string, req: any): Promise<any> {
+  async validate(req: any, phone: string, password: string): Promise<any> {
     // Get tenantId from request (set by TenantResolverMiddleware)
     const tenantId = req.tenantId;
 

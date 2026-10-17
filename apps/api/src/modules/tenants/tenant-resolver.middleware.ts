@@ -6,6 +6,7 @@ import {
 } from "@nestjs/common";
 import { Request, Response, NextFunction } from "express";
 import { PrismaService } from "./prisma.service";
+import { runWithTenantId } from "../../common/prisma/tenant-context";
 
 declare module "express" {
   interface Request {
@@ -13,6 +14,13 @@ declare module "express" {
     tenant?: any;
   }
 }
+
+type ResolvedTenantRow = {
+  id: string;
+  slug: string;
+  name: string;
+  status: string;
+};
 
 @Injectable()
 export class TenantResolverMiddleware implements NestMiddleware {
@@ -42,32 +50,36 @@ export class TenantResolverMiddleware implements NestMiddleware {
     let tenant = this.tenantCache.get(domain);
 
     if (!tenant) {
-      // Look up tenant by domain
-      const tenantDomain = await this.prisma.tenantDomain.findUnique({
-        where: { domain },
-        include: { tenant: true },
-      });
+      // Resolve through a SECURITY DEFINER function: this runs before any
+      // authentication, so no tenant context (app.tenant_id) exists yet and
+      // RLS would block a plain SELECT against tenant_domains/tenants
+      // (see 20261016000001_tenant_resolution_fn).
+      const rows = await this.prisma.$queryRaw<ResolvedTenantRow[]>`
+        SELECT id, slug, name, status
+        FROM app_resolve_tenant_by_domain(${domain})
+      `;
+      const resolved = rows[0];
 
-      if (!tenantDomain) {
+      if (!resolved) {
         throw new NotFoundException(`Tenant not found for domain: ${domain}`);
       }
 
-      if (tenantDomain.tenant.status !== "ACTIVE") {
+      if (resolved.status !== "ACTIVE") {
         throw new BadRequestException("Tenant is not active");
       }
 
-      tenant = tenantDomain.tenant;
+      tenant = resolved;
       this.tenantCache.set(domain, tenant);
     }
 
     // Set tenant context
     req.tenantId = tenant.id;
     req.tenant = tenant;
-
-    // Set PostgreSQL RLS context (this will be done in a transaction context)
-    // For now, we store it in the request for the interceptor to use
     req.headers["x-tenant-id"] = tenant.id;
 
-    next();
+    // Everything downstream (guards, controllers, services and the
+    // PrismaService wrapper) executes inside this AsyncLocalStorage scope:
+    // every tenant-scoped query gets app.tenant_id set transaction-locally.
+    return runWithTenantId(tenant.id, () => next());
   }
 }

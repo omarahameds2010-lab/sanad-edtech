@@ -30,14 +30,26 @@ export default function TeacherExamsPage() {
     );
   }
 
-  if (error) return <div className="card"><p>{error}</p></div>;
-  if (exams === null) return <div className="card"><p>جاري التحميل…</p></div>;
+  if (error)
+    return (
+      <div className="card">
+        <p>{error}</p>
+      </div>
+    );
+  if (exams === null)
+    return (
+      <div className="card">
+        <p>جاري التحميل…</p>
+      </div>
+    );
 
   return (
     <div>
       <h1 style={{ marginBottom: "var(--space-lg)" }}>الاختبارات والتصحيح</h1>
       {exams.length === 0 && (
-        <div className="card"><p>لا توجد اختبارات بعد.</p></div>
+        <div className="card">
+          <p>لا توجد اختبارات بعد.</p>
+        </div>
       )}
       <div style={{ display: "grid", gap: "var(--space-md)" }}>
         {exams.map((exam) => (
@@ -48,7 +60,9 @@ export default function TeacherExamsPage() {
             style={{ display: "block" }}
           >
             <h3 style={{ marginBottom: 4 }}>{exam.title}</h3>
-            <p style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 8 }}>
+            <p
+              style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 8 }}
+            >
               المدة: {exam.timerMinutes} دقيقة · الحالة: {exam.status}
               {exam.lesson ? ` · الدرس: ${exam.lesson.title}` : ""}
             </p>
