@@ -1,3 +1,5 @@
+import { fileURLToPath } from "node:url";
+
 /** @type {import('next').NextConfig} */
 // Local dev convention: web on :3001, API on :3002 — same-origin /api proxy
 // so login works even from a stale cached bundle that still points at the
@@ -12,6 +14,10 @@ const apiProxyTarget = (
 
 const nextConfig = {
   transpilePackages: ["@lp/design-system"],
+  // Pin file tracing to the repo root: without this Next.js walks up past the
+  // repo and may pick a stray lockfile in a parent directory (e.g. the user's
+  // home folder), which is never what a monorepo wants.
+  outputFileTracingRoot: fileURLToPath(new URL("../..", import.meta.url)),
   async rewrites() {
     return [
       {
