@@ -1,7 +1,11 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import type { CSSProperties } from "react";
-import { Reveal } from "../../components/landing/interactive";
+import {
+  GlowCard,
+  Magnetic,
+  Parallax,
+  Reveal,
+} from "../../components/landing/interactive";
 
 /** The one real space of the demo: الأستاذ صالح حسين — جوكر اللغة العربية. */
 const SPACE = {
@@ -42,18 +46,50 @@ const SPACE = {
 
 const FEATURES = [
   {
+    icon: "unlock",
     title: "مسار يفتح بالدخول",
     body: "دخولك الواجب يفتح الاختبار، ودخولك الاختبار يفتح الدرس التالي — من غير شرط درجة.",
   },
   {
+    icon: "clock",
     title: "وقت عادل ومحسوب",
     body: "مؤقت الواجب ٣٠٠ دقيقة، ومؤقت الاختبار ٧٠ دقيقة — محسوبين من الخادم، فمش هيتصفّروا بتحديث الصفحة.",
   },
   {
+    icon: "brain",
     title: "تقييم تفهمه مش بس رقم",
     body: "SANAD يقترح تقييمًا منظمًا للإجابات المفتوحة — والدرجة النهائية دايمًا باعتماد المعلم.",
   },
 ];
+
+/** 32px, stroke 1.5 — the triad's editorial marks. */
+function FeatureIcon({ name }: { name: string }) {
+  switch (name) {
+    case "unlock":
+      return (
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <rect x="4.5" y="10.5" width="15" height="9.5" rx="2.2" />
+          <path d="M8.5 10.5V8a3.8 3.8 0 0 1 7.4-1.1" />
+          <path d="M12 14.2v2.2" />
+        </svg>
+      );
+    case "clock":
+      return (
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <circle cx="12" cy="12" r="8.5" />
+          <path d="M12 7.5V12l3 2" />
+        </svg>
+      );
+    default:
+      return (
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M11.7 4.6C10.6 3.3 8.7 3 7.3 4c-1.1.8-1.6 2.2-1.3 3.5-1.2.6-2 1.9-2 3.3 0 1.3.7 2.5 1.7 3.1-.1.4-.2.9-.2 1.3 0 2 1.6 3.6 3.6 3.6 1 0 1.9-.4 2.6-1" />
+          <path d="M12.3 4.6c1.1-1.3 3-1.6 4.4-.6 1.1.8 1.6 2.2 1.3 3.5 1.2.6 2 1.9 2 3.3 0 1.3-.7 2.5-1.7 3.1.1.4.2.9.2 1.3 0 2-1.6 3.6-3.6 3.6-1 0-1.9-.4-2.6-1" />
+          <path d="M12 4.4v15.2" />
+        </svg>
+      );
+  }
+}
 
 export function generateStaticParams() {
   return [{ slug: SPACE.slug }];
@@ -78,7 +114,8 @@ export default async function TeacherSpacePage({
     <main className="ts-page">
       <Reveal>
         <section className="ts-hero" aria-label={`مساحة ${SPACE.name}`}>
-          <div className="ts-hero-glow" aria-hidden />
+          <Parallax className="ts-hero-aurora" speed={0.1} />
+          <div className="ts-hero-grain" aria-hidden />
           <svg
             className="ts-hero-motif"
             viewBox="0 0 520 300"
@@ -116,103 +153,48 @@ export default async function TeacherSpacePage({
             />
           </svg>
 
-          <div
-            style={{
-              position: "relative",
-              display: "flex",
-              gap: 24,
-              alignItems: "center",
-              flexWrap: "wrap",
-            }}
-          >
+          <div className="ts-hero-id">
             <div className="ts-avatar" aria-hidden>
               ع
             </div>
-            <div style={{ flex: "1 1 280px", minWidth: 0 }}>
-              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <div className="ts-hero-name">
+              <div className="ts-chips">
                 <span className="ts-chip">{SPACE.subject}</span>
-                <span className="ts-chip ts-chip-quiet">{SPACE.stage}</span>
-                <span className="ts-chip ts-chip-quiet">٣ كورسات</span>
+                <span className="ts-chip">{SPACE.stage}</span>
+                <span className="ts-chip">٣ كورسات</span>
               </div>
-              <h1
-                className="lp-text-gradient"
-                style={{
-                  margin: "14px 0 0",
-                  fontSize: "clamp(30px, 5vw, 44px)",
-                  fontWeight: 800,
-                  lineHeight: 1.5,
-                }}
-              >
-                {SPACE.name}
-              </h1>
+              <h1 className="ts-name">{SPACE.name}</h1>
               <p className="ts-tagline">«{SPACE.tagline}»</p>
             </div>
           </div>
 
-          <p
-            style={{
-              position: "relative",
-              color: "#a7adba",
-              lineHeight: 1.95,
-              maxWidth: 640,
-              margin: "20px 0 0",
-            }}
-          >
-            {SPACE.bio}
-          </p>
+          <p className="ts-bio">{SPACE.bio}</p>
 
-          <div
-            style={{
-              position: "relative",
-              display: "flex",
-              gap: 10,
-              flexWrap: "wrap",
-              marginTop: 18,
-            }}
-          >
+          <div className="ts-tags">
             {SPACE.focus.split(" · ").map((tag) => (
-              <span
-                key={tag}
-                className="lp-tag"
-                style={
-                  {
-                    "--tag-accent": "#34d399",
-                    "--tag-accent-soft": "rgba(52, 211, 153, 0.14)",
-                  } as CSSProperties
-                }
-              >
+              <span key={tag} className="ts-chip">
                 {tag}
               </span>
             ))}
           </div>
 
-          <div
-            style={{
-              position: "relative",
-              display: "flex",
-              gap: 12,
-              flexWrap: "wrap",
-              marginTop: 28,
-            }}
-          >
-            <Link
-              href="/courses/arabic-1-prep"
-              className="lp-btn lp-btn-primary"
-            >
-              ابدأ من الأول الإعدادي
-            </Link>
-            <a href="#courses" className="ts-btn-dark">
+          <div className="ts-hero-ctas">
+            <Magnetic maxPx={2}>
+              <Link
+                href="/courses/arabic-1-prep"
+                className="ts-btn ts-btn-primary"
+              >
+                ابدأ من الأول الإعدادي
+              </Link>
+            </Magnetic>
+            <a href="#courses" className="ts-btn ts-btn-secondary">
               استعرض كورسات المساحة
             </a>
           </div>
         </section>
       </Reveal>
 
-      <section
-        id="courses"
-        aria-label="كورسات المساحة"
-        style={{ marginTop: 64, scrollMarginTop: 24 }}
-      >
+      <section id="courses" className="ts-courses" aria-label="كورسات المساحة">
         <Reveal>
           <p className="lp-eyebrow">كورسات المساحة</p>
           <h2 className="lp-h2" style={{ fontSize: 28 }}>
@@ -223,147 +205,69 @@ export default async function TeacherSpacePage({
             يكشف اللي محتاج تحسين، واختبار يثبّت.
           </p>
         </Reveal>
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
-            gap: 20,
-            marginTop: 32,
-          }}
-        >
+        <div className="ts-bento">
           {SPACE.courses.map((course, index) => (
-            <Reveal key={course.slug} delay={index * 90}>
-              <article className="ts-course-card">
+            <Reveal key={course.slug} delay={index * 100}>
+              <GlowCard className="ts-course-card">
                 <span className="ts-course-digit" aria-hidden>
                   {course.numeral}
                 </span>
-                <span
-                  style={{
-                    color: "var(--color-action-strong)",
-                    fontWeight: 800,
-                    fontSize: 13,
-                  }}
-                >
-                  الصف {course.grade}
-                </span>
-                <h3
-                  style={{
-                    margin: 0,
-                    fontSize: 19,
-                    color: "var(--ink-700)",
-                    lineHeight: 1.6,
-                  }}
-                >
-                  {course.title}
-                </h3>
-                <p
-                  style={{
-                    margin: 0,
-                    color: "var(--text-muted)",
-                    fontSize: 14.5,
-                    lineHeight: 1.85,
-                  }}
-                >
-                  {course.desc}
-                </p>
-                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                <span className="ts-course-grade">الصف {course.grade}</span>
+                <h3 className="ts-course-title">{course.title}</h3>
+                <p className="ts-course-desc">{course.desc}</p>
+                <div className="ts-course-tags">
                   {["نحو", "بلاغة", "نصوص"].map((topic) => (
-                    <span key={topic} className="ts-pill">
+                    <span key={topic} className="ts-tag">
                       {topic}
                     </span>
                   ))}
                 </div>
                 {course.full && (
-                  <span
-                    className="ts-pill ts-pill-accent"
-                    style={{ alignSelf: "flex-start" }}
-                  >
+                  <span className="ts-tag ts-tag-accent">
                     المسار الكامل: درس ← واجب ← اختبار
                   </span>
                 )}
                 <Link
                   href={`/courses/${course.slug}`}
-                  className="lp-cta"
-                  style={{
-                    marginTop: "auto",
-                    paddingTop: 8,
-                    color: "var(--color-action-strong)",
-                  }}
+                  className="lp-cta ts-course-link"
                 >
                   استعرض الكورس
                   <span className="lp-arrow" aria-hidden>
                     ←
                   </span>
                 </Link>
-              </article>
+              </GlowCard>
             </Reveal>
           ))}
         </div>
       </section>
 
       <Reveal>
-        <section
-          aria-label="لماذا التعلم هنا"
-          style={{
-            marginTop: 56,
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
-            gap: 16,
-          }}
-        >
+        <section className="ts-triad" aria-label="لماذا التعلم هنا">
           {FEATURES.map((feature) => (
-            <div key={feature.title} className="ts-feature">
-              <h3 style={{ margin: "0 0 8px", fontSize: 16.5 }}>
-                {feature.title}
-              </h3>
-              <p
-                style={{
-                  margin: 0,
-                  color: "var(--text-muted)",
-                  fontSize: 13.5,
-                  lineHeight: 1.8,
-                }}
-              >
-                {feature.body}
-              </p>
+            <div key={feature.title} className="ts-triad-item">
+              <FeatureIcon name={feature.icon} />
+              <h3>{feature.title}</h3>
+              <p>{feature.body}</p>
             </div>
           ))}
         </section>
       </Reveal>
 
       <Reveal>
-        <section
-          style={{
-            marginTop: 56,
-            textAlign: "center",
-            background: "var(--paper-100)",
-            border: "1px solid var(--paper-200)",
-            borderRadius: 24,
-            padding: "40px 24px",
-          }}
-        >
-          <h2 className="lp-h2" style={{ fontSize: 24 }}>
-            جاهز تبدأ؟
-          </h2>
-          <p
-            className="lp-lead"
-            style={{ margin: "0 auto 22px", maxWidth: 520 }}
-          >
+        <section className="ts-final" aria-label="ابدأ رحلتك">
+          <h2>جاهز تبدأ رحلتك؟</h2>
+          <p>
             سجّل دخولك وادخل كورس الأول الإعدادي — والمسار هيوديك خطوة بخطوة.
           </p>
-          <div
-            style={{
-              display: "flex",
-              gap: 12,
-              justifyContent: "center",
-              flexWrap: "wrap",
-            }}
-          >
-            <Link href="/login" className="lp-btn lp-btn-primary">
-              تسجيل الدخول
-            </Link>
-            <Link href="/courses" className="lp-btn lp-btn-ghost">
-              تصفح كل الكورسات
+          <div className="ts-final-ctas">
+            <Magnetic maxPx={2}>
+              <Link href="/login" className="ts-btn ts-btn-primary">
+                تسجيل الدخول
+              </Link>
+            </Magnetic>
+            <Link href="/courses" className="ts-btn ts-btn-secondary">
+              تصفح الكورسات
             </Link>
           </div>
         </section>
@@ -372,6 +276,12 @@ export default async function TeacherSpacePage({
       <p className="ts-footer-note">
         الأستاذ صالح حسين · مساحة تعليمية على منصة سند
       </p>
+
+      <div className="ts-mobile-cta">
+        <Link href="/login" className="ts-btn ts-btn-primary">
+          تسجيل الدخول
+        </Link>
+      </div>
     </main>
   );
 }
