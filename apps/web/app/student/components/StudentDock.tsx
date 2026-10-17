@@ -3,21 +3,103 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+import { useCommandPalette } from "@/app/hooks/useCommandPalette";
 import StudentOrb from "./StudentOrb";
 
-const items = [
-  { href: "/student", label: "لوحتي", exact: true },
-  { href: "/student/courses", label: "كورساتي", exact: false },
-  { href: "/student/assignments", label: "واجباتي", exact: false },
-  { href: "/student/exams", label: "اختباراتي", exact: false },
+type DockIconName =
+  "grid" | "book" | "clipboard" | "file" | "search" | "target";
+
+const items: Array<{
+  href: string;
+  label: string;
+  exact: boolean;
+  icon: DockIconName;
+}> = [
+  { href: "/student", label: "لوحتي", exact: true, icon: "grid" },
+  { href: "/student/courses", label: "كورساتي", exact: false, icon: "book" },
+  {
+    href: "/student/assignments",
+    label: "واجباتي",
+    exact: false,
+    icon: "clipboard",
+  },
+  { href: "/student/exams", label: "اختباراتي", exact: false, icon: "file" },
 ];
+
+function DockIcon({ name }: { name: DockIconName }) {
+  const common = {
+    width: 20,
+    height: 20,
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: "currentColor",
+    strokeWidth: 1.5,
+    strokeLinecap: "round" as const,
+    strokeLinejoin: "round" as const,
+    "aria-hidden": true,
+  };
+  switch (name) {
+    case "grid":
+      return (
+        <svg {...common}>
+          <rect x="3.5" y="3.5" width="7" height="7" rx="1.6" />
+          <rect x="13.5" y="3.5" width="7" height="7" rx="1.6" />
+          <rect x="3.5" y="13.5" width="7" height="7" rx="1.6" />
+          <rect x="13.5" y="13.5" width="7" height="7" rx="1.6" />
+        </svg>
+      );
+    case "book":
+      return (
+        <svg {...common}>
+          <path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v15H6.5A2.5 2.5 0 0 0 4 20.5z" />
+          <path d="M4 18.5A2.5 2.5 0 0 1 6.5 16H20" />
+        </svg>
+      );
+    case "clipboard":
+      return (
+        <svg {...common}>
+          <rect x="5" y="4.5" width="14" height="16" rx="2.5" />
+          <path d="M9 4.5V3.8A1.3 1.3 0 0 1 10.3 2.5h3.4A1.3 1.3 0 0 1 15 3.8v.7" />
+          <path d="M9 10.5h6M9 14.5h4" />
+        </svg>
+      );
+    case "file":
+      return (
+        <svg {...common}>
+          <path d="M14 3H7.5A2.5 2.5 0 0 0 5 5.5v13A2.5 2.5 0 0 0 7.5 21h9a2.5 2.5 0 0 0 2.5-2.5V8z" />
+          <path d="M14 3v5h5" />
+          <path d="m9.5 14.5 2 2 3.5-4" />
+        </svg>
+      );
+    case "search":
+      return (
+        <svg {...common}>
+          <circle cx="11" cy="11" r="6.5" />
+          <path d="m20 20-3.8-3.8" />
+        </svg>
+      );
+    case "target":
+      return (
+        <svg {...common}>
+          <circle cx="12" cy="12" r="8.5" />
+          <circle cx="12" cy="12" r="4.5" />
+          <circle cx="12" cy="12" r="1" fill="currentColor" stroke="none" />
+        </svg>
+      );
+    default:
+      return null;
+  }
+}
 
 export default function StudentDock() {
   const pathname = usePathname();
+  const { open: openPalette } = useCommandPalette();
   const [compact, setCompact] = useState(false);
   const [thumb, setThumb] = useState({ left: 0, width: 0, ready: false });
+  const [focus, setFocus] = useState(false);
   const refs = useRef<(HTMLAnchorElement | null)[]>([]);
 
+  const dark = pathname === "/student";
   const activeIndex = Math.max(
     0,
     items.findIndex((it) =>
@@ -34,6 +116,11 @@ export default function StudentDock() {
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
+  // Leaving the dashboard ends focus mode; the dimming only exists there.
+  useEffect(() => {
+    setFocus(false);
+  }, [pathname]);
+
   useEffect(() => {
     function measure() {
       const el = refs.current[activeIndex];
@@ -44,18 +131,21 @@ export default function StudentDock() {
     measure();
     window.addEventListener("resize", measure);
     return () => window.removeEventListener("resize", measure);
-  }, [activeIndex, pathname]);
+  }, [activeIndex, pathname, compact]);
+
+  function toggleFocus() {
+    const next = !focus;
+    setFocus(next);
+    window.dispatchEvent(new CustomEvent("sanad:focus", { detail: next }));
+  }
 
   return (
     <div
+      className="sd-wrap"
       style={{
         position: "sticky",
         top: compact ? 12 : 20,
         zIndex: 40,
-        display: "flex",
-        justifyContent: "center",
-        alignItems: "center",
-        gap: 10,
         paddingTop: 12,
         transition: "top 300ms ease",
       }}
@@ -63,36 +153,16 @@ export default function StudentDock() {
       <StudentOrb />
       <nav
         aria-label="تنقل الطالب"
-        style={{
-          position: "relative",
-          display: "flex",
-          alignItems: "center",
-          gap: compact ? 2 : 4,
-          background: "rgba(255, 255, 255, 0.72)",
-          backdropFilter: "blur(16px)",
-          WebkitBackdropFilter: "blur(16px)",
-          border: "1px solid var(--paper-200)",
-          borderRadius: 999,
-          padding: compact ? "6px" : "6px 10px",
-          boxShadow: "0 12px 32px -12px rgba(11, 13, 16, 0.18)",
-          transition: "padding 300ms ease, gap 300ms ease",
-          maxWidth: "calc(100vw - 32px)",
-          overflowX: "auto",
-        }}
+        className={`sd-nav${compact ? " is-compact" : ""}`}
+        data-theme={dark ? "dark" : "light"}
       >
         <span
-          aria-hidden
+          aria-hidden="true"
+          className="sd-thumb"
           style={{
-            position: "absolute",
-            top: 6,
-            bottom: 6,
             left: thumb.ready ? thumb.left : 6,
             width: thumb.ready ? thumb.width : 0,
-            borderRadius: 999,
-            background: "var(--ink-950)",
             opacity: thumb.ready ? 1 : 0,
-            transition:
-              "left 320ms cubic-bezier(.2,0,0,1), width 320ms cubic-bezier(.2,0,0,1), opacity 200ms ease",
           }}
         />
         {items.map((it, i) => {
@@ -105,38 +175,37 @@ export default function StudentDock() {
               }}
               href={it.href}
               aria-current={selected ? "page" : undefined}
-              style={{
-                position: "relative",
-                zIndex: 1,
-                padding: compact ? "7px 12px" : "8px 16px",
-                borderRadius: 999,
-                fontSize: compact ? 12 : 14,
-                fontWeight: 700,
-                color: selected ? "#ffffff" : "var(--ink-700)",
-                textDecoration: "none",
-                whiteSpace: "nowrap",
-                transition:
-                  "color 200ms ease, padding 300ms ease, font-size 300ms ease",
-              }}
+              className={`sd-item${selected ? " is-active" : ""}`}
               title={it.label}
             >
-              {it.label}
+              <DockIcon name={it.icon} />
+              <span>{it.label}</span>
             </Link>
           );
         })}
-        <span
-          aria-hidden
-          title="سند"
-          style={{
-            width: 10,
-            height: 10,
-            borderRadius: "50%",
-            background: "var(--color-action)",
-            marginInlineStart: 4,
-            flexShrink: 0,
-            animation: "lp-dot-pulse 2.6s ease-in-out infinite",
-          }}
-        />
+        <span aria-hidden="true" className="sd-sep" />
+        <button
+          type="button"
+          className="sd-action"
+          onClick={openPalette}
+          aria-label="بحث سريع (Ctrl+K)"
+          title="بحث سريع — Ctrl+K"
+        >
+          <DockIcon name="search" />
+          <kbd>⌘K</kbd>
+        </button>
+        {dark && (
+          <button
+            type="button"
+            className={`sd-action${focus ? " is-on" : ""}`}
+            onClick={toggleFocus}
+            aria-pressed={focus}
+            aria-label={focus ? "إلغاء وضع التركيز" : "وضع التركيز"}
+            title="وضع التركيز"
+          >
+            <DockIcon name="target" />
+          </button>
+        )}
       </nav>
     </div>
   );

@@ -720,6 +720,8 @@ export interface GradeSubmissionResult {
 export interface ProgressionUnlockInfo {
   unlockType: string;
   unlockTargetId: string;
+  /** Server grant time — present only on student-granted unlocks. */
+  unlockedAt?: string | null;
   /** The server's own explanation of the constraint. */
   description: string;
 }
