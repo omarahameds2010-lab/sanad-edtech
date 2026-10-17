@@ -20,6 +20,7 @@ import { ProviderRegistryService } from "../providers/provider-registry.service"
 import { ProviderRouterService } from "../routing/provider-router.service";
 import { JwtAuthGuard } from "../../auth/guards/jwt-auth.guard";
 import { RequirePermission } from "../../authorization/authorization.decorators";
+import { toBigIntMinor } from "../../../common/money/minor-units";
 
 @Controller("payments")
 @UseGuards(JwtAuthGuard)
@@ -294,6 +295,50 @@ export class PaymentsController {
     }
 
     return { cancelled: true };
+  }
+
+  /**
+   * Refund a captured payment (bundle C).
+   *
+   * Money-out is idempotent by `idempotencyKey` (required) and returns the
+   * same `refundId` on any replay. `amountMinor` is optional: omit it for a
+   * full remaining refund. JSON cannot carry BigInt — pass a number or a
+   * digit string; the orchestrator canonicalizes it.
+   */
+  @Post(":paymentId/refunds")
+  @RequirePermission({
+    action: "refund",
+    resourceType: "payment",
+    resourceIdParam: "paymentId",
+  })
+  @HttpCode(HttpStatus.CREATED)
+  async refundPayment(
+    @Request() req,
+    @Param("paymentId") paymentId: string,
+    @Body()
+    body: {
+      amountMinor?: number | string;
+      reason?: string;
+      idempotencyKey?: string;
+    },
+  ) {
+    if (!body.idempotencyKey || !body.idempotencyKey.trim()) {
+      throw new BadRequestException("idempotencyKey is required");
+    }
+
+    const refund = await this.orchestrator.processRefund({
+      tenantId: req.tenantId,
+      paymentId,
+      amountMinor:
+        body.amountMinor === undefined
+          ? undefined
+          : toBigIntMinor(body.amountMinor, "amountMinor"),
+      reason: body.reason,
+      requestedBy: req.user.sub,
+      idempotencyKey: body.idempotencyKey,
+    });
+
+    return { refund };
   }
 
   // Voucher endpoints

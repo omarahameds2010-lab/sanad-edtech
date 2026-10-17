@@ -89,6 +89,21 @@ export class VoucherProvider implements PaymentProvider {
     });
 
     if (existingRedemption) {
+      // Checkout crash-resume (bundle C): the same checkout attempt already
+      // redeemed this voucher and then died before its payment completed. The
+      // redemption (and its grants) are committed — return success without
+      // touching usedCount so the retry can finish the payment instead of
+      // losing the voucher to ALREADY_REDEEMED.
+      const existingIntentId = (existingRedemption.metadata as any)?.intentId;
+      const incomingIntentId = metadata?.intentId;
+      if (
+        existingIntentId &&
+        incomingIntentId &&
+        String(existingIntentId) === String(incomingIntentId)
+      ) {
+        return { success: true, voucher, entitlements: [] };
+      }
+
       return {
         success: false,
         errorCode: "ALREADY_REDEEMED",

@@ -315,12 +315,16 @@ export class PaymobProvider implements PaymentProvider {
   }
 
   private mapEventType(obj: any): string {
-    if (obj.success === true && obj.pending !== true) return "payment.paid";
-    if (obj.success === false) return "payment.failed";
-    if (obj.pending === true) return "payment.pending";
+    // Refund/void markers win over `success`: a Paymob refund callback carries
+    // success=true AND is_refunded=true, and the old order classified it as
+    // `payment.paid` — so refunds could never settle through the inbox
+    // (bundle C).
     if (obj.is_refunded === true) return "payment.refunded";
     if (obj.is_void === true || obj.is_voided === true)
       return "payment.cancelled";
+    if (obj.success === true && obj.pending !== true) return "payment.paid";
+    if (obj.success === false) return "payment.failed";
+    if (obj.pending === true) return "payment.pending";
     return "payment.unknown";
   }
 
@@ -413,11 +417,26 @@ export class PaymobProvider implements PaymentProvider {
         },
       );
 
-      const data = await response.json();
+      const data = await response.json().catch(() => ({}) as any);
+
+      // The old code returned success:true unconditionally — an HTTP 4xx (or
+      // `success:false` in the body) was recorded as a completed refund
+      // (bundle C). Fail visibly instead.
+      if (!response.ok || data?.success === false) {
+        return {
+          success: false,
+          errorCode: "REFUND_REJECTED",
+          errorMessage:
+            data?.message ||
+            data?.detail ||
+            `Paymob rejected the refund (HTTP ${response.status})`,
+          rawResponse: data,
+        };
+      }
 
       return {
         success: true,
-        providerRefundId: data.id?.toString(),
+        providerRefundId: data?.id !== undefined ? String(data.id) : undefined,
         status: "SUCCEEDED",
         rawResponse: data,
       };

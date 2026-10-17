@@ -72,6 +72,25 @@ export interface PaymentResult {
   errorMessage?: string;
 }
 
+export interface RefundInput {
+  tenantId: string;
+  paymentId: string;
+  /** Omit for a full remaining refund. */
+  amountMinor?: bigint;
+  reason?: string;
+  requestedBy: string;
+  idempotencyKey: string;
+}
+
+export interface RefundResult {
+  refundId: string;
+  status: string;
+  /** JSON cannot carry BigInt — refunds leave the API as digit strings. */
+  amountMinor: string;
+  paymentStatus: string;
+  replayed?: boolean;
+}
+
 @Injectable()
 export class PaymentOrchestratorService {
   constructor(
@@ -337,21 +356,38 @@ export class PaymentOrchestratorService {
         },
       });
     } else {
-      intent = await this.prisma.paymentIntent.create({
-        data: {
-          tenantId,
-          orderId,
-          userId,
-          amountMinor: order.totalMinor,
-          currency: order.currency,
-          requestedMethod: paymentMethod,
-          provider: provider.name,
-          status: "CREATED",
-          idempotencyKey,
-          expiresAt: new Date(Date.now() + 30 * 60 * 1000), // 30 min
-          metadata: { ...metadata, returnUrl, webhookUrl, riskScore },
-        },
-      });
+      try {
+        intent = await this.prisma.paymentIntent.create({
+          data: {
+            tenantId,
+            orderId,
+            userId,
+            amountMinor: order.totalMinor,
+            currency: order.currency,
+            requestedMethod: paymentMethod,
+            provider: provider.name,
+            status: "CREATED",
+            idempotencyKey,
+            expiresAt: new Date(Date.now() + 30 * 60 * 1000), // 30 min
+            metadata: { ...metadata, returnUrl, webhookUrl, riskScore },
+          },
+        });
+      } catch (error) {
+        if (!this.isUniqueViolation(error)) throw error;
+        // Two concurrent requests raced the same new key: the winner's intent
+        // exists now. Replay its stored response if it already finished;
+        // otherwise fail explicitly instead of initializing a second provider
+        // payment for one order (bundle C).
+        const keyRow = await this.prisma.idempotencyKey.findUnique({
+          where: { tenantId_key: { tenantId, key: idempotencyKey } },
+        });
+        if (keyRow?.status === "COMPLETED" && keyRow.responseHash) {
+          return JSON.parse(keyRow.responseHash) as PaymentResult;
+        }
+        throw new ConflictException(
+          "Concurrent checkout in progress — retry with the same idempotency key",
+        );
+      }
     }
 
     // If voucher, handle directly
@@ -428,6 +464,35 @@ export class PaymentOrchestratorService {
       throw new BadRequestException("Voucher code required");
     }
 
+    // Crash-resume (bundle C): reuse whatever a previous attempt left behind
+    // instead of redeeming the voucher twice or dying on the payment unique
+    // index. A CONFIRMED order means the previous attempt finished — replay.
+    const existingPayment = await this.prisma.payment.findFirst({
+      where: { paymentIntentId: intent.id, provider: "voucher" },
+    });
+    if (existingPayment) {
+      const freshOrder = await this.prisma.order.findFirst({
+        where: { id: order.id },
+      });
+      if (freshOrder?.status === "CONFIRMED") {
+        const replay: PaymentResult = {
+          success: true,
+          paymentIntentId: intent.id,
+          paymentId: existingPayment.id,
+          providerTransactionId:
+            existingPayment.providerTransactionId ?? undefined,
+        };
+        if (intent.idempotencyKey) {
+          await this.idempotency.markCompleted(
+            tenantId,
+            intent.idempotencyKey,
+            replay,
+          );
+        }
+        return replay;
+      }
+    }
+
     // Check if course matches
     const courseId = order.items?.[0]?.resourceId;
 
@@ -479,26 +544,39 @@ export class PaymentOrchestratorService {
       throw new BadRequestException(result.errorMessage);
     }
 
-    // Create payment record for voucher
-    const payment = await this.prisma.payment.create({
-      data: {
-        tenantId,
-        orderId: order.id,
-        userId,
-        paymentIntentId: intent.id,
-        provider: "voucher",
-        paymentMethod: "VOUCHER",
-        status: "PAID",
-        amountMinor: order.totalMinor,
-        currency: order.currency,
-        providerTransactionId: `voucher_${intent.id}`,
-        confirmedAt: new Date(),
-        metadata: {
-          voucherId: result.voucher?.id,
-          voucherCode: metadata?.voucherCode,
-        },
-      },
-    });
+    // Create — or reuse — the payment record for this voucher checkout. The
+    // unique (provider, providerTransactionId) row is the crash anchor for
+    // retries (bundle C).
+    let payment = existingPayment;
+    if (!payment) {
+      try {
+        payment = await this.prisma.payment.create({
+          data: {
+            tenantId,
+            orderId: order.id,
+            userId,
+            paymentIntentId: intent.id,
+            provider: "voucher",
+            paymentMethod: "VOUCHER",
+            status: "PAID",
+            amountMinor: order.totalMinor,
+            currency: order.currency,
+            providerTransactionId: `voucher_${intent.id}`,
+            confirmedAt: new Date(),
+            metadata: {
+              voucherId: result.voucher?.id,
+              voucherCode: metadata?.voucherCode,
+            },
+          },
+        });
+      } catch (error) {
+        if (!this.isUniqueViolation(error)) throw error;
+        payment = await this.prisma.payment.findFirst({
+          where: { paymentIntentId: intent.id, provider: "voucher" },
+        });
+        if (!payment) throw error;
+      }
+    }
 
     // Complete the order
     await this.completePayment(
@@ -699,155 +777,586 @@ export class PaymentOrchestratorService {
   }
 
   /**
-   * Process refund
+   * Process a refund (bundle C).
+   *
+   * Money-out rules:
+   *  - a COMPLETED key replays its stored result verbatim;
+   *  - a PENDING key resumes the crashed attempt it left behind;
+   *  - the refund row is claimed (PENDING -> PROCESSING) *before* the provider
+   *    network call, so a retry after a crash lands on PROCESSING and refuses
+   *    ("outcome unknown") instead of refunding twice;
+   *  - settlement (status + reversing ledger entries + payment/order state +
+   *    entitlement revocation on a full refund) runs in ONE transaction, and
+   *    the (PENDING|PROCESSING -> SUCCEEDED) CAS makes the webhook path and
+   *    this path settle the same refund exactly once.
    */
-  async processRefund(
-    tenantId: string,
-    paymentId: string,
-    amountMinor: bigint,
-    reason: string,
-    requestedBy: string,
-    idempotencyKey: string,
-  ): Promise<void> {
+  async processRefund(input: RefundInput): Promise<RefundResult> {
+    const { tenantId, paymentId, requestedBy, idempotencyKey } = input;
+
     const payment = await this.prisma.payment.findFirst({
       where: { id: paymentId, tenantId },
       include: { order: true },
     });
 
     if (!payment) throw new NotFoundException("Payment not found");
-    if (payment.status !== "PAID")
-      throw new BadRequestException("Payment not in paid state");
-    if (payment.refundedAt)
-      throw new BadRequestException("Payment already refunded");
 
-    // Check refundable amount
-    const totalRefunded = await this.prisma.refund.aggregate({
-      where: { paymentId, status: "SUCCEEDED" },
-      _sum: { amountMinor: true },
-    });
-    const alreadyRefunded = totalRefunded._sum.amountMinor || 0n;
-    if (alreadyRefunded + amountMinor > payment.amountMinor) {
-      throw new BadRequestException("Refund amount exceeds payment amount");
-    }
-
-    // Idempotency
+    // Claim the idempotency key BEFORE any state validation: a replay must
+    // work even after the payment has since been fully refunded. The hash
+    // covers only the raw request (not the resolved amount), so retries with
+    // an omitted `amountMinor` hash identically.
     const idempotent = await this.idempotency.checkAndStore(
       tenantId,
       requestedBy,
       idempotencyKey,
       "refund_create",
-      { paymentId, amountMinor },
-    );
-    if (!idempotent.isNew) return;
-
-    // Create refund record
-    const refund = await this.prisma.refund.create({
-      data: {
-        tenantId,
+      {
         paymentId,
-        orderId: payment.orderId,
-        userId: payment.userId,
-        requestedBy,
-        amountMinor,
-        currency: payment.currency,
-        reason,
-        status: "PENDING",
-        metadata: { idempotencyKey },
+        amountMinor: input.amountMinor?.toString() ?? null,
+        reason: input.reason ?? null,
       },
-    });
+    );
 
-    // Process with provider if possible
-    if (payment.provider !== "voucher") {
-      const provider = this.providerRegistry.getProvider(payment.provider);
-      if (provider?.refund) {
-        const refundResult = await provider.refund({
-          providerPaymentId: payment.providerTransactionId!,
-          providerTransactionId: payment.providerTransactionId!,
-          amountMinor,
-          currency: payment.currency,
-          reason,
-          idempotencyKey,
-        });
-
-        if (refundResult.success) {
-          await this.prisma.refund.update({
-            where: { id: refund.id },
-            data: {
-              status: "SUCCEEDED",
-              providerRefundId: refundResult.providerRefundId,
-              processedAt: new Date(),
-            },
-          });
-        } else {
-          await this.prisma.refund.update({
-            where: { id: refund.id },
-            data: {
-              status: "FAILED",
-              metadata: { error: refundResult.errorMessage },
-            },
-          });
-          throw new BadRequestException(
-            refundResult.errorMessage || "Refund failed",
-          );
-        }
-      }
-    } else {
-      // Voucher refund - restore voucher usage
-      await this.processVoucherRefund(tenantId, payment, amountMinor);
+    if (!idempotent.isNew && idempotent.response !== undefined) {
+      return { ...(idempotent.response as RefundResult), replayed: true };
     }
 
-    // Record refund in ledger
-    await this.ledger.recordRefund(
-      this.prisma,
-      tenantId,
-      refund,
-      payment.provider,
-    );
+    if (!idempotent.isNew) {
+      // PENDING claim without a response: a previous attempt died somewhere
+      // between the key claim and completion. Resume — or refuse loudly.
+      const prior = await this.prisma.refund.findFirst({
+        where: {
+          tenantId,
+          paymentId,
+          metadata: { path: ["idempotencyKey"], equals: idempotencyKey },
+        },
+      });
 
-    // Publish event
-    await this.outbox.publish(tenantId, {
-      eventType: "payment.refunded",
-      aggregateType: "refund",
-      aggregateId: refund.id,
-      payload: {
-        refundId: refund.id,
-        paymentId,
-        amountMinor: amountMinor.toString(),
-      },
+      if (!prior)
+        throw new ConflictException(
+          "Refund attempt already in progress — retry shortly",
+        );
+
+      if (prior.status === "SUCCEEDED") {
+        const result = this.refundResult(prior, payment.status);
+        await this.idempotency.markCompleted(tenantId, idempotencyKey, result);
+        return { ...result, replayed: true };
+      }
+
+      if (prior.status === "FAILED") {
+        await this.idempotency.markFailed(tenantId, idempotencyKey);
+        throw new BadRequestException(
+          (prior.metadata as any)?.error || "Refund failed",
+        );
+      }
+
+      if (prior.status === "PROCESSING")
+        throw new ConflictException(
+          "Refund outcome unknown — reconcile with the provider before retrying",
+        );
+
+      // PENDING: the provider was never called for it (the claim flips to
+      // PROCESSING before the network call) — safe to execute now.
+      return this.executeRefund(payment, prior, idempotencyKey);
+    }
+
+    // Fresh attempt — validate now; a refusal releases the claim so the
+    // teacher can retry with the same key.
+    let amountMinor: bigint;
+    try {
+      if (payment.status !== "PAID" && payment.status !== "REFUND_PENDING")
+        throw new BadRequestException("Payment not in paid state");
+      if (payment.refundedAt)
+        throw new BadRequestException("Payment already refunded");
+
+      // Refundable amount = paid − everything already locked (SUCCEEDED PLUS
+      // in-flight). The old check only subtracted SUCCEEDED, so a request
+      // racing an in-flight refund could over-refund (bundle C).
+      const locked = await this.prisma.refund.aggregate({
+        where: {
+          paymentId,
+          status: { in: ["PENDING", "PROCESSING", "SUCCEEDED"] },
+        },
+        _sum: { amountMinor: true },
+      });
+      const lockedMinor = locked._sum.amountMinor ?? 0n;
+      const remaining = payment.amountMinor - lockedMinor;
+      if (remaining <= 0n)
+        throw new BadRequestException("Payment has no refundable amount left");
+
+      amountMinor = input.amountMinor ?? remaining;
+      if (amountMinor <= 0n)
+        throw new BadRequestException("Refund amount must be positive");
+      if (amountMinor > remaining)
+        throw new BadRequestException(
+          "Refund amount exceeds refundable amount",
+        );
+      if (payment.provider === "voucher" && amountMinor !== payment.amountMinor)
+        throw new BadRequestException(
+          "Voucher payments can only be refunded in full",
+        );
+    } catch (error) {
+      await this.idempotency.markFailed(tenantId, idempotencyKey);
+      throw error;
+    }
+
+    // Record the refund and seal the payment as refund-pending in one
+    // transaction, so any retry finds the row through its key.
+    const refund = await this.prisma.$transaction(async (tx) => {
+      await applyTenantContext(tx, tenantId);
+      const created = await tx.refund.create({
+        data: {
+          tenantId,
+          paymentId,
+          orderId: payment.orderId,
+          userId: payment.userId,
+          requestedBy,
+          amountMinor,
+          currency: payment.currency,
+          reason: input.reason,
+          status: "PENDING",
+          metadata: { idempotencyKey },
+        },
+      });
+      await tx.payment.updateMany({
+        where: { id: paymentId, status: { in: ["PAID", "REFUND_PENDING"] } },
+        data: { status: "REFUND_PENDING" },
+      });
+      return created;
     });
 
     await this.audit.log(
       tenantId,
       requestedBy,
-      "REFUND_PROCESSED",
+      "REFUND_REQUESTED",
       "refund",
       refund.id,
       {
         paymentId,
         amountMinor: amountMinor.toString(),
+        provider: payment.provider,
       },
     );
+
+    return this.executeRefund(payment, refund, idempotencyKey);
   }
 
-  private async processVoucherRefund(
-    tenantId: string,
+  /**
+   * Execute a refund row whose PENDING state is already committed: claim it
+   * PROCESSING *before* calling the provider, then settle or fail it.
+   */
+  private async executeRefund(
     payment: any,
-    amountMinor: bigint,
+    refund: any,
+    idempotencyKey: string,
+  ): Promise<RefundResult> {
+    const tenantId = payment.tenantId as string;
+
+    // Voucher refunds never hit a provider: settle immediately.
+    if (payment.provider === "voucher") {
+      const outcome = await this.settleRefundAttempt(
+        payment,
+        refund,
+        "voucher",
+      );
+      const result = this.refundResult(refund, outcome.paymentStatus);
+      await this.idempotency.markCompleted(tenantId, idempotencyKey, result);
+      await this.audit.log(
+        tenantId,
+        refund.requestedBy ?? payment.userId,
+        "REFUND_PROCESSED",
+        "refund",
+        refund.id,
+        {
+          paymentId: payment.id,
+          amountMinor: refund.amountMinor.toString(),
+          provider: "voucher",
+        },
+      );
+      return result;
+    }
+
+    // Claim before the network call: a crashed attempt leaves PROCESSING,
+    // which retries refuse to re-execute (fail visibly, never double-refund).
+    const claim = await this.prisma.$transaction(async (tx) => {
+      await applyTenantContext(tx, tenantId);
+      return tx.refund.updateMany({
+        where: { id: refund.id, status: "PENDING" },
+        data: { status: "PROCESSING" },
+      });
+    });
+    if (claim.count === 0)
+      throw new ConflictException("Refund already being processed");
+
+    const provider = this.providerRegistry.getProvider(payment.provider);
+    if (!provider?.refund)
+      throw new BadRequestException("Provider does not support refunds");
+
+    const providerResult = await provider.refund({
+      providerPaymentId: payment.providerTransactionId!,
+      providerTransactionId: payment.providerTransactionId!,
+      amountMinor: refund.amountMinor,
+      currency: refund.currency,
+      reason: refund.reason ?? undefined,
+      idempotencyKey,
+    });
+
+    if (!providerResult.success) {
+      await this.failRefundAttempt(
+        payment,
+        refund,
+        providerResult.errorMessage,
+      );
+      await this.idempotency.markFailed(tenantId, idempotencyKey);
+      throw new BadRequestException(
+        providerResult.errorMessage || "Refund failed",
+      );
+    }
+
+    const outcome = await this.settleRefundAttempt(
+      payment,
+      refund,
+      payment.provider,
+      providerResult.providerRefundId,
+    );
+    const result = this.refundResult(refund, outcome.paymentStatus);
+    await this.idempotency.markCompleted(tenantId, idempotencyKey, result);
+    await this.audit.log(
+      tenantId,
+      refund.requestedBy ?? payment.userId,
+      "REFUND_PROCESSED",
+      "refund",
+      refund.id,
+      {
+        paymentId: payment.id,
+        amountMinor: refund.amountMinor.toString(),
+        provider: payment.provider,
+      },
+    );
+    return result;
+  }
+
+  private refundResult(refund: any, paymentStatus: string): RefundResult {
+    return {
+      refundId: refund.id,
+      status: "SUCCEEDED",
+      amountMinor: refund.amountMinor.toString(),
+      paymentStatus,
+    };
+  }
+
+  private async settleRefundAttempt(
+    payment: any,
+    refund: any,
+    providerName: string,
+    providerRefundId?: string,
+  ): Promise<{ settled: boolean; paymentStatus: string }> {
+    return this.prisma.$transaction(async (tx) => {
+      await applyTenantContext(tx, payment.tenantId);
+      return this.applyRefundSettlement(
+        tx,
+        payment,
+        refund,
+        providerName,
+        providerRefundId,
+      );
+    });
+  }
+
+  private async failRefundAttempt(
+    payment: any,
+    refund: any,
+    errorMessage?: string,
   ): Promise<void> {
-    // Find voucher redemption and restore usage
-    const redemption = await this.prisma.voucherRedemption.findFirst({
+    await this.prisma.$transaction(async (tx) => {
+      await applyTenantContext(tx, payment.tenantId);
+      const won = await tx.refund.updateMany({
+        where: { id: refund.id, status: { in: ["PENDING", "PROCESSING"] } },
+        data: {
+          status: "FAILED",
+          metadata: {
+            ...((refund.metadata as Record<string, any>) ?? {}),
+            error: errorMessage ?? "Refund failed",
+          },
+        },
+      });
+      if (won.count > 0) {
+        // No money moved — put the payment back into its paid state so the
+        // remaining balance stays refundable.
+        await tx.payment.updateMany({
+          where: { id: payment.id, status: "REFUND_PENDING" },
+          data: { status: "PAID" },
+        });
+      }
+    });
+  }
+
+  /**
+   * The single settlement path shared by the API flow and the provider
+   * webhook. The CAS on (PENDING|PROCESSING -> SUCCEEDED) is the money guard:
+   * whichever caller wins writes the reversing ledger entries exactly once.
+   */
+  private async applyRefundSettlement(
+    tx: Prisma.TransactionClient,
+    payment: any,
+    refund: any,
+    providerName: string,
+    providerRefundId?: string,
+  ): Promise<{ settled: boolean; paymentStatus: string }> {
+    const won = await tx.refund.updateMany({
+      where: { id: refund.id, status: { in: ["PENDING", "PROCESSING"] } },
+      data: {
+        status: "SUCCEEDED",
+        processedAt: new Date(),
+        ...(providerRefundId ? { providerRefundId } : {}),
+      },
+    });
+
+    if (won.count === 0) {
+      // Lost the race to a concurrent path (webhook callback or a second
+      // attempt): read the final state instead of double-writing.
+      const fresh = await tx.refund.findUnique({ where: { id: refund.id } });
+      if (fresh?.status === "SUCCEEDED") {
+        const freshPayment = await tx.payment.findUnique({
+          where: { id: payment.id },
+        });
+        return {
+          settled: false,
+          paymentStatus: freshPayment?.status ?? "PAID",
+        };
+      }
+      throw new ConflictException("Refund is no longer settleable");
+    }
+
+    await this.ledger.recordRefund(
+      tx,
+      payment.tenantId,
+      {
+        id: refund.id,
+        amountMinor: refund.amountMinor,
+        currency: refund.currency,
+        paymentId: payment.id,
+        orderId: payment.orderId,
+        userId: payment.userId,
+      },
+      providerName,
+    );
+
+    const agg = await tx.refund.aggregate({
+      where: { paymentId: payment.id, status: "SUCCEEDED" },
+      _sum: { amountMinor: true },
+    });
+    const totalRefunded = agg._sum.amountMinor ?? 0n;
+    const fullyRefunded = totalRefunded >= payment.amountMinor;
+
+    if (fullyRefunded) {
+      await tx.payment.update({
+        where: { id: payment.id },
+        data: { status: "REFUNDED", refundedAt: new Date() },
+      });
+      await tx.order.update({
+        where: { id: payment.orderId },
+        data: { status: "REFUNDED" },
+      });
+      // Revoke before restoring the redemption: the revocation resolves the
+      // voucherId through that redemption row.
+      await this.revokeOrderEntitlements(tx, payment);
+      if (providerName === "voucher") {
+        await this.restoreVoucherRedemption(tx, payment);
+      }
+    } else {
+      // Partially refunded: back to PAID so the remaining balance stays
+      // refundable; access is kept.
+      await tx.payment.updateMany({
+        where: { id: payment.id, status: "REFUND_PENDING" },
+        data: { status: "PAID" },
+      });
+    }
+
+    await this.outbox.publish(
+      payment.tenantId,
+      {
+        eventType: "refund.succeeded",
+        aggregateType: "refund",
+        aggregateId: refund.id,
+        payload: {
+          refundId: refund.id,
+          paymentId: payment.id,
+          amountMinor: refund.amountMinor.toString(),
+          totalRefundedMinor: totalRefunded.toString(),
+        },
+      },
+      tx,
+    );
+
+    return {
+      settled: true,
+      paymentStatus: fullyRefunded ? "REFUNDED" : "PAID",
+    };
+  }
+
+  /** Undo a voucher redemption so the code becomes usable again. */
+  private async restoreVoucherRedemption(
+    tx: Prisma.TransactionClient,
+    payment: any,
+  ): Promise<void> {
+    const redemption = await tx.voucherRedemption.findFirst({
+      where: {
+        userId: payment.userId,
+        metadata: { path: ["orderId"], equals: payment.orderId },
+      },
+    });
+    if (!redemption) return;
+
+    await tx.voucher.updateMany({
+      where: { id: redemption.voucherId, usedCount: { gt: 0 } },
+      data: { usedCount: { decrement: 1 } },
+    });
+    await tx.voucherRedemption.deleteMany({ where: { id: redemption.id } });
+  }
+
+  /**
+   * A full refund revokes exactly the entitlements THIS payment granted:
+   * purchase grants carry `metadata.orderId`; voucher grants carry
+   * `metadata.voucherId` (resolved through the redemption row). Nothing else
+   * is touched — a partially refunded purchase keeps access.
+   */
+  private async revokeOrderEntitlements(
+    tx: Prisma.TransactionClient,
+    payment: any,
+  ): Promise<void> {
+    const redemption = await tx.voucherRedemption.findFirst({
       where: {
         userId: payment.userId,
         metadata: { path: ["orderId"], equals: payment.orderId },
       },
     });
 
-    if (redemption) {
-      await this.prisma.voucher.update({
-        where: { id: redemption.voucherId },
-        data: { usedCount: { decrement: 1 } },
+    const or: Prisma.EntitlementWhereInput[] = [
+      { metadata: { path: ["orderId"], equals: payment.orderId } },
+    ];
+    if (redemption?.voucherId) {
+      or.push({
+        metadata: { path: ["voucherId"], equals: redemption.voucherId },
       });
     }
+
+    const entitlements = await tx.entitlement.findMany({
+      where: {
+        tenantId: payment.tenantId,
+        userId: payment.userId,
+        status: "ACTIVE",
+        OR: or,
+      },
+    });
+
+    for (const entitlement of entitlements) {
+      await tx.entitlement.update({
+        where: { id: entitlement.id },
+        data: {
+          status: "REVOKED",
+          metadata: {
+            ...((entitlement.metadata as Record<string, any>) ?? {}),
+            revokedAt: new Date().toISOString(),
+            revokedReason: `refund:${payment.id}`,
+          },
+        },
+      });
+    }
+  }
+
+  /**
+   * Settle a refund from a provider webhook (bundle C). Resolves the in-flight
+   * refund row (or records an externally-initiated refund as a delta), then
+   * reuses the same single settlement path as the API flow. Never throws on
+   * "nothing to do" — returns an outcome for the inbox to audit.
+   */
+  async settleRefundFromProvider(params: {
+    tenantId: string;
+    paymentId: string;
+    provider: string;
+    providerRefundId?: string;
+    /** Cumulative refunded total reported by the provider payload, if any. */
+    refundAmountMinor?: bigint;
+    webhookEventId?: string;
+  }): Promise<"settled" | "already_settled" | "no_op"> {
+    return this.prisma.$transaction(async (tx) => {
+      await applyTenantContext(tx, params.tenantId);
+
+      const payment = await tx.payment.findUnique({
+        where: { id: params.paymentId },
+      });
+      if (!payment || payment.tenantId !== params.tenantId) return "no_op";
+
+      let refund: any = null;
+      if (params.providerRefundId) {
+        refund = await tx.refund.findFirst({
+          where: {
+            paymentId: payment.id,
+            providerRefundId: params.providerRefundId,
+          },
+        });
+        if (refund && refund.status === "SUCCEEDED") return "already_settled";
+      }
+
+      if (!refund || !["PENDING", "PROCESSING"].includes(refund.status)) {
+        refund = await tx.refund.findFirst({
+          where: {
+            paymentId: payment.id,
+            status: { in: ["PENDING", "PROCESSING"] },
+          },
+          orderBy: { createdAt: "asc" },
+        });
+      }
+
+      if (!refund) {
+        // No local refund was in flight — e.g. a refund initiated from the
+        // provider dashboard. Reverse exactly the delta the provider reports
+        // (falling back to "the rest of the payment") and synthesize the row.
+        const agg = await tx.refund.aggregate({
+          where: { paymentId: payment.id, status: "SUCCEEDED" },
+          _sum: { amountMinor: true },
+        });
+        const already = agg._sum.amountMinor ?? 0n;
+        const target = params.refundAmountMinor ?? payment.amountMinor;
+        const delta = target - already;
+        if (delta <= 0n) return "no_op";
+
+        refund = await tx.refund.create({
+          data: {
+            tenantId: params.tenantId,
+            paymentId: payment.id,
+            orderId: payment.orderId,
+            userId: payment.userId,
+            requestedBy: `provider:${params.provider}`,
+            amountMinor: delta,
+            currency: payment.currency,
+            reason: "provider_callback",
+            status: "PROCESSING",
+            metadata: {
+              source: "external",
+              webhookEventId: params.webhookEventId ?? null,
+            },
+          },
+        });
+      }
+
+      const outcome = await this.applyRefundSettlement(
+        tx,
+        payment,
+        refund,
+        params.provider,
+        params.providerRefundId,
+      );
+
+      return outcome.settled ? "settled" : "already_settled";
+    });
+  }
+
+  private isUniqueViolation(error: unknown): boolean {
+    return (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === "P2002"
+    );
   }
 
   /**

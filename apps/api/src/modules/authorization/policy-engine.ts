@@ -47,6 +47,7 @@ export type Action =
   | "redeem"
   | "archive"
   | "reorder"
+  | "refund" // money-out action on a captured payment (bundle C)
   | "evaluate"; // AI evaluation action
 
 export interface AuthorizationContext {
@@ -256,7 +257,10 @@ export class PolicyEngine {
         attempt: ["read", "grade", "manage"],
         enrollment: ["create", "read", "update", "delete", "manage"],
         order: ["read", "manage"],
-        payment: ["read", "manage"],
+        // `refund` is listed explicitly: moving money back out of a captured
+        // payment is the one payment action that must never ride on a generic
+        // "manage" grant (bundle C).
+        payment: ["read", "manage", "refund"],
         voucher: ["create", "read", "update", "delete", "manage"],
         user: ["read", "update", "manage"],
         tenant: ["read", "update", "configure"],

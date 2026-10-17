@@ -30,22 +30,27 @@ describe("WebhookInboxService (audit #5)", () => {
       paymentIntent: { findFirst: jest.fn(), update: jest.fn() },
       payment: { create: jest.fn(), findFirst: jest.fn() },
       refund: { updateMany: jest.fn() },
+      paymentRiskEvent: { create: jest.fn() },
     };
     const registry = { getProvider: jest.fn() };
     const provider = buildProvider();
     registry.getProvider.mockReturnValue(provider);
-    const orchestrator = { completePayment: jest.fn().mockResolvedValue({}) };
+    const orchestrator = {
+      completePayment: jest.fn().mockResolvedValue({}),
+      settleRefundFromProvider: jest.fn(),
+    };
     const idempotency = {
       checkAndStore: jest.fn(),
       markCompleted: jest.fn(),
     };
+    const audit = { log: jest.fn().mockResolvedValue(undefined) };
 
     const service = new WebhookInboxService(
       prisma as any,
       registry as any,
       orchestrator as any,
       idempotency as any,
-      {} as any,
+      audit as any,
       {} as any,
     );
 
@@ -56,6 +61,7 @@ describe("WebhookInboxService (audit #5)", () => {
       provider,
       orchestrator,
       idempotency,
+      audit,
     };
   }
 
@@ -654,5 +660,181 @@ describe("WebhookInboxService (audit #5)", () => {
 
     // An escaping rejection would take the API process down in production.
     expect(rejections).toHaveLength(0);
+  });
+
+  it("detects a SECOND charge: different transaction id for an already settled order (bundle C)", async () => {
+    const { service, prisma, orchestrator } = build();
+
+    prisma.webhookEvent.findUnique.mockResolvedValue({
+      id: "evt-sc",
+      provider: "paymob",
+      eventType: "payment.paid",
+      rawPayload: {
+        obj: {
+          id: 777,
+          success: true,
+          order: { merchant_order_id: "order-1" },
+        },
+      },
+    });
+    prisma.webhookEvent.update.mockResolvedValue({});
+    // 1st lookup: no PROCESSING intent. 2nd: the settled intent for the order.
+    prisma.paymentIntent.findFirst
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({ id: "int-1", orderId: "order-1" });
+    // 1st lookup: "777" is not on file. 2nd: the settled payment — a DIFFERENT
+    // transaction id for the same order.
+    prisma.payment.findFirst.mockResolvedValueOnce(null).mockResolvedValueOnce({
+      id: "pay-1",
+      tenantId: "t-1",
+      userId: "u-1",
+      providerTransactionId: "111",
+      status: "PAID",
+    });
+
+    await expect(service.processEvent("evt-sc")).rejects.toThrow(
+      /SECOND_CHARGE_DETECTED/,
+    );
+
+    expect(prisma.paymentRiskEvent.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        tenantId: "t-1",
+        paymentId: "pay-1",
+        eventType: "SECOND_CHARGE_DETECTED",
+        severity: "HIGH",
+        details: expect.objectContaining({
+          incomingTransactionId: "777",
+          settledTransactionId: "111",
+          orderId: "order-1",
+        }),
+      }),
+    });
+    expect(orchestrator.completePayment).not.toHaveBeenCalled();
+    expect(prisma.webhookEvent.update).toHaveBeenLastCalledWith({
+      where: { id: "evt-sc" },
+      data: {
+        processingStatus: "FAILED",
+        errorCode: expect.stringContaining("SECOND_CHARGE_DETECTED"),
+      },
+    });
+  });
+
+  it("settles a Paymob refund callback through the orchestrator (parent_transaction match)", async () => {
+    const { service, prisma, orchestrator, audit } = build();
+
+    prisma.webhookEvent.findUnique.mockResolvedValue({
+      id: "evt-r1",
+      provider: "paymob",
+      eventType: "payment.refunded",
+      rawPayload: {
+        obj: {
+          id: 554400,
+          success: true,
+          is_refunded: true,
+          parent_transaction: 999,
+          refunded_amount_cents: 10000,
+          order: { merchant_order_id: "order-1" },
+        },
+      },
+    });
+    prisma.webhookEvent.update.mockResolvedValue({});
+    prisma.payment.findFirst.mockResolvedValue({
+      id: "pay-1",
+      tenantId: "t-1",
+      userId: "u-1",
+      providerTransactionId: "999",
+      status: "REFUND_PENDING",
+    });
+    orchestrator.settleRefundFromProvider.mockResolvedValue("settled");
+
+    await service.processEvent("evt-r1");
+
+    expect(prisma.payment.findFirst).toHaveBeenNthCalledWith(1, {
+      where: {
+        provider: "paymob",
+        providerTransactionId: "999",
+        status: { in: ["PAID", "REFUND_PENDING", "REFUNDED"] },
+      },
+    });
+    expect(orchestrator.settleRefundFromProvider).toHaveBeenCalledWith({
+      tenantId: "t-1",
+      paymentId: "pay-1",
+      provider: "paymob",
+      providerRefundId: "554400",
+      refundAmountMinor: 10000n,
+      webhookEventId: "evt-r1",
+    });
+    expect(audit.log).toHaveBeenCalledWith(
+      "t-1",
+      "webhook",
+      "REFUND_SETTLED_WEBHOOK",
+      "refund",
+      "pay-1",
+      expect.objectContaining({ providerRefundId: "554400" }),
+    );
+    expect(prisma.webhookEvent.update).toHaveBeenLastCalledWith({
+      where: { id: "evt-r1" },
+      data: { processingStatus: "PROCESSED" },
+    });
+  });
+
+  it("does not audit a refund callback that has nothing to settle", async () => {
+    const { service, prisma, orchestrator, audit } = build();
+
+    prisma.webhookEvent.findUnique.mockResolvedValue({
+      id: "evt-r2",
+      provider: "paymob",
+      eventType: "payment.refunded",
+      rawPayload: {
+        obj: {
+          id: 554401,
+          is_refunded: true,
+          parent_transaction: 999,
+          order: { merchant_order_id: "order-1" },
+        },
+      },
+    });
+    prisma.webhookEvent.update.mockResolvedValue({});
+    prisma.payment.findFirst.mockResolvedValue({
+      id: "pay-1",
+      tenantId: "t-1",
+      userId: "u-1",
+      providerTransactionId: "999",
+      status: "REFUNDED",
+    });
+    orchestrator.settleRefundFromProvider.mockResolvedValue("no_op");
+
+    await service.processEvent("evt-r2");
+
+    expect(orchestrator.settleRefundFromProvider).toHaveBeenCalled();
+    expect(audit.log).not.toHaveBeenCalled();
+    expect(prisma.webhookEvent.update).toHaveBeenLastCalledWith({
+      where: { id: "evt-r2" },
+      data: { processingStatus: "PROCESSED" },
+    });
+  });
+
+  it("ignores a refund callback whose payment cannot be resolved", async () => {
+    const { service, prisma, orchestrator } = build();
+
+    prisma.webhookEvent.findUnique.mockResolvedValue({
+      id: "evt-r3",
+      provider: "paymob",
+      eventType: "payment.refunded",
+      rawPayload: {
+        obj: { id: 111, is_refunded: true, order: { id: 222 } },
+      },
+    });
+    prisma.webhookEvent.update.mockResolvedValue({});
+    prisma.payment.findFirst.mockResolvedValue(null);
+    prisma.paymentIntent.findFirst.mockResolvedValue(null);
+
+    await service.processEvent("evt-r3");
+
+    expect(orchestrator.settleRefundFromProvider).not.toHaveBeenCalled();
+    expect(prisma.webhookEvent.update).toHaveBeenLastCalledWith({
+      where: { id: "evt-r3" },
+      data: { processingStatus: "PROCESSED" },
+    });
   });
 });

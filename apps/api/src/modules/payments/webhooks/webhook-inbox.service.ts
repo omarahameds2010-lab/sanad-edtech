@@ -216,7 +216,7 @@ export class WebhookInboxService {
         await this.handlePaymentFailed(provider, rawPayload, eventType);
         break;
       case "payment.refunded":
-        await this.handleRefundCompleted(provider, rawPayload);
+        await this.handleRefundCompleted(provider, rawPayload, webhookEventId);
         break;
       case "payment.pending":
         // Just log, no action needed
@@ -279,9 +279,13 @@ export class WebhookInboxService {
     }
 
     if (!intent) {
-      // No PROCESSING intent. Two very different cases (bundle B):
+      // No PROCESSING intent. Three very different cases (bundle B/C):
       //  - a redelivery for a transaction this inbox already settled → drop
       //    it as a duplicate no-op;
+      //  - the order's intent is ALREADY SETTLED with a DIFFERENT transaction
+      //    id: the provider charged twice for one order → record a risk event
+      //    and keep the failure visible (reversing the extra charge is a
+      //    manual decision, not an automatic one);
       //  - the delivery raced intent creation (or the transaction is not
       //    ours) → never swallow it: fail the event so it stays visible and
       //    `retryFailedWebhooks` can finish it once the intent exists.
@@ -291,6 +295,51 @@ export class WebhookInboxService {
         });
         if (settled) return;
       }
+
+      let settledIntent = orderId
+        ? await this.prisma.paymentIntent.findFirst({
+            where: { orderId, provider },
+          })
+        : null;
+      if (!settledIntent && obj.order?.id !== undefined) {
+        settledIntent = await this.prisma.paymentIntent.findFirst({
+          where: { externalIntentId: String(obj.order.id), provider },
+        });
+      }
+      if (settledIntent) {
+        const settledPayment = await this.prisma.payment.findFirst({
+          where: {
+            paymentIntentId: settledIntent.id,
+            provider,
+            status: { in: ["PAID", "REFUND_PENDING", "REFUNDED"] },
+          },
+        });
+        if (
+          settledPayment &&
+          transactionId !== undefined &&
+          String(transactionId) !==
+            String(settledPayment.providerTransactionId ?? "")
+        ) {
+          await this.prisma.paymentRiskEvent.create({
+            data: {
+              tenantId: settledPayment.tenantId,
+              paymentId: settledPayment.id,
+              userId: settledPayment.userId,
+              eventType: "SECOND_CHARGE_DETECTED",
+              severity: "HIGH",
+              score: 90,
+              details: {
+                provider,
+                incomingTransactionId: String(transactionId),
+                settledTransactionId: settledPayment.providerTransactionId,
+                orderId: settledIntent.orderId,
+              },
+            },
+          });
+          throw new Error(`SECOND_CHARGE_DETECTED:${transactionId}`);
+        }
+      }
+
       throw new Error(
         `INTENT_NOT_FOUND:${orderId ?? String(obj.order?.id ?? "unknown")}`,
       );
@@ -423,26 +472,124 @@ export class WebhookInboxService {
     });
   }
 
+  /**
+   * Provider says a refund finished (bundle C).
+   *
+   * Shapes handled:
+   *  - Paymob refund callbacks (`{ obj: { id, parent_transaction,
+   *    refunded_amount_cents, is_refunded: true, ... } }`);
+   *  - Fawry `orderStatus: "REFUNDED"` payloads (`referenceNumber`);
+   *  - dashboard-initiated refunds with no local refund row — the delta the
+   *    provider reports is recorded and reversed here.
+   *
+   * Settlement is delegated to the orchestrator whose
+   * (PENDING|PROCESSING -> SUCCEEDED) CAS guarantees the reversing ledger
+   * entries are written exactly once, whether the API flow or this callback
+   * gets there first.
+   */
   private async handleRefundCompleted(
     provider: string,
     payload: any,
+    webhookEventId?: string,
   ): Promise<void> {
     const obj = this.unwrapPayload(payload);
-    const refundId = obj.refund_id || obj.id;
-    const paymentId = obj.payment_id || obj.referenceNumber;
+    const orderId = this.extractOrderId(obj);
 
-    // Find payment
-    const payment = await this.prisma.payment.findFirst({
-      where: { providerTransactionId: paymentId, provider },
-    });
+    // Resolve the settled payment: transaction ids first (a refund callback
+    // may carry the parent transaction / the original reference), then the
+    // order.
+    const txnCandidates = [
+      obj.parent_transaction,
+      obj.payment_id,
+      obj.referenceNumber,
+      obj.fawryRefNumber,
+      obj.transaction_id,
+      obj.id,
+    ]
+      .filter((value) => value !== undefined && value !== null && value !== "")
+      .map((value) => String(value));
+
+    let payment: any = null;
+    for (const candidate of txnCandidates) {
+      payment = await this.prisma.payment.findFirst({
+        where: {
+          provider,
+          providerTransactionId: candidate,
+          status: { in: ["PAID", "REFUND_PENDING", "REFUNDED"] },
+        },
+      });
+      if (payment) break;
+    }
+
+    if (!payment && orderId) {
+      let intent = await this.prisma.paymentIntent.findFirst({
+        where: { orderId, provider },
+      });
+      if (!intent && obj.order?.id !== undefined) {
+        intent = await this.prisma.paymentIntent.findFirst({
+          where: { externalIntentId: String(obj.order.id), provider },
+        });
+      }
+      if (intent) {
+        payment = await this.prisma.payment.findFirst({
+          where: {
+            paymentIntentId: intent.id,
+            provider,
+            status: { in: ["PAID", "REFUND_PENDING", "REFUNDED"] },
+          },
+          orderBy: { createdAt: "desc" },
+        });
+      }
+    }
 
     if (!payment) return;
 
-    // Update refund record
-    await this.prisma.refund.updateMany({
-      where: { paymentId: payment.id, providerRefundId: refundId },
-      data: { status: "SUCCEEDED", processedAt: new Date() },
+    // Provider refund id: an explicit refund id wins; otherwise `obj.id`
+    // counts only when it is NOT the original (paid) transaction id.
+    const explicitRefundId = obj.refund_id ?? obj.refund_transaction_id;
+    const objId = obj.id !== undefined ? String(obj.id) : undefined;
+    let providerRefundId =
+      explicitRefundId !== undefined ? String(explicitRefundId) : undefined;
+    if (
+      !providerRefundId &&
+      objId &&
+      objId !== String(payment.providerTransactionId ?? "")
+    ) {
+      providerRefundId = objId;
+    }
+
+    // `refunded_amount_cents` is cumulative on Paymob; other providers may
+    // send the refund amount itself. Either way it is only a target — the
+    // orchestrator computes the delta against what is already reversed.
+    const refundedTotalRaw =
+      obj.refunded_amount_cents ?? obj.refund_amount_cents ?? obj.refund_amount;
+    let refundAmountMinor: bigint | undefined;
+    if (refundedTotalRaw !== undefined && refundedTotalRaw !== null) {
+      const asNumber = Number(refundedTotalRaw);
+      if (Number.isFinite(asNumber)) {
+        refundAmountMinor = BigInt(Math.trunc(asNumber));
+      }
+    }
+
+    const outcome = await this.orchestrator.settleRefundFromProvider({
+      tenantId: payment.tenantId,
+      paymentId: payment.id,
+      provider,
+      providerRefundId,
+      refundAmountMinor,
+      webhookEventId,
     });
+
+    if (outcome === "settled") {
+      await this.audit.log(
+        payment.tenantId,
+        "webhook",
+        "REFUND_SETTLED_WEBHOOK",
+        "refund",
+        payment.id,
+        { provider, providerRefundId: providerRefundId ?? null },
+      );
+    }
   }
 
   /** Raw body parsed for storage/audit; non-JSON bodies are wrapped. */
