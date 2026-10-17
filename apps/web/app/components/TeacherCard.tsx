@@ -1,101 +1,82 @@
 import Link from "next/link";
+import type { CSSProperties } from "react";
+
+/* ------------------------------------------------------------------
+   TeacherCard — editorial “book cover” card for the directory.
+   Ink cover + emerald aurora + monogram ghost, glass/solid badges,
+   paper body with name, tagline, focus, meta and the emerald CTA.
+   ------------------------------------------------------------------ */
 
 interface TeacherCardProps {
   slug: string;
   subject: string;
   teacherName: string;
   focusAreas: string;
-  courseCount: number;
-  motif: "orbit" | "grid" | "ink";
   tagline?: string;
-  studentCount?: number;
+  /** Cover caption, e.g. «المرحلة الإعدادية». */
+  stage?: string;
+  /** Solid emerald chip on the cover, e.g. «التسجيل مفتوح». */
+  openLabel: string;
+  /** Small meta line under the focus areas, e.g. «٣ كورسات». */
+  meta?: string;
+  /** CTA label, e.g. «ادخل المنصة». */
+  enter: string;
+  arrow?: string;
 }
-
-const motifStyles: Record<TeacherCardProps["motif"], string> = {
-  orbit:
-    "radial-gradient(circle at 30% 30%, var(--tenant-accent) 0, transparent 60%)",
-  grid: "linear-gradient(var(--tenant-accent) 1px, transparent 1px), linear-gradient(90deg, var(--tenant-accent) 1px, transparent 1px)",
-  ink: "repeating-linear-gradient(45deg, var(--tenant-accent) 0 2px, transparent 2px 12px)",
-};
 
 export default function TeacherCard({
   slug,
   subject,
   teacherName,
   focusAreas,
-  courseCount,
-  motif,
   tagline,
-  studentCount,
+  stage,
+  openLabel,
+  meta,
+  enter,
+  arrow = "←",
 }: TeacherCardProps) {
   return (
-    <article className="ts-teacher-card lp-lift">
-      <div
-        aria-hidden
-        style={{
-          position: "absolute",
-          inset: 0,
-          background: motifStyles[motif],
-          backgroundSize: motif === "grid" ? "24px 24px" : undefined,
-          opacity: "var(--tenant-motif-opacity, 0.08)",
-        }}
-      />
-      <div style={{ position: "relative" }}>
-        <span
-          style={{
-            display: "inline-block",
-            borderRadius: 999,
-            padding: "5px 14px",
-            fontSize: 12.5,
-            fontWeight: 700,
-            color: "var(--color-action-strong)",
-            background: "var(--color-action-soft)",
-          }}
-        >
-          {subject}
-        </span>
-        <h2 style={{ margin: "14px 0 2px", fontSize: 22 }}>{teacherName}</h2>
-        {tagline && (
-          <p
-            style={{
-              margin: 0,
-              color: "var(--color-action-strong)",
-              fontWeight: 700,
-              fontSize: 14.5,
-            }}
+    <article className="tp-card">
+      <Link
+        href={`/teachers/${slug}`}
+        className="tp-card-hit"
+        aria-label={`${enter}: ${teacherName}`}
+      >
+        <div className="tp-cover">
+          <span className="tp-cover-aurora" aria-hidden />
+          <span className="cover-grain" aria-hidden />
+          <span className="tp-cover-ghost" aria-hidden>
+            ع
+          </span>
+          <div className="tp-cover-badges">
+            <span className="ed-badge ed-badge-glass">{subject}</span>
+            <span className="ed-badge ed-badge-solid">{openLabel}</span>
+          </div>
+          <span className="tp-cover-shade" aria-hidden />
+          {stage && <span className="tp-cover-caption">{stage}</span>}
+        </div>
+
+        <div className="tp-body">
+          <h2 className="tp-name">{teacherName}</h2>
+          {tagline && <p className="tp-tagline">{tagline}</p>}
+          <p className="tp-focus">{focusAreas}</p>
+          {meta && <p className="tp-meta">{meta}</p>}
+          <span
+            className="tp-enter"
+            style={
+              {
+                "--tp-arrow-x": arrow === "→" ? "4px" : "-4px",
+              } as CSSProperties
+            }
           >
-            {tagline}
-          </p>
-        )}
-        <p
-          style={{
-            color: "var(--text-muted)",
-            fontSize: 14,
-            lineHeight: 1.8,
-            margin: "10px 0 0",
-          }}
-        >
-          {focusAreas}
-        </p>
-        <p style={{ color: "var(--text-muted)", fontSize: 13, marginTop: 12 }}>
-          {courseCount} كورسات
-          {studentCount !== undefined
-            ? ` · ${studentCount.toLocaleString("ar-EG")} طالب`
-            : " · التسجيل مفتوح"}
-        </p>
-        <Link
-          href={`/teachers/${slug}`}
-          style={{
-            display: "inline-flex",
-            alignItems: "center",
-            gap: 6,
-            marginTop: 18,
-            fontWeight: 700,
-          }}
-        >
-          دخول المساحة <span aria-hidden>←</span>
-        </Link>
-      </div>
+            {enter}
+            <span className="tp-arrow" aria-hidden>
+              {arrow}
+            </span>
+          </span>
+        </div>
+      </Link>
     </article>
   );
 }

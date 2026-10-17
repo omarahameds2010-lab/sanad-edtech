@@ -184,6 +184,58 @@ export interface Dict {
     offline: string;
     brandLines: { strong: string; rest: string }[];
   };
+  teachersPage: {
+    eyebrow: string;
+    title: string;
+    lead: string;
+    coursesUnit: string;
+    openEnrollment: string;
+    enter: string;
+    note: { badge: string; title: string; body: string; cta: string };
+  };
+  teacherSpace: {
+    stage: string;
+    tagline: string;
+    coursesCount: string;
+    bio: string;
+    focus: string[];
+    ctaPrimary: string;
+    ctaSecondary: string;
+    coursesSection: {
+      eyebrow: string;
+      title: string;
+      lead: string;
+      view: string;
+      full: string;
+      open: string;
+    };
+    courses: { slug: string; grade: string; desc: string }[];
+    triad: {
+      icon: "unlock" | "clock" | "brain";
+      title: string;
+      body: string;
+    }[];
+    final: { title: string; body: string; login: string; browse: string };
+    footerNote: string;
+    mobileCta: string;
+  };
+  catalog: {
+    eyebrow: string;
+    title: string;
+    lead: string;
+    fallbackDesc: string;
+    searchPlaceholder: string;
+    loading: string;
+    error: string;
+    empty: string;
+    view: string;
+    enroll: string;
+    complete: string;
+    free: string;
+    enrolledBadge: string;
+    openBadge: string;
+    progress: string;
+  };
   footer: { courses: string; teachers: string; login: string; tagline: string };
 }
 
@@ -604,6 +656,96 @@ export const dict: Record<Lang, Dict> = {
         { strong: "كل بكسل هنا", rest: " يخدم رحلتك." },
         { strong: "وتقييم ذكي", rest: " يراجعه مدرسك البشري." },
       ],
+    },
+    teachersPage: {
+      eyebrow: "منصة سند التعليمية",
+      title: "منصات المعلمين",
+      lead: "اختر منصتك التعليمية، وابدأ رحلة التعلم مع نخبة من المعلمين.",
+      coursesUnit: "كورسات",
+      openEnrollment: "التسجيل مفتوح",
+      enter: "ادخل المنصة",
+      note: {
+        badge: "للمدرسين",
+        title: "منصتك التعليمية القادمة؟",
+        body: "أنشئ منصتك على سند: كورساتك وطلابك ومسار تعليمي كامل — بهويتك أنت.",
+        cta: "ابدأ من هنا",
+      },
+    },
+    teacherSpace: {
+      stage: "المرحلة الإعدادية",
+      tagline: "جوكر اللغة العربية",
+      coursesCount: "٣ كورسات",
+      bio: "نحو وبلاغة ونصوص للمرحلة الإعدادية — شرح يوصّل القاعدة من غير حفظ أعمى، وتدريب مستمر يراجع معاك نقاط التحسين قبل الامتحان.",
+      focus: ["نحو", "بلاغة", "نصوص"],
+      ctaPrimary: "ابدأ من الأول الإعدادي",
+      ctaSecondary: "استعرض كورسات المنصة",
+      coursesSection: {
+        eyebrow: "كورسات المنصة",
+        title: "ثلاث سنوات دراسية — وطريقة واحدة واضحة",
+        lead: "اختر سنتك: كل كورس مبني على نفس الطريقة — شرح يوصّل القاعدة، وتدريب يكشف اللي محتاج تحسين، واختبار يثبّت.",
+        view: "استعرض الكورس",
+        full: "المسار الكامل: درس ← واجب ← اختبار",
+        open: "مفتوح التسجيل",
+      },
+      courses: [
+        {
+          slug: "arabic-1-prep",
+          grade: "الأول الإعدادي",
+          desc: "تأسيس قوي من أقسام الكلمة للجملة والمفعول المطلق — بأمثلة من الامتحانات وتدريبات مصححة.",
+        },
+        {
+          slug: "arabic-2-prep",
+          grade: "الثاني الإعدادي",
+          desc: "توسّع في النحو والصرف مع تحليل النصوص وتذوّقها، وتدريب على صيغ أسئلة الامتحان.",
+        },
+        {
+          slug: "arabic-3-prep",
+          grade: "الثالث الإعدادي",
+          desc: "مراجعة مركّزة ومهارات إجابة: من القاعدة إلى الدرجة — مع تدريب مستمر قبل الشهادة.",
+        },
+      ],
+      triad: [
+        {
+          icon: "unlock",
+          title: "مسار يفتح بالدخول",
+          body: "دخولك الواجب يفتح الاختبار، ودخولك الاختبار يفتح الدرس التالي — من غير شرط درجة.",
+        },
+        {
+          icon: "clock",
+          title: "وقت عادل ومحسوب",
+          body: "مؤقت الواجب ٣٠٠ دقيقة، ومؤقت الاختبار ٧٠ دقيقة — محسوبين من الخادم، فمش هيتصفّروا بتحديث الصفحة.",
+        },
+        {
+          icon: "brain",
+          title: "تقييم تفهمه مش بس رقم",
+          body: "SANAD يقترح تقييمًا منظمًا للإجابات المفتوحة — والدرجة النهائية دايمًا باعتماد المعلم.",
+        },
+      ],
+      final: {
+        title: "جاهز تبدأ رحلتك؟",
+        body: "سجّل دخولك وادخل كورس الأول الإعدادي — والمسار هيوديك خطوة بخطوة.",
+        login: "تسجيل الدخول",
+        browse: "تصفح الكورسات",
+      },
+      footerNote: "الأستاذ صالح حسين · منصة تعليمية على سند",
+      mobileCta: "تسجيل الدخول",
+    },
+    catalog: {
+      eyebrow: "الكورسات المتاحة",
+      title: "الكورسات",
+      lead: "استكشف كورسات المنصة — سجّل في كورسك، تابع تقدمك، وكمّل من حيث وقفت.",
+      fallbackDesc: "شرح منظم، تدريبات مصححة، وامتحان في كل خطوة.",
+      searchPlaceholder: "ابحث عن كورس…",
+      loading: "جاري التحميل…",
+      error: "تعذر تحميل الكورسات",
+      empty: "لا توجد كورسات منشورة حاليًا.",
+      view: "استعرض",
+      enroll: "سجل الآن",
+      complete: "أكمل التعلم",
+      free: "مجاني",
+      enrolledBadge: "مسجل",
+      openBadge: "مفتوح التسجيل",
+      progress: "تقدمك",
     },
     footer: {
       courses: "الكورسات",
@@ -1039,6 +1181,97 @@ export const dict: Record<Lang, Dict> = {
           rest: " reviewed by your human teacher.",
         },
       ],
+    },
+    teachersPage: {
+      eyebrow: "Sanad learning platform",
+      title: "Teacher platforms",
+      lead: "Pick your teaching platform and start learning with a select group of teachers.",
+      coursesUnit: "courses",
+      openEnrollment: "Enrollment open",
+      enter: "Enter the platform",
+      note: {
+        badge: "For teachers",
+        title: "Your teaching platform next?",
+        body: "Build your platform on Sanad: your courses, your students and a full learning path — under your own identity.",
+        cta: "Start here",
+      },
+    },
+    teacherSpace: {
+      stage: "Prep stage",
+      tagline: "the Joker of Arabic",
+      coursesCount: "3 courses",
+      bio: "Grammar, rhetoric and texts for the prep stage — explanations that make the rule land, and steady practice that reviews your weak spots before the exam.",
+      focus: ["Grammar", "Rhetoric", "Texts"],
+      ctaPrimary: "Start with first prep",
+      ctaSecondary: "Browse the platform's courses",
+      coursesSection: {
+        eyebrow: "Platform courses",
+        title: "Three school years — one clear path",
+        lead: "Pick your year: every course follows the same way — an explanation that lands, practice that reveals what to improve, and an exam that locks it in.",
+        view: "View course",
+        full: "Full path: lesson → assignment → exam",
+        open: "Enrollment open",
+      },
+      courses: [
+        {
+          slug: "arabic-1-prep",
+          grade: "First prep",
+          desc: "A strong foundation from word classes to sentences — with exam-style examples and corrected practice.",
+        },
+        {
+          slug: "arabic-2-prep",
+          grade: "Second prep",
+          desc: "Deeper grammar and morphology with text analysis and taste — plus practice on real exam formats.",
+        },
+        {
+          slug: "arabic-3-prep",
+          grade: "Third prep",
+          desc: "Focused revision and answer skills: from the rule to the mark — with steady practice before finals.",
+        },
+      ],
+      triad: [
+        {
+          icon: "unlock",
+          title: "Progress opens by entering",
+          body: "Entering the assignment unlocks the exam; entering the exam unlocks the next lesson — no score conditions.",
+        },
+        {
+          icon: "clock",
+          title: "Fair, server-set time",
+          body: "Assignment timer: 300 minutes; exam timer: 70 minutes — computed on the server, never reset by a page refresh.",
+        },
+        {
+          icon: "brain",
+          title: "Evaluation you can read",
+          body: "SANAD suggests an organized evaluation of open answers — the final grade is always approved by the teacher.",
+        },
+      ],
+      final: {
+        title: "Ready to start your journey?",
+        body: "Log in and start the first-prep course — the path takes you step by step.",
+        login: "Log in",
+        browse: "Browse courses",
+      },
+      footerNote: "Mr. Saleh Hussein · a teaching platform on Sanad",
+      mobileCta: "Log in",
+    },
+    catalog: {
+      eyebrow: "Available courses",
+      title: "Courses",
+      lead: "Explore the platform's courses — enroll, track your progress, and pick up where you left off.",
+      fallbackDesc:
+        "Structured explanations, corrected practice, and an exam at every step.",
+      searchPlaceholder: "Search courses…",
+      loading: "Loading…",
+      error: "Could not load courses",
+      empty: "No published courses yet.",
+      view: "View",
+      enroll: "Enroll now",
+      complete: "Continue learning",
+      free: "Free",
+      enrolledBadge: "Enrolled",
+      openBadge: "Enrollment open",
+      progress: "Your progress",
     },
     footer: {
       courses: "Courses",
