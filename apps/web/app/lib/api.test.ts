@@ -12,7 +12,9 @@ import {
 
 function mockFetchOnce(payload: unknown, status = 200) {
   const json = vi.fn().mockResolvedValue(payload);
-  const fetchMock = vi.fn().mockResolvedValue({ ok: status < 300, status, json });
+  const fetchMock = vi
+    .fn()
+    .mockResolvedValue({ ok: status < 300, status, json });
   vi.stubGlobal("fetch", fetchMock);
   return { fetchMock, json };
 }
@@ -55,9 +57,9 @@ describe("apiFetch", () => {
   it("returns raw JSON when there is no envelope (login)", async () => {
     const raw = { accessToken: "a", user: { id: "u" } };
     mockFetchOnce(raw);
-    await expect(apiFetch("/api/auth/login", { method: "POST" })).resolves.toEqual(
-      raw,
-    );
+    await expect(
+      apiFetch("/api/auth/login", { method: "POST" }),
+    ).resolves.toEqual(raw);
   });
 
   it("throws ApiError with the server message on failure", async () => {
@@ -97,23 +99,27 @@ describe("exam endpoints", () => {
 
 describe("newIdempotencyKey", () => {
   it("generates unique keys", () => {
-    const keys = new Set(
-      Array.from({ length: 50 }, () => newIdempotencyKey()),
-    );
+    const keys = new Set(Array.from({ length: 50 }, () => newIdempotencyKey()));
     expect(keys.size).toBe(50);
   });
 });
 
 describe("teacher grading endpoints", () => {
   it("getGradingQueue supports an optional status filter", async () => {
-    const { fetchMock } = mockFetchOnce({ data: { attempts: [], nextCursor: null } });
+    const { fetchMock } = mockFetchOnce({
+      data: { attempts: [], nextCursor: null },
+    });
     await api.getGradingQueue("t", "exam-1", "SUBMITTED");
     const [url] = fetchMock.mock.calls[0] as [string, RequestInit];
-    expect(url).toContain("/api/v1/exams/exam-1/attempts/grading?status=SUBMITTED");
+    expect(url).toContain(
+      "/api/v1/exams/exam-1/attempts/grading?status=SUBMITTED",
+    );
   });
 
   it("getGradingQueue omits the filter when absent", async () => {
-    const { fetchMock } = mockFetchOnce({ data: { attempts: [], nextCursor: null } });
+    const { fetchMock } = mockFetchOnce({
+      data: { attempts: [], nextCursor: null },
+    });
     await api.getGradingQueue("t", "exam-1");
     const [url] = fetchMock.mock.calls[0] as [string, RequestInit];
     expect(url).toBe(`${API_BASE_URL}/api/v1/exams/exam-1/attempts/grading`);
@@ -232,9 +238,7 @@ describe("five new pages endpoints", () => {
     });
     await api.getStudentCourseStructure("t", "c1");
     const [url] = fetchMock.mock.calls[0] as [string, RequestInit];
-    expect(url).toBe(
-      `${API_BASE_URL}/api/v1/student/courses/c1/structure`,
-    );
+    expect(url).toBe(`${API_BASE_URL}/api/v1/student/courses/c1/structure`);
   });
 
   it("enrollCourse posts to the enroll endpoint", async () => {
@@ -277,7 +281,9 @@ describe("five new pages endpoints", () => {
     });
     await api.getSubmissionQueue("t", "a1", "SUBMITTED");
     const [url] = fetchMock.mock.calls[0] as [string, RequestInit];
-    expect(url).toContain("/api/v1/assignments/a1/submissions?status=SUBMITTED");
+    expect(url).toContain(
+      "/api/v1/assignments/a1/submissions?status=SUBMITTED",
+    );
   });
 
   it("gradeSubmission posts score and feedback", async () => {
@@ -325,7 +331,8 @@ describe("five new pages endpoints", () => {
 
   it("listPublicCourses is public and supports search", async () => {
     const { fetchMock } = mockFetchOnce({
-      data: { courses: [], nextCursor: null },
+      data: [],
+      pagination: { hasNextPage: false, nextCursor: null },
     });
     await api.listPublicCourses("جبر");
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];

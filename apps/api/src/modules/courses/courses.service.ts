@@ -546,6 +546,7 @@ export class CoursesService {
             duration: true,
             lockStatus: true,
             unlockType: true,
+            isFree: true,
           },
           orderBy: { orderIndex: "asc" },
         },

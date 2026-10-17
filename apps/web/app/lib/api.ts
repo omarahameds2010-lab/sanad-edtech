@@ -597,6 +597,7 @@ export interface StructureLesson {
   duration: number | null;
   lockStatus: string;
   unlockType: string;
+  isFree?: boolean;
 }
 
 export interface StructureSection {
@@ -818,11 +819,6 @@ export interface PublicCourseCard {
   price: number | string;
   currency: string;
   teacher: { name: string };
-}
-
-export interface PublicCourseList {
-  courses: PublicCourseCard[];
-  nextCursor: string | null;
 }
 
 export interface LessonVideo {
@@ -1152,7 +1148,7 @@ export const api = {
     apiFetch<CourseStructure>(`/api/v1/public/courses/${slug}/structure`),
 
   listPublicCourses: (search?: string) =>
-    apiFetch<PublicCourseList>(
+    apiFetch<PublicCourseCard[]>(
       `/api/v1/public/courses${search ? `?search=${encodeURIComponent(search)}` : ""}`,
     ),
 

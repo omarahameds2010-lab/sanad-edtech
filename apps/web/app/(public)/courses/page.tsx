@@ -17,20 +17,25 @@ export default function CoursesPage() {
 
   useEffect(() => {
     let cancelled = false;
-    const t = setTimeout(() => {
-      api
-        .listPublicCourses(search.trim() === "" ? undefined : search.trim())
-        .then((r) => {
-          if (!cancelled) {
-            setCourses(r.courses);
-            setError(null);
-          }
-        })
-        .catch((e) => {
-          if (!cancelled)
-            setError(e instanceof ApiError ? e.message : "تعذر تحميل الكورسات");
-        });
-    }, search === "" ? 0 : 400);
+    const t = setTimeout(
+      () => {
+        api
+          .listPublicCourses(search.trim() === "" ? undefined : search.trim())
+          .then((r) => {
+            if (!cancelled) {
+              setCourses(r);
+              setError(null);
+            }
+          })
+          .catch((e) => {
+            if (!cancelled)
+              setError(
+                e instanceof ApiError ? e.message : "تعذر تحميل الكورسات",
+              );
+          });
+      },
+      search === "" ? 0 : 400,
+    );
     return () => {
       cancelled = true;
       clearTimeout(t);
@@ -40,7 +45,9 @@ export default function CoursesPage() {
   return (
     <main>
       <h1>الكورسات</h1>
-      <p style={{ color: "var(--text-muted)", marginBottom: "var(--space-md)" }}>
+      <p
+        style={{ color: "var(--text-muted)", marginBottom: "var(--space-md)" }}
+      >
         استكشف المساحات التعليمية المتاحة.
       </p>
 
@@ -49,19 +56,29 @@ export default function CoursesPage() {
         value={search}
         onChange={(e) => setSearch(e.target.value)}
         placeholder="ابحث عن كورس…"
-        style={{ width: "100%", maxWidth: 480, marginBottom: "var(--space-lg)" }}
+        style={{
+          width: "100%",
+          maxWidth: 480,
+          marginBottom: "var(--space-lg)",
+        }}
       />
 
       {error && (
-        <div className="card"><p>{error}</p></div>
+        <div className="card">
+          <p>{error}</p>
+        </div>
       )}
 
       {courses === null && !error && (
-        <div className="card"><p>جاري التحميل…</p></div>
+        <div className="card">
+          <p>جاري التحميل…</p>
+        </div>
       )}
 
       {courses !== null && courses.length === 0 && (
-        <div className="card"><p>لا توجد كورسات منشورة حاليًا.</p></div>
+        <div className="card">
+          <p>لا توجد كورسات منشورة حاليًا.</p>
+        </div>
       )}
 
       {courses !== null && courses.length > 0 && (
@@ -73,18 +90,37 @@ export default function CoursesPage() {
               className="card"
               style={{ display: "block" }}
             >
-              <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "baseline" }}>
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  gap: 12,
+                  alignItems: "baseline",
+                }}
+              >
                 <h2 style={{ margin: 0 }}>{course.title}</h2>
                 <strong style={{ whiteSpace: "nowrap" }}>
                   {formatPrice(course.price, course.currency)}
                 </strong>
               </div>
               {course.shortDescription && (
-                <p style={{ color: "var(--text-muted)", fontSize: 13, marginTop: 4 }}>
+                <p
+                  style={{
+                    color: "var(--text-muted)",
+                    fontSize: 13,
+                    marginTop: 4,
+                  }}
+                >
                   {course.shortDescription}
                 </p>
               )}
-              <p style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 8 }}>
+              <p
+                style={{
+                  fontSize: 12,
+                  color: "var(--text-muted)",
+                  marginTop: 8,
+                }}
+              >
                 {course.teacher.name ? `المدرس: ${course.teacher.name} · ` : ""}
                 {course.level ?? ""}
               </p>
