@@ -48,9 +48,16 @@ set one in §2.5 before the runtime switches to it.
 1. Railway → **+ New → GitHub Repo** → select `sanad-edtech` (same project
    as Postgres is fine).
 2. Service Settings → **Root Directory**: repo root (default). `railway.json`
-   at root is auto-detected: build = `pnpm install --frozen-lockfile` +
-   `pnpm --filter api run build`, start = `node apps/api/dist/src/main`,
+   at root is auto-detected: the build installs with `--prod=false`, runs
+   `prisma generate`, then `nest build`. Start = `node apps/api/dist/src/main`,
    healthcheck = `/api/health`.
+
+   > Why `--prod=false`: with `NODE_ENV=production` set below, pnpm 9 skips
+   > devDependencies — and the build needs `@nestjs/cli`, `typescript` and
+   > `prisma`. Generation lives in the Railway build command, not in the api
+   > `build` script: on Windows the running dev API locks Prisma's query
+   > engine and `prisma generate` would fail with EPERM on every commit.
+
 3. **Variables** tab — set exactly these (no more, no less to start):
 
 | Variable                      | Value                                                                                         |
@@ -103,19 +110,32 @@ migration, but without a password).
 1. Vercel → Add New Project → Import `sanad-edtech`. (Production Branch: set
    it to `feat/go-live-deploy` while `master` lags behind — Settings → Git.)
 2. **Root Directory**: `apps/web` (Framework preset: Next.js).
-3. **Environment Variables**: `NEXT_PUBLIC_API_URL` = `https://<api-domain>`
-   from step 2. No other vars needed.
+3. **Environment Variables** — the browser only calls the web's own origin;
+   Next.js proxies `/api/*` to the API (`apps/web/next.config.mjs`):
+
+   | Variable              | Value                                         |
+   | --------------------- | --------------------------------------------- |
+   | `NEXT_PUBLIC_API_URL` | `https://<web-domain>` — the web's own domain |
+   | `API_PROXY_TARGET`    | `https://<api-domain>` from step 2            |
+
+   Same-origin proxy = first-party cookies + no CORS. (The project's
+   `*.vercel.app` domain shows up under Settings → Domains right after
+   import.)
+
 4. Deploy → open `https://<web-domain>`. **Write down `<web-domain>`.**
-5. Back in Railway API service: set `ALLOWED_ORIGINS` to the web domain
-   (redeploy happens automatically) — otherwise browsers block every call.
+5. Back in Railway API service: set `ALLOWED_ORIGINS` to `https://<web-domain>`
+   (redeploy happens automatically) — the API validates the `Origin` of every
+   unsafe request against it, proxied requests included.
 
-## 4) Custom domain + cookies (do this before real users)
+## 4) Cookies — why the no-domain setup works
 
-Session cookies are `SameSite=Strict` by default
-(`apps/api/src/modules/auth/cookies.ts`). "Site" means the registrable domain,
-so `*.vercel.app` ↔ `*.railway.app` are **different sites** — the refresh
-cookie is not sent cross-site and users get logged out when the access token
-expires (~15 min). Two fixes:
+The browser only ever talks to the **web origin**: `/api/*` is proxied from
+Vercel to the Railway API (`API_PROXY_TARGET` in §3), so session cookies are
+first-party and the default `SameSite=Strict` policy just works — no custom
+domain, no `COOKIE_SAMESITE=none`.
+
+Only if you bypass the proxy (point `NEXT_PUBLIC_API_URL` straight at the API
+domain) do cookies become cross-site — then:
 
 1. **Same parent domain (recommended):** web on `app.example.com`, API on
    `api.example.com` — same site, default cookies just work.
@@ -143,17 +163,18 @@ tenant-resolution follow-up beyond this single-tenant launch.
 
 ## Troubleshooting (symptom → cause → fix)
 
-| Symptom                                              | Cause                                                               | Fix                                                                                   |
-| ---------------------------------------------------- | ------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
-| `P1001` anywhere                                     | Postgres paused/unreachable                                         | Railway → Resume Postgres; re-run migrate                                             |
-| `404 Tenant not found` (API JSON)                    | cloud Host not in `tenant_domains`                                  | re-run seed with `PROD_TENANT_DOMAINS` set                                            |
-| Browser CORS errors, API fine via curl               | web domain missing from `ALLOWED_ORIGINS`                           | set it on API service, redeploy                                                       |
-| API crashes on boot, "SECURITY ERROR" log            | default secrets + `NODE_ENV=production`                             | set real generated secrets                                                            |
-| Railway build fails on `tsup`/design-system          | root `pnpm build` pulls broken packages                             | our `railway.json` builds **api only** (`--filter api`) — do not switch to root build |
-| Login `401 Invalid credentials` on live              | seed never ran on Railway DB                                        | run `pnpm seed:path2` against Railway URL                                             |
-| Logged out every ~15 min / refresh 401               | web and API on different "sites" (`*.vercel.app` ↔ `*.railway.app`) | §4 — same parent domain, or `COOKIE_SAMESITE=none` (caveat)                           |
-| Cross-tenant data visible in prod                    | runtime still connects as superuser (FORCE RLS skips superusers)    | unset `MIGRATION_DATABASE_URL`, point `DATABASE_URL` at `app_user` (§2.5)             |
-| `password authentication failed for user "app_user"` | role exists with no password (migrations create it without one)     | `ALTER ROLE app_user WITH PASSWORD '...'` in the Postgres Data tab (§2.5)             |
+| Symptom                                                | Cause                                                               | Fix                                                                                   |
+| ------------------------------------------------------ | ------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| `P1001` anywhere                                       | Postgres paused/unreachable                                         | Railway → Resume Postgres; re-run migrate                                             |
+| `404 Tenant not found` (API JSON)                      | cloud Host not in `tenant_domains`                                  | re-run seed with `PROD_TENANT_DOMAINS` set                                            |
+| Browser CORS errors, API fine via curl                 | web domain missing from `ALLOWED_ORIGINS`                           | set it on API service, redeploy                                                       |
+| API crashes on boot, "SECURITY ERROR" log              | default secrets + `NODE_ENV=production`                             | set real generated secrets                                                            |
+| Railway build fails on `tsup`/design-system            | root `pnpm build` pulls broken packages                             | our `railway.json` builds **api only** (`--filter api`) — do not switch to root build |
+| Railway build: `nest: not found` / `prisma: not found` | pnpm 9 skips devDeps when `NODE_ENV=production`                     | install with `--prod=false` — see `railway.json` / §2                                 |
+| Login `401 Invalid credentials` on live                | seed never ran on Railway DB                                        | run `pnpm seed:path2` against Railway URL                                             |
+| Logged out every ~15 min / refresh 401                 | cookies went cross-site (proxy bypassed / `API_PROXY_TARGET` unset) | §4 — keep the web-origin proxy, or same parent domain / `COOKIE_SAMESITE=none`        |
+| Cross-tenant data visible in prod                      | runtime still connects as superuser (FORCE RLS skips superusers)    | unset `MIGRATION_DATABASE_URL`, point `DATABASE_URL` at `app_user` (§2.5)             |
+| `password authentication failed for user "app_user"`   | role exists with no password (migrations create it without one)     | `ALTER ROLE app_user WITH PASSWORD '...'` in the Postgres Data tab (§2.5)             |
 
 ## What NOT to send in chat, ever
 
