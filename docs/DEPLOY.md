@@ -49,7 +49,7 @@ set one in §2.5 before the runtime switches to it.
    as Postgres is fine).
 2. Service Settings → **Root Directory**: repo root (default). `railway.json`
    at root is auto-detected: build = `pnpm install --frozen-lockfile` +
-   `pnpm --filter api run build`, start = `node apps/api/dist/main`,
+   `pnpm --filter api run build`, start = `node apps/api/dist/src/main`,
    healthcheck = `/api/health`.
 3. **Variables** tab — set exactly these (no more, no less to start):
 
