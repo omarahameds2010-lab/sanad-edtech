@@ -1365,6 +1365,255 @@ a.sc-panel:focus-visible {
   background: rgba(255, 255, 255, 0.03);
 }
 
+/* -- Attempt room (exam / assignment runners) ------------------------- */
+.sc-deck {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4) var(--space-6);
+  flex-wrap: wrap;
+}
+
+.sc-timer {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  padding: 10px 18px;
+  border-radius: 16px;
+  border: 1px solid var(--sc-hairline-strong);
+  background: rgba(255, 255, 255, 0.02);
+  color: #ffffff;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+  font-weight: 800;
+  font-size: clamp(22px, 3vw, 30px);
+  line-height: 1;
+}
+.sc-timer-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: rgba(244, 244, 246, 0.55);
+}
+.sc-timer[data-low="true"] {
+  border-color: rgba(248, 113, 113, 0.4);
+  background: rgba(248, 113, 113, 0.08);
+  color: #fca5a5;
+}
+
+.sc-btn {
+  font: inherit;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px 22px;
+  border-radius: 16px;
+  border: 1px solid var(--sc-hairline-strong);
+  background: rgba(255, 255, 255, 0.02);
+  color: #f4f4f6;
+  font-weight: 700;
+  font-size: 15px;
+  cursor: pointer;
+  text-decoration: none;
+  transition:
+    border-color 220ms ease,
+    background 220ms ease;
+}
+.sc-btn:hover {
+  border-color: rgba(255, 255, 255, 0.28);
+  background: rgba(255, 255, 255, 0.05);
+  text-decoration: none;
+}
+.sc-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.sc-btn-primary {
+  border-color: transparent;
+  background: var(--tenant-accent-glow, #34d399);
+  color: #052e1b;
+}
+.sc-btn-primary:hover {
+  border-color: transparent;
+  background: var(--tenant-accent-glow, #34d399);
+  filter: brightness(1.06);
+}
+.sc-btn-ghost {
+  border-color: transparent;
+  background: transparent;
+  color: rgba(244, 244, 246, 0.72);
+}
+.sc-btn-ghost:hover {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.sc-nav-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+  margin-top: var(--space-6);
+}
+
+.sc-pal-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-6);
+}
+.sc-pal {
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  border: 1px solid var(--sc-hairline);
+  background: rgba(255, 255, 255, 0.02);
+  color: rgba(244, 244, 246, 0.85);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    border-color 200ms ease,
+    background 200ms ease,
+    color 200ms ease;
+}
+.sc-pal[data-state="answered"] {
+  border-color: rgba(52, 211, 153, 0.4);
+  background: rgba(52, 211, 153, 0.12);
+  color: #a7f3d0;
+}
+.sc-pal[data-state="current"] {
+  border-color: transparent;
+  background: #ffffff;
+  color: #0b0d10;
+}
+
+.sc-choice {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: 14px 16px;
+  border: 1px solid var(--sc-hairline);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.015);
+  cursor: pointer;
+  transition:
+    border-color 200ms ease,
+    background 200ms ease;
+}
+.sc-choice:hover {
+  border-color: var(--sc-hairline-strong);
+}
+.sc-choice[data-selected="true"] {
+  border-color: rgba(52, 211, 153, 0.55);
+  background: rgba(52, 211, 153, 0.08);
+}
+.sc-choice input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+.sc-choice-dot {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.28);
+  transition: border-color 200ms ease;
+}
+.sc-choice[data-selected="true"] .sc-choice-dot {
+  border-color: var(--tenant-accent-glow, #34d399);
+}
+.sc-choice[data-selected="true"] .sc-choice-dot::after {
+  content: "";
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--tenant-accent-glow, #34d399);
+}
+
+.sc-input {
+  font: inherit;
+  width: 100%;
+  padding: 14px 16px;
+  border-radius: 16px;
+  border: 1px solid var(--sc-hairline);
+  background: rgba(255, 255, 255, 0.02);
+  color: #f4f4f6;
+  font-size: 15px;
+  line-height: 1.9;
+  transition:
+    border-color 200ms ease,
+    box-shadow 200ms ease;
+}
+.sc-input::placeholder {
+  color: rgba(244, 244, 246, 0.35);
+}
+.sc-input:focus {
+  outline: none;
+  border-color: rgba(52, 211, 153, 0.55);
+  box-shadow: 0 0 0 4px rgba(52, 211, 153, 0.12);
+}
+textarea.sc-input {
+  min-height: 220px;
+  resize: vertical;
+}
+
+.sc-spec-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: var(--space-2);
+  margin-top: var(--space-4);
+}
+.sc-spec {
+  border: 1px solid var(--sc-hairline);
+  border-radius: 16px;
+  padding: 12px 14px;
+  background: rgba(255, 255, 255, 0.015);
+}
+.sc-spec-label {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  color: rgba(244, 244, 246, 0.5);
+  margin-bottom: 4px;
+}
+.sc-spec-value {
+  font-weight: 700;
+  color: #ffffff;
+  font-variant-numeric: tabular-nums;
+}
+
+/* -- Confirm dialog --------------------------------------------------- */
+.sc-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  place-items: center;
+  padding: var(--space-6);
+  background: rgba(7, 7, 8, 0.72);
+  backdrop-filter: blur(6px);
+}
+.sc-modal {
+  width: min(540px, 100%);
+  border: 1px solid var(--sc-hairline-strong);
+  border-radius: 28px;
+  background:
+    radial-gradient(
+      120% 140% at 85% -10%,
+      rgba(52, 211, 153, 0.14),
+      transparent 55%
+    ),
+    linear-gradient(180deg, #0e0e11, #0a0a0c);
+  padding: clamp(var(--space-6), 4vw, var(--space-8));
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.55);
+}
+
 /* -- Locked state (frosted, not a wall) ------------------------------ */
 .sc-locked {
   position: relative;
