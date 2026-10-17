@@ -634,4 +634,25 @@ describe("WebhookInboxService (audit #5)", () => {
       take: 50,
     });
   });
+
+  it("never lets a processing failure escape the fire-and-forget queue", async () => {
+    const { service } = build();
+    const rejections: unknown[] = [];
+    const onRejection = (reason: unknown) => rejections.push(reason);
+    process.on("unhandledRejection", onRejection);
+    const errSpy = jest.spyOn(console, "error").mockImplementation(() => {});
+
+    try {
+      jest.spyOn(service, "processEvent").mockRejectedValue(new Error("boom"));
+      await (service as any).queueForProcessing("evt-x");
+      await flushImmediates();
+      await new Promise((r) => setTimeout(r, 25));
+    } finally {
+      process.removeListener("unhandledRejection", onRejection);
+      errSpy.mockRestore();
+    }
+
+    // An escaping rejection would take the API process down in production.
+    expect(rejections).toHaveLength(0);
+  });
 });

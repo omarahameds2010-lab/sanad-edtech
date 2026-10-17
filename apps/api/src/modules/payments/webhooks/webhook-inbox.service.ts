@@ -155,9 +155,19 @@ export class WebhookInboxService {
   }
 
   private async queueForProcessing(eventId: string): Promise<void> {
-    // In a real implementation, this would push to a queue (BullMQ)
-    // For now, process synchronously
-    setImmediate(() => this.processEvent(eventId));
+    // In a real implementation, this would push to a queue (BullMQ); for now
+    // the event runs on the next tick. The rejection MUST be swallowed here:
+    // `processEvent` records FAILED + errorCode on the row before rethrowing,
+    // and an unhandled rejection takes the whole API process down — the
+    // bundle-B live smoke left an orphan `INTENT_NOT_FOUND` event that killed
+    // the server moments after every HTTP check had passed.
+    setImmediate(() => {
+      this.processEvent(eventId).catch((error) => {
+        console.error(
+          `Webhook processing failed for event ${eventId}: ${error?.message ?? error}`,
+        );
+      });
+    });
   }
 
   async processEvent(eventId: string): Promise<void> {
