@@ -3,6 +3,7 @@
 ## What this proves (3-minute pitch)
 
 0. المساحة العامة للمعلم (`/teachers/saleh-hussein`) تعرض هويته وكورساته الثلاثة (الأول/الثاني/الثالث الإعدادي).
+   0.5 المدرس ينشر من `/teacher/publish`: يختار الصف → مساحة الكورس → يضيف درسًا (فيديو/امتحان/واجب) وينشره — والطالب يجد الامتحان في «الاختبارات» والواجب في «الواجبات» فورًا.
 1. طالب يدخل امتحانًا بتايمر سيرفر (70 دقيقة)، يحل MCQ وصح/خطأ ومقاليًا، يتنقل بين الأسئلة، ويسلّم (يدويًا أو تلقائيًا عند انتهاء الوقت).
 2. دخول الاختبار يفتح الدرس التالي تلقائيًا (ENTER_EXAM progression).
 3. الدرس يعرض فيديو YouTube UNLISTED حقيقيًا.
@@ -75,27 +76,18 @@ pnpm dev
 
 ## 7) Teacher authoring (UI, no DB console needed)
 
-All flows below are clickable in `/teacher/lessons/<lessonId>` after login
-as teacher. Lesson shells themselves still come from seed/API for now —
-lesson CREATE UI is the next slice, not this one.
+مسار النشر كامل من قائمة «النشر» عند المدرس:
 
-1. **YouTube video**: open the VIDEO lesson → paste the UNLISTED video id
-   → "ربط فيديو يوتيوب". Verifies via `POST /api/video/youtube`
-   `{ lessonId, title, providerVideoId }` (READY immediately, one active
-   video per lesson — delete to replace).
-2. **Exam**: open the EXAM lesson → fill settings + add questions
-   (MCQ with options + correct radio, True/False preset, short/essay)
-   → "حفظ ونشر الاختبار". Uses `POST /api/v1/exams/lessons/:lessonId/exams`,
-   then `POST /api/v1/exams/:examId/questions` per question,
-   then `POST /api/v1/exams/:examId/publish`.
-3. **Assignment**: open the ASSIGNMENT lesson → fill + "حفظ ونشر الواجب".
-   Uses `POST /api/v1/assignments/lessons/:lessonId/assignments`
-   then `POST /api/v1/assignments/:assignmentId/publish`.
-4. **Exam after every lecture**: set the next lesson row
-   `unlockType=ENTER_EXAM, unlockTargetId=<examId>, lockStatus=LOCKED`
-   (one Prisma/API update) — entering the exam unlocks it automatically.
-5. **Students + phones**: `/teacher/students` lists every student enrolled
-   in your courses with phone numbers (no submission needed).
+1. **مساحة النشر** (`/teacher/publish`): ثلاثة كروت للصفوف (الأول/الثاني/الثالث الإعدادي) بعدادات حقيقية لكل صف (كورسات/دروس/منشور/امتحانات/واجبات).
+2. **صفحة الصف** (`/teacher/publish/<prep-1|prep-2|prep-3>`): كورسات الصف + مناهجها، وأزرار «فتح الامتحان» و«تصحيح الواجب» على الدروس. زر «+ كورس جديد للصف» يفتح الإنشاء والصف مُعبَّأ مسبقًا.
+3. **مساحة الكورس** (`/teacher/courses/<id>`): نشر/إلغاء نشر الكورس، «+ إضافة وحدة»، و«+ إضافة درس» (النوع: فيديو/امتحان/واجب)، مع نشر/إلغاء نشر/حذف لكل درس (الحذف يشمل الامتحان/الواجب المرتبط تلقائيًا).
+4. **محرر الدرس** (`/teacher/lessons/<id>`): بيانات الدرس + محرر حسب النوع —
+   - **فيديو**: الصق معرّف يوتيوب UNLISTED → «ربط فيديو يوتيوب» (`POST /api/video/youtube`).
+   - **امتحان**: إعدادات + أسئلة (MCQ/صح-خطأ/مقالي) → «حفظ ونشر الاختبار» (`POST /api/v1/exams/lessons/:lessonId/exams` → `.../questions` → `.../publish`).
+   - **واجب**: إعدادات → «حفظ ونشر الواجب» (`POST /api/v1/assignments/lessons/:lessonId/assignments` → `.../publish`).
+5. بعد النشر: الطالب يجد الامتحان في `/student/exams` والواجب في `/student/assignments` ومحتوى الدرس في صفحة الدرس.
+6. **امتحان بعد كل محاضرة**: اضبط صف الدرس التالي `unlockType=ENTER_EXAM, unlockTargetId=<examId>, lockStatus=LOCKED` (تحديث Prisma/API واحد) — دخول الامتحان يفتحه تلقائيًا.
+7. **الطلاب + التليفونات**: `/teacher/students` يعرض كل طالب مسجّل في كورساتك بأرقام تليفونه.
 
 ## Verification already done in CI/local
 
