@@ -211,6 +211,9 @@ importers:
 
   packages/design-system:
     dependencies:
+      framer-motion:
+        specifier: '>=10'
+        version: 10.18.0(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
       react:
         specifier: '>=18'
         version: 19.3.0
