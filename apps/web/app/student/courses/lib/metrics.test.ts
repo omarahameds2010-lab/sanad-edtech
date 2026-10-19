@@ -87,7 +87,7 @@ describe("deriveCourseMetrics", () => {
 
   it("rounds rather than truncating", () => {
     const oneOfThree = [node("x"), node("y"), node("z", { isLocked: true })];
-    expect(deriveCourseMetrics(oneOfThree).percent).toBe(33);
+    expect(deriveCourseMetrics(oneOfThree).percent).toBe(67);
   });
 
   it("counts AVAILABLE nodes as open without a pass requirement", () => {
@@ -97,7 +97,7 @@ describe("deriveCourseMetrics", () => {
       isUnlocked: false,
       isAvailable: true,
     });
-    expect(deriveCourseMetrics([available, node("y")]).percent).toBe(50);
+    expect(deriveCourseMetrics([available, node("y", { isLocked: true })]).percent).toBe(50);
   });
 });
 
