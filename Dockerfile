@@ -19,7 +19,7 @@ WORKDIR /app
 
 # Workspace manifests first so dependency installation stays cached until the
 # lockfile changes.
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml turbo.json tsconfig.base.json ./
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml turbo.json ./
 COPY apps/api/package.json apps/api/package.json
 COPY apps/web/package.json apps/web/package.json
 COPY packages/design-system/package.json packages/design-system/package.json
