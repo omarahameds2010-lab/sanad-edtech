@@ -1,0 +1,22 @@
+# Fallback build config for Railway's (deprecated) Nixpacks path.
+#
+# A root Dockerfile is the primary, deterministic build; Railway fails to
+# auto-detect a start command for this pnpm monorepo ("No start command could
+# be found"), so when Nixpacks is used instead of Docker, these phases replace
+# the auto-generated plan. Mirrors the Dockerfile 1:1:
+#   install -> prisma generate -> nest build -> node dist/src/main
+
+[phases.install]
+cmds = [
+  "npm install -g corepack@0.24.1 && corepack enable",
+  "pnpm install --frozen-lockfile --prod=false",
+]
+
+[phases.build]
+cmds = [
+  "pnpm --filter api exec prisma generate",
+  "pnpm --filter api run build",
+]
+
+[start]
+cmd = "node apps/api/dist/src/main"
