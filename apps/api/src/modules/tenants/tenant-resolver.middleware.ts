@@ -38,10 +38,17 @@ export class TenantResolverMiddleware implements NestMiddleware {
     // Extract domain (remove port if present)
     const domain = host.split(":")[0];
 
-    // Skip tenant resolution for health checks and platform admin routes
+    // Skip tenant resolution for health checks and platform admin routes.
+    //
+    // Do NOT use req.path here: Nest applies the global prefix ("api") to
+    // middleware registered with forRoutes("*"), so Express mounts this
+    // middleware under /api/* and rewrites req.path to "/". The untouched
+    // request path is only available on req.originalUrl.
+    const requestPath = (req.originalUrl || req.url || "").split("?")[0];
+
     if (
-      req.path.startsWith("/api/health") ||
-      req.path.startsWith("/api/ready")
+      requestPath.startsWith("/api/health") ||
+      requestPath.startsWith("/api/ready")
     ) {
       return next();
     }
