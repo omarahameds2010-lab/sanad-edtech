@@ -467,8 +467,19 @@ describe("signup helpers", () => {
     });
   });
 
-  it("buildFullName joins and collapses whitespace", () => {
-    expect(buildFullName("  أحمد ", " محمد  علي ")).toBe("أحمد محمد علي");
+  it("logout posts to /api/auth/logout with cookies and no bearer token", async () => {
+    const { fetchMock } = mockFetchOnce({ message: "Logged out successfully" });
+    await api.logout();
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe(`${API_BASE_URL}/api/auth/logout`);
+    expect(init.method).toBe("POST");
+    expect(init.credentials).toBe("include");
+    expect(
+      (init.headers as Record<string, string>).Authorization,
+    ).toBeUndefined();
+  });
+
+  it("buildFullName joins and collapses whitespace", () => {    expect(buildFullName("  أحمد ", " محمد  علي ")).toBe("أحمد محمد علي");
     expect(buildFullName("", "")).toBe("");
   });
 
