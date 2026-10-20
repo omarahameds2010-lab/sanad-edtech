@@ -8,6 +8,10 @@ import { LangProvider } from '@/app/components/landing/i18n';
 export const metadata: Metadata = {
   title: 'Learning Platform',
   description: 'One learning universe. Many learning identities.',
+  // Google Search Console ownership proof (HTML-tag method).
+  verification: {
+    google: 'dlUCblFqO6NLb7gMtDGyont0pwN09Jg1TEU7j_Mkb_s',
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
