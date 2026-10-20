@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import SiteHeader from "@/app/components/landing/SiteHeader";
+import SiteFooter from "@/app/components/landing/SiteFooter";
 import { useLang } from "@/app/components/landing/i18n";
 import {
   EditorialCourseCard,
@@ -281,6 +282,7 @@ export default function CoursesPage() {
           </div>
         )}
       </main>
+      <SiteFooter />
     </>
   );
 }

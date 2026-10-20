@@ -4922,7 +4922,7 @@ html[dir="rtl"] .lp-footer-nav a::after {
   margin: 0;
 }
 .lp-footer-sep {
-  color: var(--paper-200);
+  color: var(--ink-300);
   font-weight: 700;
 }
 

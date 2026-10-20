@@ -1,4 +1,5 @@
 import SiteHeader from "../components/landing/SiteHeader";
+import SiteFooter from "../components/landing/SiteFooter";
 import TeachersDirectory from "../components/teachers/TeachersDirectory";
 
 export const metadata = {
@@ -12,6 +13,7 @@ export default function TeachersPage() {
     <>
       <SiteHeader />
       <TeachersDirectory />
+      <SiteFooter />
     </>
   );
 }
