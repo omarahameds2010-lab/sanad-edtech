@@ -1,7 +1,12 @@
 /**
  * Typed HTTP client for the NestJS API.
  *
- * - Base URL comes from NEXT_PUBLIC_API_URL (demo default: http://localhost:3002).
+ * - Base URL comes from NEXT_PUBLIC_API_URL when set. The fail-safe defaults
+ *   keep a deploy alive without env vars:
+ *     · Browser — same-origin (""), so `/api/*` rides the Next rewrite that
+ *       next.config.mjs points at the API in every environment.
+ *     · Server — Node's fetch cannot resolve relative URLs, so it targets the
+ *       production API origin on Vercel and :3002 elsewhere.
  * - Auth is a Bearer access token obtained from POST /api/auth/login.
  *   The token is kept in memory (React context) — never in localStorage.
  * - Tenant is resolved server-side from the Host header, so the client
@@ -9,8 +14,15 @@
  * - Mutating exam calls carry an `idempotency-key` header for safe retries.
  */
 
+const PRODUCTION_API_ORIGIN = "https://sanad-edtech-production.up.railway.app";
+
 export const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3002";
+  process.env.NEXT_PUBLIC_API_URL ??
+  (typeof window === "undefined"
+    ? process.env.VERCEL
+      ? PRODUCTION_API_ORIGIN
+      : "http://localhost:3002"
+    : "");
 
 export interface ApiOptions {
   token?: string;
