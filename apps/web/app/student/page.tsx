@@ -42,6 +42,7 @@ import {
   SignalChart,
   StatStrip,
 } from "./components/command-center/widgets";
+import SiteFooter from "@/app/components/landing/SiteFooter";
 
 interface DashData {
   enrollments: EnrollmentItem[];
@@ -422,6 +423,10 @@ export default function StudentDashboard() {
             <EmptyCourses />
           </section>
         )}
+      </div>
+
+      <div className="cc-footer">
+        <SiteFooter compact theme="dark" />
       </div>
     </div>
   );

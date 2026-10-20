@@ -760,7 +760,7 @@ export const dict: Record<Lang, Dict> = {
       login: "دخول",
       tagline: "مساحة تعليمية واضحة لكل خطوة.",
       rights: "جميع الحقوق محفوظة © 2026 لمنصة سند.",
-      developedBy: "تم التطوير بواسطة",
+      developedBy: "تطوير وتصميم وإدارة بواسطة:",
     },
   },
 
@@ -1288,7 +1288,7 @@ export const dict: Record<Lang, Dict> = {
       login: "Log in",
       tagline: "A clear learning space for every step.",
       rights: "© 2026 SANAD. All rights reserved.",
-      developedBy: "Developed by",
+      developedBy: "Created & Developed by:",
     },
   },
 };

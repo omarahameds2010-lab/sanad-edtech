@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { useAuth } from "@/app/lib/auth";
+import SiteFooter from "@/app/components/landing/SiteFooter";
 import TeacherCommandRegistrar from "./TeacherCommandRegistrar";
 
 const navItems = [
@@ -194,6 +195,8 @@ export default function TeacherLayout({
       </nav>
 
       <main className="tc-inner">{children as any}</main>
+
+      <SiteFooter compact theme="dark" />
     </div>
   );
 }

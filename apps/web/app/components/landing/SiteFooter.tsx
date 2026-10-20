@@ -11,18 +11,29 @@ export const LINKEDIN_URL = "https://www.linkedin.com/in/omar-ahmed-7b97613b1/";
  * The site footer.
  *
  * `compact` renders only the legal line — used under the auth screens, which
- * already carry their own brand stage. The landing page gets the full bar.
+ * already carry their own brand stage, and inside the dark dashboards.
+ * `theme="dark"` lightens the legal line for the graphite shells.
  *
  * The developer name is a living link: a slow emerald→indigo gradient, a
  * LinkedIn mark that wakes up on hover, and an arrow that lifts out of the
  * line. All motion is disabled under `prefers-reduced-motion`.
  */
-export default function SiteFooter({ compact = false }: { compact?: boolean }) {
+export default function SiteFooter({
+  compact = false,
+  theme = "light",
+}: {
+  compact?: boolean;
+  theme?: "light" | "dark";
+}) {
   const { t, lang } = useLang();
   const isAr = lang === "ar";
 
   return (
-    <footer className={`lp-footer${compact ? " lp-footer--compact" : ""}`}>
+    <footer
+      className={`lp-footer${compact ? " lp-footer--compact" : ""}${
+        theme === "dark" ? " lp-footer--dark" : ""
+      }`}
+    >
       <div className="lp-container lp-footer-inner">
         {!compact && (
           <div className="lp-footer-top">
