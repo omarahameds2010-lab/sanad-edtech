@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+import { useAuth } from "@/app/lib/auth";
 import TeacherCommandRegistrar from "./TeacherCommandRegistrar";
 
 const navItems = [
@@ -34,9 +35,18 @@ export default function TeacherLayout({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
+  const router = useRouter();
+  const { token, ready } = useAuth();
   const [morphed, setMorphed] = useState(false);
   const [pill, setPill] = useState({ left: 0, width: 0, ready: false });
   const linkRefs = useRef<Record<string, HTMLAnchorElement | null>>({});
+
+  // Deny by default: no session after the restore attempt ⇒ /login. Waiting
+  // for `ready` matters — a reload briefly has no in-memory token while the
+  // refresh cookie is still being rotated.
+  useEffect(() => {
+    if (ready && !token) router.replace("/login");
+  }, [ready, token, router]);
 
   // Scroll-morph: collapse once the teacher heads into content, expand on the
   // faintest upward intent.
@@ -60,6 +70,8 @@ export default function TeacherLayout({
     if (!el) return;
     setPill({ left: el.offsetLeft, width: el.offsetWidth, ready: true });
   }, [pathname, morphed]);
+
+  if (!ready || !token) return null;
 
   return (
     <div className="tc-canvas">

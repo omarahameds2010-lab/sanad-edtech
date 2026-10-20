@@ -125,7 +125,9 @@ export default function TeacherDashboard() {
       <header style={{ marginBottom: "var(--space-8)" }}>
         <p className="tc-hello">
           صباح الخير،
-          <span className="tc-name">{userName ?? "أستاذ"}</span>
+          <span className="tc-name">
+            {userName ? `أستاذ ${userName}` : "أستاذ"}
+          </span>
         </p>
         <p className="tc-sub">أدر مساحتك التعليمية والكورسات الخاصة بك.</p>
       </header>

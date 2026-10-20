@@ -29,11 +29,11 @@ import * as argon2 from "argon2";
 const prisma = new PrismaClient();
 
 const TENANT_SLUG = "sanad-demo";
-const TENANT_NAME = "الأستاذ صالح حسين";
+const TENANT_NAME = process.env.DEMO_TENANT_NAME ?? "الأستاذ صالح حسين";
 
 const TEACHER_PHONE = "01000000001";
 const STUDENT_PHONE = "01000000002";
-const TEACHER_NAME = "صالح حسين";
+const TEACHER_NAME = process.env.DEMO_TEACHER_NAME ?? "صالح حسين";
 const STUDENT_NAME = "طالب الديمو";
 // Demo credentials (documented in docs/DEMO.md). Re-runs rotate the hash to
 // this password; env override wins on cloud deploys.

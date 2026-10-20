@@ -54,7 +54,7 @@ interface DashData {
 }
 
 export default function StudentDashboard() {
-  const { token, userName } = useAuth();
+  const { token, userName, ready } = useAuth();
   const [data, setData] = useState<DashData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [focus, setFocus] = useState(false);
@@ -266,6 +266,14 @@ export default function StudentDashboard() {
       courseRows,
     };
   }, [data]);
+
+  if (!ready) {
+    return (
+      <div className="cc-root">
+        <DashboardSkeleton />
+      </div>
+    );
+  }
 
   if (!token) {
     return (
