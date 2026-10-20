@@ -94,6 +94,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     hasSession.current = false;
     setMemoryAccessToken(null);
     setState(INITIAL_STATE);
+    // Revoke the refresh family and drop the HttpOnly cookies — otherwise a
+    // reload would silently restore the session we just discarded in memory.
+    void api.logout().catch(() => null);
   }, []);
 
   // Restore a session after a hard reload: the refresh token rides in an

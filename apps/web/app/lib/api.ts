@@ -974,6 +974,17 @@ export const api = {
       skipAuthRetry: true,
     }),
 
+  /**
+   * Revokes the refresh family server-side and clears both HttpOnly cookies.
+   * Without this call a client-side "logout" is only an illusion: the cookie
+   * survives and the next page load restores the session.
+   */
+  logout: () =>
+    apiFetch<{ message: string }>("/api/auth/logout", {
+      method: "POST",
+      skipAuthRetry: true,
+    }),
+
   getStudentExamView: (token: string, examId: string) =>
     apiFetch<StudentExamView>(`/api/v1/exams/${examId}/view`, { token }),
 
