@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useAuth } from "@/app/lib/auth";
 import { ApiError, landingForRole } from "@/app/lib/api";
 import { Magnetic } from "@/app/components/landing/interactive";
+import SiteFooter from "@/app/components/landing/SiteFooter";
 import { LanguageSwitcher, useLang } from "@/app/components/landing/i18n";
 
 function EyeIcon({ open }: { open: boolean }) {
@@ -60,7 +61,8 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="lp-login-split">
+    <>
+      <main className="lp-login-split">
       <section
         aria-label="Sanad"
         style={{
@@ -236,6 +238,8 @@ export default function LoginPage() {
           </p>
         </form>
       </section>
-    </main>
+      </main>
+      <SiteFooter compact />
+    </>
   );
 }

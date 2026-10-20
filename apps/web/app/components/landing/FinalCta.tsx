@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { Magnetic, Reveal } from "./interactive";
 import { useLang } from "./i18n";
-import Logo from "./Logo";
+import SiteFooter from "./SiteFooter";
 
 export default function FinalCta() {
   const { t } = useLang();
@@ -33,41 +33,7 @@ export default function FinalCta() {
           </Reveal>
         </div>
       </section>
-      <footer
-        style={{
-          borderTop: "1px solid var(--paper-200)",
-          background: "var(--paper-50)",
-        }}
-      >
-        <div
-          className="lp-container"
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            gap: 16,
-            flexWrap: "wrap",
-            paddingTop: 24,
-            paddingBottom: 24,
-          }}
-        >
-          <Logo />
-          <nav aria-label="Footer" style={{ display: "flex", gap: 16, fontSize: 14 }}>
-            <Link href="/courses" style={{ color: "var(--ink-700)" }}>
-              {t.footer.courses}
-            </Link>
-            <Link href="/teachers" style={{ color: "var(--ink-700)" }}>
-              {t.footer.teachers}
-            </Link>
-            <Link href="/login" style={{ color: "var(--ink-700)" }}>
-              {t.footer.login}
-            </Link>
-          </nav>
-          <p style={{ margin: 0, fontSize: 13, color: "var(--text-muted)" }}>
-            {t.footer.tagline}
-          </p>
-        </div>
-      </footer>
+      <SiteFooter />
     </>
   );
 }

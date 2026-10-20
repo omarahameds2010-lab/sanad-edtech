@@ -1,4 +1,4 @@
-@import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700;800&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap");
 
 /* ======================================================================
    P0 VISUAL IDENTITY — MASTER TOKENS (P0 SCOPE LOCKED)
@@ -4830,5 +4830,219 @@ textarea.sc-input {
   .ed-sk-cover,
   .ed-sk-line {
     animation: none;
+  }
+}
+
+/* -- 24. SITE FOOTER — copyright + developer credit -------------------- */
+.lp-footer {
+  position: relative;
+  border-top: 1px solid var(--paper-200);
+  background:
+    radial-gradient(900px 210px at 50% -150px, rgba(4, 120, 87, 0.09), transparent 70%),
+    var(--paper-50);
+}
+.lp-footer--compact {
+  border-top: none;
+  background: var(--paper-50);
+}
+.lp-footer-inner {
+  padding: 26px 24px 20px;
+}
+.lp-footer--compact .lp-footer-inner {
+  padding: 18px 24px;
+}
+.lp-footer-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.lp-footer-nav {
+  display: flex;
+  gap: 18px;
+  font-size: 14px;
+  font-weight: 600;
+}
+.lp-footer-nav a {
+  position: relative;
+  color: var(--ink-700);
+  text-decoration: none;
+}
+.lp-footer-nav a::after {
+  content: "";
+  position: absolute;
+  inset-inline-start: 0;
+  bottom: -5px;
+  width: 100%;
+  height: 2px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, var(--color-action), #4f46e5);
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 260ms var(--ease-standard);
+}
+html[dir="rtl"] .lp-footer-nav a::after {
+  transform-origin: right;
+}
+.lp-footer-nav a:hover::after,
+.lp-footer-nav a:focus-visible::after {
+  transform: scaleX(1);
+}
+.lp-footer-tagline {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.lp-footer-legal {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 28px;
+  flex-wrap: wrap;
+  margin-top: 22px;
+  padding-top: 18px;
+  border-top: 1px dashed var(--paper-200);
+  font-size: 13px;
+  color: var(--text-muted);
+}
+.lp-footer--compact .lp-footer-legal {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: none;
+}
+.lp-footer-copy {
+  margin: 0;
+}
+.lp-footer-made {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+}
+.lp-footer-sep {
+  color: var(--paper-200);
+  font-weight: 700;
+}
+
+/* The credit link — a quiet jewel that wakes up on hover. */
+.lp-maker {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 10px 6px;
+  margin-inline-start: 1px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  font-family: "Space Grotesk", "Inter", system-ui, sans-serif;
+  font-size: 13.5px;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  line-height: 1;
+  color: var(--ink-950);
+  text-decoration: none;
+  isolation: isolate;
+  transition:
+    border-color 280ms var(--ease-standard),
+    box-shadow 280ms var(--ease-standard),
+    transform 280ms var(--ease-standard);
+}
+.lp-maker::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(115deg, rgba(4, 120, 87, 0.1), rgba(79, 70, 229, 0.12));
+  opacity: 0;
+  transition: opacity 280ms var(--ease-standard);
+  z-index: -1;
+}
+.lp-maker:hover,
+.lp-maker:focus-visible {
+  border-color: rgba(4, 120, 87, 0.24);
+  box-shadow: 0 12px 26px -16px rgba(4, 120, 87, 0.55);
+  transform: translateY(-1px);
+  outline: none;
+}
+.lp-maker:focus-visible {
+  box-shadow:
+    0 0 0 3px var(--color-action-soft),
+    0 12px 26px -16px rgba(4, 120, 87, 0.55);
+}
+.lp-maker:hover::before,
+.lp-maker:focus-visible::before {
+  opacity: 1;
+}
+.lp-maker-name {
+  background-image: linear-gradient(
+    100deg,
+    #065f46 0%,
+    #059669 30%,
+    #4f46e5 62%,
+    #065f46 100%
+  );
+  background-size: 280% 100%;
+  background-position: 0% 50%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+  transition: background-position 900ms var(--ease-standard);
+}
+.lp-maker:hover .lp-maker-name,
+.lp-maker:focus-visible .lp-maker-name {
+  background-position: 100% 50%;
+}
+.lp-maker-in {
+  color: #0a66c2;
+  opacity: 0.55;
+  transition:
+    opacity 280ms ease,
+    transform 280ms ease;
+}
+.lp-maker:hover .lp-maker-in,
+.lp-maker:focus-visible .lp-maker-in {
+  opacity: 1;
+  transform: scale(1.12) rotate(-4deg);
+}
+.lp-maker-arrow {
+  color: var(--color-action);
+  font-size: 12.5px;
+  transition: transform 320ms var(--ease-standard);
+}
+.lp-maker:hover .lp-maker-arrow,
+.lp-maker:focus-visible .lp-maker-arrow {
+  transform: translate(3px, -3px);
+}
+html[dir="rtl"] .lp-maker:hover .lp-maker-arrow,
+html[dir="rtl"] .lp-maker:focus-visible .lp-maker-arrow {
+  transform: translate(-3px, -3px);
+}
+@media (max-width: 640px) {
+  .lp-footer-legal {
+    justify-content: center;
+    text-align: center;
+  }
+  .lp-footer-made {
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .lp-maker,
+  .lp-maker-name,
+  .lp-maker-in,
+  .lp-maker-arrow,
+  .lp-footer-nav a::after {
+    transition: none;
+  }
+  .lp-maker:hover {
+    transform: none;
+  }
+  .lp-maker:hover .lp-maker-in,
+  .lp-maker:hover .lp-maker-arrow {
+    transform: none;
   }
 }

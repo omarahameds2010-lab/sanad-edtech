@@ -13,6 +13,7 @@ import {
   landingForRole,
 } from "@/app/lib/api";
 import { Magnetic } from "@/app/components/landing/interactive";
+import SiteFooter from "@/app/components/landing/SiteFooter";
 
 function EyeIcon({ open }: { open: boolean }) {
   return (
@@ -116,7 +117,8 @@ export default function SignupPage() {
   const isTeacher = role === "TEACHER";
 
   return (
-    <main className="lp-signup-split">
+    <>
+      <main className="lp-signup-split">
       {/* 45% — brand theater */}
       <section
         aria-label="Sanad"
@@ -498,6 +500,8 @@ export default function SignupPage() {
           </p>
         </div>
       </section>
-    </main>
+      </main>
+      <SiteFooter compact />
+    </>
   );
 }

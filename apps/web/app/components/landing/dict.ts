@@ -236,7 +236,14 @@ export interface Dict {
     openBadge: string;
     progress: string;
   };
-  footer: { courses: string; teachers: string; login: string; tagline: string };
+  footer: {
+    courses: string;
+    teachers: string;
+    login: string;
+    tagline: string;
+    rights: string;
+    developedBy: string;
+  };
 }
 
 export const dict: Record<Lang, Dict> = {
@@ -752,6 +759,8 @@ export const dict: Record<Lang, Dict> = {
       teachers: "المدرسون",
       login: "دخول",
       tagline: "مساحة تعليمية واضحة لكل خطوة.",
+      rights: "جميع الحقوق محفوظة © 2026 لمنصة سند.",
+      developedBy: "تم التطوير بواسطة",
     },
   },
 
@@ -1278,6 +1287,8 @@ export const dict: Record<Lang, Dict> = {
       teachers: "Teachers",
       login: "Log in",
       tagline: "A clear learning space for every step.",
+      rights: "© 2026 SANAD. All rights reserved.",
+      developedBy: "Developed by",
     },
   },
 };
