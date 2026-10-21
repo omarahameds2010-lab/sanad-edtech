@@ -359,7 +359,7 @@ export default function TeacherStudentsPage() {
             </span>
           </div>
           <div className="st-stat-value">{activeCount}</div>
-          <div className="st-stat-foot">جاهزون للدخول للمنصة</div>
+          <div className="st-stat-foot">من إجمالي الطلاب</div>
         </div>
       </div>
 
