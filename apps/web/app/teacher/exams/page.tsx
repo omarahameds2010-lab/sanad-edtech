@@ -131,7 +131,9 @@ function ExamCard({ exam, index }: { exam: ExamListItem; index: number }) {
         {exam.lesson && (
           <span className="tx-meta-item">
             <BookIcon />
-            <span title={exam.lesson.title}>{exam.lesson.title}</span>
+            <span title={exam.lesson.title}>
+              الدرس: {exam.lesson.title}
+            </span>
           </span>
         )}
       </div>
