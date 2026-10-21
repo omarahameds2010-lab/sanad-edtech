@@ -11,7 +11,12 @@ import {
   ShieldAlertIcon,
   SparkIcon,
 } from "../TeacherIcons";
-import type { LiveExamRow, LoadState, PendingRow } from "./types";
+import {
+  examLessonLabel,
+  type LiveExamRow,
+  type LoadState,
+  type PendingRow,
+} from "./types";
 
 const shortDateFormatter = new Intl.DateTimeFormat("ar-EG-u-nu-latn", {
   day: "numeric",
@@ -63,7 +68,7 @@ export function AssistantRail({
     pendingState === "loading"
       ? { label: "جارٍ القراءة", tone: "quiet" }
       : pendingState === "failed"
-        ? { label: "قراءة جزئية", tone: "red" }
+        ? { label: "غير مكتمل", tone: "red" }
         : (pendingTotal ?? 0) > 0
           ? { label: "عاجل", tone: "red" }
           : { label: "مكتمل", tone: "green" };
@@ -79,7 +84,7 @@ export function AssistantRail({
     pendingState === "loading"
       ? "بنجهّز طابور التصحيح من الخادم…"
       : pendingState === "failed"
-        ? "بعض الطوابير لم تستجب، والأرقام غير المؤكدة لن تظهر."
+        ? "طابور واحد على الأقل لم يستجب، والأرقام غير المؤكدة لن تظهر."
         : (pendingTotal ?? 0) > 0
           ? "تسليم ومحاولة بانتظار قرارك."
           : "كل التسليمات والمحاولات مصححة.";
@@ -90,6 +95,22 @@ export function AssistantRail({
       : liveExamsState === "failed"
         ? null
         : (liveExams?.length ?? 0);
+
+  const liveChip =
+    liveExamsState === "loading"
+      ? { label: "جارٍ التحقق", tone: "quiet" }
+      : (liveCount ?? 0) > 0
+        ? { label: "مباشر", tone: "green" }
+        : { label: "غير متاح", tone: "quiet" };
+
+  const liveStateLabel =
+    liveExamsState === "loading"
+      ? "…"
+      : liveExamsState === "failed"
+        ? "تعذر"
+        : (liveCount ?? 0) > 0
+          ? "منشور"
+          : "لا يوجد";
 
   return (
     <aside className="td-side" aria-label="المساعد الذكي للمعلم">
@@ -201,12 +222,17 @@ export function AssistantRail({
           <span className="td-side-icon" aria-hidden>
             <ExamsIcon size={17} />
           </span>
-          <span className="td-chip" data-tone="green">
-            <span className="td-live-dot" aria-hidden />
-            مباشر
+          <span className="td-chip" data-tone={liveChip.tone}>
+            {liveChip.tone === "green" ? (
+              <span className="td-live-dot" aria-hidden />
+            ) : null}
+            {liveChip.label}
           </span>
-          <span className="td-chip td-side-state" data-tone="quiet">
-            {liveExamsState === "failed" ? "تعذر" : "منشور"}
+          <span
+            className="td-chip td-side-state"
+            data-tone={liveExamsState === "failed" ? "red" : "quiet"}
+          >
+            {liveStateLabel}
           </span>
         </div>
 
@@ -237,7 +263,7 @@ export function AssistantRail({
                 </span>
                 <span className="td-side-task-copy">
                   <strong>{exam.title}</strong>
-                  <small>{exam.lessonTitle ?? "بدون درس"}</small>
+                  <small>{examLessonLabel(exam)}</small>
                 </span>
                 <span className="td-side-task-time">
                   {exam.pending === null

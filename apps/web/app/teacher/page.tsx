@@ -406,7 +406,7 @@ export default function TeacherDashboard() {
     pendingState === "loading"
       ? "بنجهّز طابور التصحيح"
       : pendingState === "failed"
-        ? "تعذر قراءة بعض الطوابير"
+        ? "تعذر قراءة طابور أو أكثر"
         : pendingTotal !== null && pendingTotal > 0
           ? `${pendingTotal.toLocaleString("en-US")}${pendingCapped ? "+" : ""} بانتظار قرارك`
           : "لا مهام معلقة";
@@ -491,7 +491,7 @@ export default function TeacherDashboard() {
             لوحة المعلم
           </span>
           <h1 className="td-greeting">
-            <span className="td-greeting-lead">صباح الخير،</span>
+            <span className="td-greeting-lead">صباح الخير،</span>{" "}
             <span className="td-greeting-name">{teacherName}</span>
           </h1>
           <p className="td-sub">

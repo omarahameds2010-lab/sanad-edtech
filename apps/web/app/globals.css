@@ -7149,6 +7149,13 @@ html[dir="rtl"] .lp-maker:focus-visible .lp-maker-arrow {
   flex-direction: column;
   gap: 16px;
   min-width: 0;
+  max-height: calc(100vh - 48px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+}
+.td-side::-webkit-scrollbar {
+  display: none;
 }
 
 .td-card {
@@ -8262,6 +8269,8 @@ html[dir="rtl"] .lp-maker:focus-visible .lp-maker-arrow {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 12px;
+    max-height: none;
+    overflow: visible;
   }
   .td-side-note {
     grid-column: 1 / -1;
@@ -8277,8 +8286,8 @@ html[dir="rtl"] .lp-maker:focus-visible .lp-maker-arrow {
   }
   .td-kpis {
     overflow-x: auto;
-    margin-inline: -16px;
-    padding: 0 16px 6px;
+    margin-inline: 0;
+    padding: 0 0 6px;
     scroll-snap-type: x mandatory;
     scrollbar-width: none;
   }

@@ -13,7 +13,12 @@ import {
   InboxIcon,
   PhoneIcon,
 } from "../TeacherIcons";
-import type { LiveExamRow, LoadState, PendingRow } from "./types";
+import {
+  examLessonLabel,
+  type LiveExamRow,
+  type LoadState,
+  type PendingRow,
+} from "./types";
 
 const dateFormatter = new Intl.DateTimeFormat("ar-EG-u-nu-latn", {
   day: "numeric",
@@ -425,7 +430,7 @@ export function ActionCenter({
                         </td>
                         <td className="td-cell">
                           <span className="td-muted">
-                            {exam.lessonTitle ?? "—"}
+                            {examLessonLabel(exam)}
                           </span>
                         </td>
                         <td className="td-cell">
@@ -470,7 +475,7 @@ export function ActionCenter({
                       <span className="td-m-main">
                         <strong className="td-m-name">{exam.title}</strong>
                         <span className="td-m-sub">
-                          {exam.lessonTitle ?? "بدون درس"}
+                          {examLessonLabel(exam)}
                         </span>
                       </span>
                       <span className="td-pill" data-tone="green">
