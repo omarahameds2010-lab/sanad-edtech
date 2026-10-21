@@ -224,6 +224,25 @@ a:hover {
   color: var(--ink-700);
   border: 1px solid var(--paper-200);
 }
+.lp-btn-danger {
+  background: transparent;
+  color: var(--color-danger);
+  border: 1px solid rgba(220, 38, 38, 0.35);
+  cursor: pointer;
+  font-family: inherit;
+}
+.lp-btn-danger:hover {
+  background: rgba(220, 38, 38, 0.06);
+  border-color: rgba(220, 38, 38, 0.55);
+  filter: none;
+}
+.lp-btn-block {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
 .lp-grid-3 {
   display: grid;
   grid-template-columns: repeat(3, 1fr);

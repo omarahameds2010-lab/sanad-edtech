@@ -9,6 +9,7 @@ import {
   type EnrollmentItem,
   type UserProfile,
 } from "@/app/lib/api";
+import LogoutButton from "@/app/components/LogoutButton";
 
 const roleLabels: Record<string, string> = {
   STUDENT: "طالب",
@@ -313,6 +314,38 @@ export default function StudentProfilePage() {
             ))}
           </div>
         )}
+      </section>
+
+      <section
+        className="card"
+        style={{
+          marginTop: 20,
+          padding: 20,
+          borderColor: "rgba(220, 38, 38, 0.18)",
+        }}
+      >
+        <h2
+          style={{
+            margin: "0 0 var(--space-sm)",
+            fontSize: 18,
+            color: "var(--ink-950)",
+          }}
+        >
+          تسجيل الخروج
+        </h2>
+        <p
+          style={{
+            margin: "0 0 var(--space-md)",
+            color: "var(--text-muted)",
+            fontSize: 14,
+            lineHeight: 1.8,
+          }}
+        >
+          مسجّل دخول كـ{" "}
+          <strong style={{ color: "var(--ink-950)" }}>{profile.name}</strong>
+          {"."} لو خلصت، اقفل الجلسة بأمان.
+        </p>
+        <LogoutButton />
       </section>
     </div>
   );

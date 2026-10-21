@@ -1,14 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { useAuth } from "@/app/lib/auth";
+import LogoutDialog from "@/app/components/LogoutDialog";
 
 export default function StudentOrb() {
-  const { userName, logout } = useAuth();
-  const router = useRouter();
+  const { userName } = useAuth();
   const [open, setOpen] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
   const [hover, setHover] = useState(false);
   const [tilt, setTilt] = useState({ x: 0, y: 0 });
   const boxRef = useRef<HTMLDivElement>(null);
@@ -33,9 +33,8 @@ export default function StudentOrb() {
   }, []);
 
   function handleLogout() {
-    logout();
     setOpen(false);
-    router.push("/login");
+    setConfirmOpen(true);
   }
 
   function onMove(e: React.MouseEvent) {
@@ -258,6 +257,10 @@ export default function StudentOrb() {
           </button>
         </div>
       )}
+      <LogoutDialog
+        open={confirmOpen}
+        onClose={() => setConfirmOpen(false)}
+      />
     </div>
   );
 }
