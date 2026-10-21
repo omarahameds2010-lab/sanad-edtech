@@ -6433,8 +6433,19 @@ html[dir="rtl"] .lp-maker:focus-visible .lp-maker-arrow {
    TEACHER SHELL — graphite rail · floating mobile command bar
    Layer 0 is black, the rail is #121214, interactive states are #161618.
    The rail is fixed to the RTL inline-start edge (the right).
+
+   The language provider wraps the app in a 320ms transform animation. A
+   transformed ancestor becomes the containing block for fixed children, so
+   the rail would scroll with the page and the mobile bar would stick to the
+   document bottom. The teacher workspace opts out of that wrapper animation;
+   its own cards still animate in.
    ====================================================================== */
+.lp-lang-enter:has(.tc-canvas) {
+  animation: none;
+  transform: none;
+}
 .tn-rail {
+  box-sizing: border-box;
   position: fixed;
   z-index: 70;
   top: 16px;
