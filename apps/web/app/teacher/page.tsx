@@ -471,7 +471,7 @@ export default function TeacherDashboard() {
       value: pendingTotal,
       suffix: pendingCapped ? "+" : undefined,
       foot: pendingCapped ? "العدد قد يزيد" : "تسليمات ومحاولات",
-      href: "/teacher/assignments",
+      href: "#td-action-center",
       Icon: InboxIcon,
       tone:
         pendingTotal !== null && pendingTotal > 0

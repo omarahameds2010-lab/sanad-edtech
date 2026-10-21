@@ -175,7 +175,7 @@ export function AssessmentCard({
           </>
         )}
 
-        {item.lessonTitle && (
+        {item.lessonTitle && item.lessonTitle !== item.title && (
           <>
             <span className="tx-meta-sep" aria-hidden />
             <span className="tx-meta-item">

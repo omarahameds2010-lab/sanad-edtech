@@ -7136,6 +7136,9 @@ html[dir="rtl"] .lp-maker:focus-visible .lp-maker-arrow {
   align-items: start;
   gap: 20px;
 }
+#td-action-center {
+  scroll-margin-top: 24px;
+}
 .td-main {
   display: flex;
   flex-direction: column;
