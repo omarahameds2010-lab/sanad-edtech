@@ -1,9 +1,19 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@/app/lib/auth";
 import { api, ApiError, type ExamListItem } from "@/app/lib/api";
+import {
+  AssessmentCard,
+  AssessmentEmpty,
+  AssessmentNoResults,
+  AssessmentPageHeader,
+  AssessmentSidebar,
+  AssessmentSkeleton,
+  AssessmentToolbar,
+  type AssessmentFilter,
+} from "../components/AssessmentIndex";
 
 const STATUS_LABELS: Record<string, string> = {
   PUBLISHED: "منشور",
@@ -11,215 +21,154 @@ const STATUS_LABELS: Record<string, string> = {
   ARCHIVED: "مؤرشف",
 };
 
-function ExamIcon() {
-  return (
-    <svg
-      aria-hidden
-      width="20"
-      height="20"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.7"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-      <path d="M14 2v6h6" />
-      <path d="M8 13h8" />
-      <path d="M8 17h5" />
-    </svg>
-  );
+const FILTERS: AssessmentFilter[] = [
+  { id: "all", label: "الكل" },
+  { id: "published", label: "منشور" },
+  { id: "draft", label: "مسودة" },
+  { id: "pending", label: "بحاجة لتصحيح" },
+];
+
+interface PendingSummary {
+  byId: Record<string, number>;
+  total: number;
+  capped: boolean;
+  failed: boolean;
 }
 
-function ClockIcon() {
-  return (
-    <svg
-      aria-hidden
-      width="15"
-      height="15"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.8"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <circle cx="12" cy="12" r="9" />
-      <path d="M12 7v5l3 2" />
-    </svg>
+async function fetchPendingSummary(
+  token: string,
+  exams: ExamListItem[],
+): Promise<PendingSummary> {
+  let failed = false;
+  let capped = false;
+
+  // There is no aggregate endpoint yet; each exam's grading queue is the only
+  // honest source for ungraded work. Fetch in parallel and fail soft so the
+  // list itself still renders if one queue is unavailable.
+  const entries = await Promise.all(
+    exams.map(async (exam) => {
+      try {
+        const queue = await api.getGradingQueue(token, exam.id, undefined, 100);
+        if (queue.nextCursor) capped = true;
+        const count = queue.attempts.filter(
+          (attempt) =>
+            attempt.status === "SUBMITTED" || attempt.status === "TIMED_OUT",
+        ).length;
+        return [exam.id, count] as const;
+      } catch {
+        failed = true;
+        return [exam.id, 0] as const;
+      }
+    }),
   );
-}
 
-function BookIcon() {
-  return (
-    <svg
-      aria-hidden
-      width="15"
-      height="15"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.8"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
-      <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
-    </svg>
-  );
-}
-
-function ArrowIcon() {
-  return (
-    <svg
-      aria-hidden
-      width="16"
-      height="16"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M19 12H5" />
-      <path d="m12 19-7-7 7-7" />
-    </svg>
-  );
-}
-
-function PencilIcon() {
-  return (
-    <svg
-      aria-hidden
-      width="15"
-      height="15"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.8"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M12 20h9" />
-      <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" />
-    </svg>
-  );
-}
-
-function ExamCard({ exam, index }: { exam: ExamListItem; index: number }) {
-  const status = STATUS_LABELS[exam.status] ?? exam.status;
-  const isPublished = exam.status === "PUBLISHED";
-  const description = exam.description?.trim();
-
-  return (
-    <article
-      className="tx-card"
-      style={{ animationDelay: `${Math.min(index, 8) * 55}ms` }}
-    >
-      <div className="tx-card-head">
-        <div className="tx-card-heading">
-          <span className="tx-icon" aria-hidden>
-            <ExamIcon />
-          </span>
-          <div className="tx-card-heading-copy">
-            <span className="tx-kicker">اختبار</span>
-            <h2 className="tx-card-title">
-              <Link href={`/teacher/exams/${exam.id}`}>{exam.title}</Link>
-            </h2>
-          </div>
-        </div>
-        <span
-          className={`tx-badge ${isPublished ? "tx-badge-live" : "tx-badge-muted"}`}
-        >
-          <span className="tx-badge-dot" aria-hidden />
-          {status}
-        </span>
-      </div>
-
-      {description && <p className="tx-card-desc">{description}</p>}
-
-      <div className="tx-meta">
-        <span className="tx-meta-item">
-          <ClockIcon />
-          <span>
-            المدة: <strong>{exam.timerMinutes} دقيقة</strong>
-          </span>
-        </span>
-        {exam.lesson && (
-          <span className="tx-meta-item">
-            <BookIcon />
-            <span title={exam.lesson.title}>
-              الدرس: {exam.lesson.title}
-            </span>
-          </span>
-        )}
-      </div>
-
-      <div className="tx-actions">
-        <Link className="tx-cta" href={`/teacher/exams/${exam.id}`}>
-          فتح طابور التصحيح
-          <ArrowIcon />
-        </Link>
-        <Link
-          className="tx-cta tx-cta-outline"
-          href={`/teacher/lessons/${exam.lessonId}`}
-        >
-          <PencilIcon />
-          تعديل الاختبار
-        </Link>
-      </div>
-    </article>
-  );
-}
-
-function ExamState({
-  title,
-  body,
-  action,
-}: {
-  title: string;
-  body: string;
-  action?: React.ReactNode;
-}) {
-  return (
-    <div className="tx-state">
-      <span className="tx-state-icon" aria-hidden>
-        <ExamIcon />
-      </span>
-      <h2 className="tx-state-title">{title}</h2>
-      <p className="tx-state-body">{body}</p>
-      {action}
-    </div>
-  );
+  return {
+    byId: Object.fromEntries(entries),
+    total: entries.reduce((sum, [, count]) => sum + count, 0),
+    capped,
+    failed,
+  };
 }
 
 export default function TeacherExamsPage() {
   const { token } = useAuth();
   const [exams, setExams] = useState<ExamListItem[] | null>(null);
+  const [pending, setPending] = useState<PendingSummary | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
+  const [filter, setFilter] = useState("all");
+  const requestSeq = useRef(0);
 
   const load = useCallback(() => {
     if (!token) return;
+    const seq = ++requestSeq.current;
+
     setError(null);
     setExams(null);
+    setPending(null);
+
     api
-      .listExams(token)
-      .then((r) => setExams(r.exams))
-      .catch((e) =>
-        setError(e instanceof ApiError ? e.message : "تعذر تحميل الاختبارات"),
-      );
+      .listTeacherExams(token)
+      .then(async (result) => {
+        if (seq !== requestSeq.current) return;
+        setExams(result.exams);
+
+        if (result.exams.length === 0) {
+          setPending({ byId: {}, total: 0, capped: false, failed: false });
+          return;
+        }
+
+        const summary = await fetchPendingSummary(token, result.exams);
+        if (seq !== requestSeq.current) return;
+        setPending(summary);
+      })
+      .catch((e) => {
+        if (seq !== requestSeq.current) return;
+        setError(e instanceof ApiError ? e.message : "تعذر تحميل الاختبارات");
+      });
   }, [token]);
 
   useEffect(() => {
     load();
+    return () => {
+      requestSeq.current += 1;
+    };
   }, [load]);
+
+  const publishedCount =
+    exams?.filter((exam) => exam.status === "PUBLISHED").length ?? 0;
+  const draftCount =
+    exams?.filter((exam) => exam.status === "DRAFT").length ?? 0;
+
+  const pendingCount =
+    pending && !pending.failed && exams
+      ? exams.filter((exam) => (pending.byId[exam.id] ?? 0) > 0).length
+      : undefined;
+
+  const filters = FILTERS.map((item) => {
+    if (item.id === "all") return { ...item, count: exams?.length };
+    if (item.id === "published") return { ...item, count: publishedCount };
+    if (item.id === "draft") return { ...item, count: draftCount };
+    return {
+      ...item,
+      count: pendingCount,
+      disabled: !pending || pending.failed,
+    };
+  });
+
+  const visible = useMemo(() => {
+    if (!exams) return [];
+    const query = search.trim().toLowerCase();
+
+    return exams.filter((exam) => {
+      if (filter === "published" && exam.status !== "PUBLISHED") return false;
+      if (filter === "draft" && exam.status !== "DRAFT") return false;
+      if (filter === "pending" && !((pending?.byId[exam.id] ?? 0) > 0)) {
+        return false;
+      }
+      if (query === "") return true;
+
+      return [exam.title, exam.description ?? "", exam.lesson?.title ?? ""].some(
+        (value) => value.toLowerCase().includes(query),
+      );
+    });
+  }, [exams, filter, pending, search]);
+
+  const clearFilters = () => {
+    setSearch("");
+    setFilter("all");
+  };
+
+  const pendingState: "loading" | "ready" | "failed" = !pending
+    ? "loading"
+    : pending.failed
+      ? "failed"
+      : "ready";
 
   if (!token) {
     return (
       <section className="tx-shell">
-        <ExamState
+        <AssessmentEmpty
           title="سجّل الدخول أولًا"
           body="عشان تشوف الاختبارات وطابور التصحيح، محتاج تكون مسجل دخول بحساب مدرس."
           action={
@@ -235,7 +184,7 @@ export default function TeacherExamsPage() {
   if (error) {
     return (
       <section className="tx-shell">
-        <ExamState
+        <AssessmentEmpty
           title="تعذر تحميل الاختبارات"
           body={error}
           action={
@@ -251,72 +200,90 @@ export default function TeacherExamsPage() {
   if (exams === null) {
     return (
       <section className="tx-shell" aria-busy="true" aria-live="polite">
-        <header className="tx-head">
-          <div>
-            <span className="tx-eyebrow">
-              <span className="tx-eyebrow-dot" aria-hidden />
-              مركز التقييم
-            </span>
-            <h1 className="tx-title">الاختبارات والتصحيح</h1>
-            <p className="tx-sub">
-              بنجهّز الاختبارات وطوابير التصحيح…
-            </p>
-          </div>
-        </header>
-        <div className="tx-grid" aria-hidden>
-          {[0, 1, 2].map((i) => (
-            <div className="tx-skeleton" key={i}>
-              <span className="tx-skeleton-line tx-skeleton-line-short" />
-              <span className="tx-skeleton-line tx-skeleton-line-title" />
-              <span className="tx-skeleton-line" />
-              <span className="tx-skeleton-line tx-skeleton-line-cta" />
-            </div>
-          ))}
-        </div>
+        <AssessmentPageHeader
+          eyebrow="مركز التقييم"
+          title="الاختبارات والتصحيح"
+          sub="بنجهّز الاختبارات وطوابير التصحيح…"
+        />
+        <AssessmentSkeleton />
       </section>
     );
   }
 
   return (
     <section className="tx-shell">
-      <header className="tx-head">
-        <div className="tx-head-copy">
-          <span className="tx-eyebrow">
-            <span className="tx-eyebrow-dot" aria-hidden />
-            مركز التقييم
-          </span>
-          <h1 className="tx-title">الاختبارات والتصحيح</h1>
-          <p className="tx-sub">
-            افتح طابور التصحيح، راجع إجابات الطلاب، وسلّم الدرجات من مكان واحد.
-          </p>
-        </div>
-        {exams.length > 0 && (
-          <span className="tx-count">
-            <strong>{exams.length}</strong>
-            {exams.length === 1 ? " اختبار منشور" : " اختبارات منشورة"}
-          </span>
-        )}
-      </header>
+      <AssessmentPageHeader
+        eyebrow="مركز التقييم"
+        title="الاختبارات والتصحيح"
+        sub="افتح طابور التصحيح، راجع إجابات الطلاب، وسلّم الدرجات من مكان واحد."
+        actionHref="/teacher/courses"
+        actionLabel="اختبار جديد"
+        actionTitle="اختار كورس ودرس لإضافة اختبار"
+      />
 
-      {exams.length === 0 ? (
-        <ExamState
-          title="لا توجد اختبارات منشورة بعد"
-          body="أنشئ اختبارًا من داخل درس في الكورس، وبعد النشر هيظهر هنا جاهز للتصحيح."
-          action={
-            <Link className="tx-cta tx-cta-outline" href="/teacher/courses">
-              روح للكورسات
-            </Link>
-          }
-        />
-      ) : (
-        <div
-          className={`tx-grid${exams.length === 1 ? " tx-grid-single" : ""}`}
-        >
-          {exams.map((exam, index) => (
-            <ExamCard key={exam.id} exam={exam} index={index} />
-          ))}
+      <div className="tx-layout">
+        <div className="tx-main">
+          {exams.length > 0 && (
+            <AssessmentToolbar
+              search={search}
+              onSearchChange={setSearch}
+              placeholder="ابحث في الاختبارات بالاسم أو الدرس…"
+              filters={filters}
+              activeFilter={filter}
+              onFilterChange={setFilter}
+            />
+          )}
+
+          {exams.length === 0 ? (
+            <AssessmentEmpty
+              title="لا توجد اختبارات بعد"
+              body="أنشئ اختبارًا من داخل درس في الكورس، وبعد النشر هيظهر هنا جاهز للتصحيح."
+              action={
+                <Link className="tx-cta tx-cta-outline" href="/teacher/courses">
+                  روح للكورسات
+                </Link>
+              }
+            />
+          ) : visible.length === 0 ? (
+            <AssessmentNoResults onClear={clearFilters} />
+          ) : (
+            <div className="tx-list">
+              {visible.map((exam, index) => (
+                <AssessmentCard
+                  key={exam.id}
+                  kind="exam"
+                  index={index}
+                  item={{
+                    title: exam.title,
+                    statusLabel: STATUS_LABELS[exam.status] ?? exam.status,
+                    isLive: exam.status === "PUBLISHED",
+                    description: exam.description,
+                    timerMinutes: exam.timerMinutes,
+                    lessonTitle: exam.lesson?.title,
+                    href: `/teacher/exams/${exam.id}`,
+                    editHref: `/teacher/lessons/${exam.lessonId}`,
+                  }}
+                />
+              ))}
+            </div>
+          )}
         </div>
-      )}
+
+        <AssessmentSidebar
+          published={publishedCount}
+          pending={pending?.failed ? null : (pending?.total ?? null)}
+          pendingState={pendingState}
+          pendingCapped={pending?.capped}
+          total={exams.length}
+          labels={{
+            published: "اختبارات منشورة",
+            pending: "بانتظار التصحيح",
+            total: "إجمالي الاختبارات",
+            pendingFoot: "محاولات مُسلّمة",
+            totalFoot: "كل الحالات",
+          }}
+        />
+      </div>
     </section>
   );
 }

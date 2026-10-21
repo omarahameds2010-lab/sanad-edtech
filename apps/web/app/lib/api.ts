@@ -367,6 +367,7 @@ export interface EnrollmentItem {
 export interface AssignmentListItem {
   id: string;
   title: string;
+  description?: string | null;
   status: string;
   lessonId: string;
   timerMinutes: number;
@@ -1025,6 +1026,10 @@ export const api = {
   listExams: (token: string) =>
     apiFetch<ExamListResult>("/api/v1/exams?status=PUBLISHED", { token }),
 
+  /** Teacher index: every status so filters and totals are honest. */
+  listTeacherExams: (token: string) =>
+    apiFetch<ExamListResult>("/api/v1/exams", { token }),
+
   getNextLesson: (token: string, lessonId: string) =>
     apiFetch<NextLessonRef | null>(
       `/api/v1/progression/lessons/${lessonId}/next`,
@@ -1039,11 +1044,21 @@ export const api = {
       token,
     }),
 
-  getGradingQueue: (token: string, examId: string, status?: string) =>
-    apiFetch<GradingQueueResult>(
-      `/api/v1/exams/${examId}/attempts/grading${status ? `?status=${status}` : ""}`,
+  getGradingQueue: (
+    token: string,
+    examId: string,
+    status?: string,
+    limit?: number,
+  ) => {
+    const params = new URLSearchParams();
+    if (status) params.set("status", status);
+    if (limit) params.set("limit", String(limit));
+    const query = params.toString();
+    return apiFetch<GradingQueueResult>(
+      `/api/v1/exams/${examId}/attempts/grading${query ? `?${query}` : ""}`,
       { token },
-    ),
+    );
+  },
 
   gradeAttempt: (
     token: string,
@@ -1237,11 +1252,21 @@ export const api = {
       token,
     }),
 
-  getSubmissionQueue: (token: string, assignmentId: string, status?: string) =>
-    apiFetch<SubmissionQueueResult>(
-      `/api/v1/assignments/${assignmentId}/submissions${status ? `?status=${status}` : ""}`,
+  getSubmissionQueue: (
+    token: string,
+    assignmentId: string,
+    status?: string,
+    limit?: number,
+  ) => {
+    const params = new URLSearchParams();
+    if (status) params.set("status", status);
+    if (limit) params.set("limit", String(limit));
+    const query = params.toString();
+    return apiFetch<SubmissionQueueResult>(
+      `/api/v1/assignments/${assignmentId}/submissions${query ? `?${query}` : ""}`,
       { token },
-    ),
+    );
+  },
 
   gradeSubmission: (
     token: string,

@@ -1,9 +1,19 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@/app/lib/auth";
 import { api, ApiError, type AssignmentListItem } from "@/app/lib/api";
+import {
+  AssessmentCard,
+  AssessmentEmpty,
+  AssessmentNoResults,
+  AssessmentPageHeader,
+  AssessmentSidebar,
+  AssessmentSkeleton,
+  AssessmentToolbar,
+  type AssessmentFilter,
+} from "../components/AssessmentIndex";
 
 const STATUS_LABELS: Record<string, string> = {
   PUBLISHED: "منشور",
@@ -11,220 +21,161 @@ const STATUS_LABELS: Record<string, string> = {
   ARCHIVED: "مؤرشف",
 };
 
-function AssignmentIcon() {
-  return (
-    <svg
-      aria-hidden
-      width="20"
-      height="20"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.7"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M9 3h6a1 1 0 0 1 1 1v1H8V4a1 1 0 0 1 1-1z" />
-      <path d="M16 5h2a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h2" />
-      <path d="M9 12h6" />
-      <path d="M9 16h4" />
-    </svg>
-  );
+const FILTERS: AssessmentFilter[] = [
+  { id: "all", label: "الكل" },
+  { id: "published", label: "منشور" },
+  { id: "draft", label: "مسودة" },
+  { id: "pending", label: "بحاجة لتصحيح" },
+];
+
+interface PendingSummary {
+  byId: Record<string, number>;
+  total: number;
+  capped: boolean;
+  failed: boolean;
 }
 
-function ClockIcon() {
-  return (
-    <svg
-      aria-hidden
-      width="15"
-      height="15"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.8"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <circle cx="12" cy="12" r="9" />
-      <path d="M12 7v5l3 2" />
-    </svg>
+async function fetchPendingSummary(
+  token: string,
+  assignments: AssignmentListItem[],
+): Promise<PendingSummary> {
+  let failed = false;
+  let capped = false;
+
+  // The submission queue is the only honest source for ungraded work until an
+  // aggregate endpoint exists. Fetch in parallel and fail soft: the list must
+  // still render even if one queue cannot be read.
+  const entries = await Promise.all(
+    assignments.map(async (assignment) => {
+      try {
+        const queue = await api.getSubmissionQueue(
+          token,
+          assignment.id,
+          undefined,
+          100,
+        );
+        if (queue.nextCursor) capped = true;
+        const count = queue.submissions.filter(
+          (submission) =>
+            submission.status === "SUBMITTED" || submission.status === "LATE",
+        ).length;
+        return [assignment.id, count] as const;
+      } catch {
+        failed = true;
+        return [assignment.id, 0] as const;
+      }
+    }),
   );
-}
 
-function BookIcon() {
-  return (
-    <svg
-      aria-hidden
-      width="15"
-      height="15"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.8"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
-      <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
-    </svg>
-  );
-}
-
-function ArrowIcon() {
-  return (
-    <svg
-      aria-hidden
-      width="16"
-      height="16"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M19 12H5" />
-      <path d="m12 19-7-7 7-7" />
-    </svg>
-  );
-}
-
-function PencilIcon() {
-  return (
-    <svg
-      aria-hidden
-      width="15"
-      height="15"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.8"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M12 20h9" />
-      <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" />
-    </svg>
-  );
-}
-
-function AssignmentCard({
-  assignment,
-  index,
-}: {
-  assignment: AssignmentListItem;
-  index: number;
-}) {
-  const status = STATUS_LABELS[assignment.status] ?? assignment.status;
-  const isPublished = assignment.status === "PUBLISHED";
-
-  return (
-    <article
-      className="tx-card"
-      style={{ animationDelay: `${Math.min(index, 8) * 55}ms` }}
-    >
-      <div className="tx-card-head">
-        <div className="tx-card-heading">
-          <span className="tx-icon" aria-hidden>
-            <AssignmentIcon />
-          </span>
-          <div className="tx-card-heading-copy">
-            <span className="tx-kicker">واجب</span>
-            <h2 className="tx-card-title">
-              <Link href={`/teacher/assignments/${assignment.id}`}>
-                {assignment.title}
-              </Link>
-            </h2>
-          </div>
-        </div>
-        <span
-          className={`tx-badge ${isPublished ? "tx-badge-live" : "tx-badge-muted"}`}
-        >
-          <span className="tx-badge-dot" aria-hidden />
-          {status}
-        </span>
-      </div>
-
-      <div className="tx-meta">
-        <span className="tx-meta-item">
-          <ClockIcon />
-          <span>
-            المدة: <strong>{assignment.timerMinutes} دقيقة</strong>
-          </span>
-        </span>
-        {assignment.lesson && (
-          <span className="tx-meta-item">
-            <BookIcon />
-            <span title={assignment.lesson.title}>
-              الدرس: {assignment.lesson.title}
-            </span>
-          </span>
-        )}
-      </div>
-
-      <div className="tx-actions">
-        <Link className="tx-cta" href={`/teacher/assignments/${assignment.id}`}>
-          فتح طابور التصحيح
-          <ArrowIcon />
-        </Link>
-        <Link
-          className="tx-cta tx-cta-outline"
-          href={`/teacher/lessons/${assignment.lessonId}`}
-        >
-          <PencilIcon />
-          تعديل الواجب
-        </Link>
-      </div>
-    </article>
-  );
-}
-
-function AssignmentState({
-  title,
-  body,
-  action,
-}: {
-  title: string;
-  body: string;
-  action?: React.ReactNode;
-}) {
-  return (
-    <div className="tx-state">
-      <span className="tx-state-icon" aria-hidden>
-        <AssignmentIcon />
-      </span>
-      <h2 className="tx-state-title">{title}</h2>
-      <p className="tx-state-body">{body}</p>
-      {action}
-    </div>
-  );
+  return {
+    byId: Object.fromEntries(entries),
+    total: entries.reduce((sum, [, count]) => sum + count, 0),
+    capped,
+    failed,
+  };
 }
 
 export default function TeacherAssignmentsPage() {
   const { token } = useAuth();
   const [items, setItems] = useState<AssignmentListItem[] | null>(null);
+  const [pending, setPending] = useState<PendingSummary | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
+  const [filter, setFilter] = useState("all");
+  const requestSeq = useRef(0);
 
   const load = useCallback(() => {
     if (!token) return;
+    const seq = ++requestSeq.current;
+
     setError(null);
     setItems(null);
+    setPending(null);
+
     api
       .listAssignments(token)
-      .then((r) => setItems(r.assignments))
-      .catch((e) =>
-        setError(e instanceof ApiError ? e.message : "تعذر تحميل الواجبات"),
-      );
+      .then(async (result) => {
+        if (seq !== requestSeq.current) return;
+        setItems(result.assignments);
+
+        if (result.assignments.length === 0) {
+          setPending({ byId: {}, total: 0, capped: false, failed: false });
+          return;
+        }
+
+        const summary = await fetchPendingSummary(token, result.assignments);
+        if (seq !== requestSeq.current) return;
+        setPending(summary);
+      })
+      .catch((e) => {
+        if (seq !== requestSeq.current) return;
+        setError(e instanceof ApiError ? e.message : "تعذر تحميل الواجبات");
+      });
   }, [token]);
 
   useEffect(() => {
     load();
+    return () => {
+      requestSeq.current += 1;
+    };
   }, [load]);
+
+  const publishedCount =
+    items?.filter((item) => item.status === "PUBLISHED").length ?? 0;
+  const draftCount =
+    items?.filter((item) => item.status === "DRAFT").length ?? 0;
+
+  const pendingCount =
+    pending && !pending.failed && items
+      ? items.filter((item) => (pending.byId[item.id] ?? 0) > 0).length
+      : undefined;
+
+  const filters = FILTERS.map((item) => {
+    if (item.id === "all") return { ...item, count: items?.length };
+    if (item.id === "published") return { ...item, count: publishedCount };
+    if (item.id === "draft") return { ...item, count: draftCount };
+    return {
+      ...item,
+      count: pendingCount,
+      disabled: !pending || pending.failed,
+    };
+  });
+
+  const visible = useMemo(() => {
+    if (!items) return [];
+    const query = search.trim().toLowerCase();
+
+    return items.filter((item) => {
+      if (filter === "published" && item.status !== "PUBLISHED") return false;
+      if (filter === "draft" && item.status !== "DRAFT") return false;
+      if (filter === "pending" && !((pending?.byId[item.id] ?? 0) > 0)) {
+        return false;
+      }
+      if (query === "") return true;
+
+      return [
+        item.title,
+        item.description ?? "",
+        item.lesson?.title ?? "",
+      ].some((value) => value.toLowerCase().includes(query));
+    });
+  }, [filter, items, pending, search]);
+
+  const clearFilters = () => {
+    setSearch("");
+    setFilter("all");
+  };
+
+  const pendingState: "loading" | "ready" | "failed" = !pending
+    ? "loading"
+    : pending.failed
+      ? "failed"
+      : "ready";
 
   if (!token) {
     return (
       <section className="tx-shell">
-        <AssignmentState
+        <AssessmentEmpty
           title="سجّل الدخول أولًا"
           body="عشان تشوف الواجبات وطوابير التصحيح، محتاج تكون مسجل دخول بحساب مدرس."
           action={
@@ -240,7 +191,7 @@ export default function TeacherAssignmentsPage() {
   if (error) {
     return (
       <section className="tx-shell">
-        <AssignmentState
+        <AssessmentEmpty
           title="تعذر تحميل الواجبات"
           body={error}
           action={
@@ -256,74 +207,90 @@ export default function TeacherAssignmentsPage() {
   if (items === null) {
     return (
       <section className="tx-shell" aria-busy="true" aria-live="polite">
-        <header className="tx-head">
-          <div>
-            <span className="tx-eyebrow">
-              <span className="tx-eyebrow-dot" aria-hidden />
-              مركز التقييم
-            </span>
-            <h1 className="tx-title">الواجبات والتصحيح</h1>
-            <p className="tx-sub">بنجهّز الواجبات وطوابير التصحيح…</p>
-          </div>
-        </header>
-        <div className="tx-grid" aria-hidden>
-          {[0, 1, 2].map((i) => (
-            <div className="tx-skeleton" key={i}>
-              <span className="tx-skeleton-line tx-skeleton-line-short" />
-              <span className="tx-skeleton-line tx-skeleton-line-title" />
-              <span className="tx-skeleton-line" />
-              <span className="tx-skeleton-line tx-skeleton-line-cta" />
-            </div>
-          ))}
-        </div>
+        <AssessmentPageHeader
+          eyebrow="مركز التقييم"
+          title="الواجبات والتصحيح"
+          sub="بنجهّز الواجبات وطوابير التصحيح…"
+        />
+        <AssessmentSkeleton />
       </section>
     );
   }
 
   return (
     <section className="tx-shell">
-      <header className="tx-head">
-        <div className="tx-head-copy">
-          <span className="tx-eyebrow">
-            <span className="tx-eyebrow-dot" aria-hidden />
-            مركز التقييم
-          </span>
-          <h1 className="tx-title">الواجبات والتصحيح</h1>
-          <p className="tx-sub">
-            راجع تسليمات الطلاب، صحح الواجبات، وسلّم الدرجات من طابور واحد.
-          </p>
-        </div>
-        {items.length > 0 && (
-          <span className="tx-count">
-            <strong>{items.length}</strong>
-            {items.length === 1 ? " واجب" : " واجبات"}
-          </span>
-        )}
-      </header>
+      <AssessmentPageHeader
+        eyebrow="مركز التقييم"
+        title="الواجبات والتصحيح"
+        sub="راجع تسليمات الطلاب، صحح الواجبات، وسلّم الدرجات من طابور واحد."
+        actionHref="/teacher/courses"
+        actionLabel="واجب جديد"
+        actionTitle="اختار كورس ودرس لإضافة واجب"
+      />
 
-      {items.length === 0 ? (
-        <AssignmentState
-          title="لا توجد واجبات بعد"
-          body="أنشئ واجبًا من داخل درس في الكورس، وبعد النشر هيظهر هنا جاهز للتصحيح."
-          action={
-            <Link className="tx-cta tx-cta-outline" href="/teacher/courses">
-              روح للكورسات
-            </Link>
-          }
-        />
-      ) : (
-        <div
-          className={`tx-grid${items.length === 1 ? " tx-grid-single" : ""}`}
-        >
-          {items.map((assignment, index) => (
-            <AssignmentCard
-              key={assignment.id}
-              assignment={assignment}
-              index={index}
+      <div className="tx-layout">
+        <div className="tx-main">
+          {items.length > 0 && (
+            <AssessmentToolbar
+              search={search}
+              onSearchChange={setSearch}
+              placeholder="ابحث في الواجبات بالاسم أو الدرس…"
+              filters={filters}
+              activeFilter={filter}
+              onFilterChange={setFilter}
             />
-          ))}
+          )}
+
+          {items.length === 0 ? (
+            <AssessmentEmpty
+              title="لا توجد واجبات بعد"
+              body="أنشئ واجبًا من داخل درس في الكورس، وبعد النشر هيظهر هنا جاهز للتصحيح."
+              action={
+                <Link className="tx-cta tx-cta-outline" href="/teacher/courses">
+                  روح للكورسات
+                </Link>
+              }
+            />
+          ) : visible.length === 0 ? (
+            <AssessmentNoResults onClear={clearFilters} />
+          ) : (
+            <div className="tx-list">
+              {visible.map((item, index) => (
+                <AssessmentCard
+                  key={item.id}
+                  kind="assignment"
+                  index={index}
+                  item={{
+                    title: item.title,
+                    statusLabel: STATUS_LABELS[item.status] ?? item.status,
+                    isLive: item.status === "PUBLISHED",
+                    description: item.description,
+                    timerMinutes: item.timerMinutes,
+                    lessonTitle: item.lesson?.title,
+                    href: `/teacher/assignments/${item.id}`,
+                    editHref: `/teacher/lessons/${item.lessonId}`,
+                  }}
+                />
+              ))}
+            </div>
+          )}
         </div>
-      )}
+
+        <AssessmentSidebar
+          published={publishedCount}
+          pending={pending?.failed ? null : (pending?.total ?? null)}
+          pendingState={pendingState}
+          pendingCapped={pending?.capped}
+          total={items.length}
+          labels={{
+            published: "واجبات منشورة",
+            pending: "بانتظار التصحيح",
+            total: "إجمالي الواجبات",
+            pendingFoot: "تسليمات بانتظار التصحيح",
+            totalFoot: "كل الحالات",
+          }}
+        />
+      </div>
     </section>
   );
 }
