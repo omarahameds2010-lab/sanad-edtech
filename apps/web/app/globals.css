@@ -5466,11 +5466,6 @@ html[dir="rtl"] .lp-maker:focus-visible .lp-maker-arrow {
   background: rgba(34, 211, 238, 0.08);
   color: #a5f3fc;
 }
-.tx-actions-hint {
-  color: rgba(244, 244, 246, 0.34);
-  font-size: 11px;
-  line-height: 1.6;
-}
 .tx-state {
   display: flex;
   flex-direction: column;
@@ -5586,9 +5581,6 @@ html[dir="rtl"] .lp-maker:focus-visible .lp-maker-arrow {
   }
   .tx-card {
     padding: 18px;
-  }
-  .tx-actions-hint {
-    display: none;
   }
   .tx-title {
     font-size: 30px;

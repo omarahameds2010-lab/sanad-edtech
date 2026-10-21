@@ -89,6 +89,25 @@ function ArrowIcon() {
   );
 }
 
+function PencilIcon() {
+  return (
+    <svg
+      aria-hidden
+      width="15"
+      height="15"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M12 20h9" />
+      <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" />
+    </svg>
+  );
+}
+
 function ExamCard({ exam, index }: { exam: ExamListItem; index: number }) {
   const status = STATUS_LABELS[exam.status] ?? exam.status;
   const isPublished = exam.status === "PUBLISHED";
@@ -143,7 +162,13 @@ function ExamCard({ exam, index }: { exam: ExamListItem; index: number }) {
           فتح طابور التصحيح
           <ArrowIcon />
         </Link>
-        <span className="tx-actions-hint">الإجابات والدرجات في نفس المكان</span>
+        <Link
+          className="tx-cta tx-cta-outline"
+          href={`/teacher/lessons/${exam.lessonId}`}
+        >
+          <PencilIcon />
+          تعديل الاختبار
+        </Link>
       </div>
     </article>
   );
