@@ -163,15 +163,17 @@ function StudentCard({
     >
       <div className="st-card-top">
         <div className="st-card-identity">
-          <h3 className="st-card-name">{student.name}</h3>
+          <div className="st-card-name-row">
+            <h3 className="st-card-name">{student.name}</h3>
+            <span className={`st-card-status${active ? "" : " is-off"}`}>
+              <span className="st-dot" aria-hidden />
+              {status}
+            </span>
+          </div>
           {student.grade && (
             <span className="st-card-grade">{student.grade}</span>
           )}
         </div>
-        <span className={`st-card-status${active ? "" : " is-off"}`}>
-          <span className="st-dot" aria-hidden />
-          {status}
-        </span>
       </div>
 
       <div className="st-card-lines">
