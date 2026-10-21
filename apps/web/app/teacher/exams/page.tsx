@@ -48,13 +48,12 @@ async function fetchPendingSummary(
   const entries = await Promise.all(
     exams.map(async (exam) => {
       try {
-        const queue = await api.getGradingQueue(token, exam.id, undefined, 100);
-        if (queue.nextCursor) capped = true;
-        const count = queue.attempts.filter(
-          (attempt) =>
-            attempt.status === "SUBMITTED" || attempt.status === "TIMED_OUT",
-        ).length;
-        return [exam.id, count] as const;
+        const [submitted, timedOut] = await Promise.all([
+          api.getGradingQueue(token, exam.id, "SUBMITTED", 100),
+          api.getGradingQueue(token, exam.id, "TIMED_OUT", 100),
+        ]);
+        if (submitted.nextCursor || timedOut.nextCursor) capped = true;
+        return [exam.id, submitted.attempts.length + timedOut.attempts.length] as const;
       } catch {
         failed = true;
         return [exam.id, 0] as const;
@@ -262,6 +261,10 @@ export default function TeacherExamsPage() {
                     lessonTitle: exam.lesson?.title,
                     href: `/teacher/exams/${exam.id}`,
                     editHref: `/teacher/lessons/${exam.lessonId}`,
+                    ctaLabel:
+                      exam.status === "PUBLISHED"
+                        ? "فتح طابور التصحيح"
+                        : "مراجعة الاختبار",
                   }}
                 />
               ))}
@@ -279,7 +282,7 @@ export default function TeacherExamsPage() {
             published: "اختبارات منشورة",
             pending: "بانتظار التصحيح",
             total: "إجمالي الاختبارات",
-            pendingFoot: "محاولات مُسلّمة",
+            pendingFoot: "مُسلّمة أو انتهى وقتها",
             totalFoot: "كل الحالات",
           }}
         />

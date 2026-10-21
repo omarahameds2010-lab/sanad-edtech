@@ -5212,6 +5212,7 @@ html[dir="rtl"] .lp-maker:focus-visible .lp-maker-arrow {
   justify-content: center;
   gap: 8px;
   min-height: 44px;
+  margin-top: 34px;
   padding: 0 18px;
   border: 1px solid #fafafa;
   border-radius: 12px;
@@ -5772,6 +5773,7 @@ html[dir="rtl"] .lp-maker:focus-visible .lp-maker-arrow {
   }
   .tx-new {
     align-self: flex-start;
+    margin-top: 0;
   }
   .tx-title {
     font-size: 28px;
@@ -6372,9 +6374,6 @@ html[dir="rtl"] .lp-maker:focus-visible .lp-maker-arrow {
   }
 }
 @media (max-width: 420px) {
-  .st-stats {
-    gap: 12px;
-  }
   .st-stat {
     min-height: 132px;
     padding: 14px;

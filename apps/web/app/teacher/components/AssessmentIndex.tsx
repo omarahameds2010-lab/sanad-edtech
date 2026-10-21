@@ -21,6 +21,7 @@ export interface AssessmentCardData {
   lessonTitle?: string | null;
   href: string;
   editHref: string;
+  ctaLabel?: string;
 }
 
 export interface AssessmentFilter {
@@ -149,7 +150,7 @@ export function AssessmentCard({
 
       <div className="tx-actions">
         <Link className="tx-cta" href={item.href}>
-          فتح طابور التصحيح
+          {item.ctaLabel ?? "فتح طابور التصحيح"}
           <ArrowIcon />
         </Link>
         <Link className="tx-cta tx-cta-outline" href={item.editHref}>

@@ -48,18 +48,15 @@ async function fetchPendingSummary(
   const entries = await Promise.all(
     assignments.map(async (assignment) => {
       try {
-        const queue = await api.getSubmissionQueue(
-          token,
+        const [submitted, late] = await Promise.all([
+          api.getSubmissionQueue(token, assignment.id, "SUBMITTED", 100),
+          api.getSubmissionQueue(token, assignment.id, "LATE", 100),
+        ]);
+        if (submitted.nextCursor || late.nextCursor) capped = true;
+        return [
           assignment.id,
-          undefined,
-          100,
-        );
-        if (queue.nextCursor) capped = true;
-        const count = queue.submissions.filter(
-          (submission) =>
-            submission.status === "SUBMITTED" || submission.status === "LATE",
-        ).length;
-        return [assignment.id, count] as const;
+          submitted.submissions.length + late.submissions.length,
+        ] as const;
       } catch {
         failed = true;
         return [assignment.id, 0] as const;
@@ -269,6 +266,10 @@ export default function TeacherAssignmentsPage() {
                     lessonTitle: item.lesson?.title,
                     href: `/teacher/assignments/${item.id}`,
                     editHref: `/teacher/lessons/${item.lessonId}`,
+                    ctaLabel:
+                      item.status === "PUBLISHED"
+                        ? "فتح طابور التصحيح"
+                        : "مراجعة الواجب",
                   }}
                 />
               ))}
@@ -286,7 +287,7 @@ export default function TeacherAssignmentsPage() {
             published: "واجبات منشورة",
             pending: "بانتظار التصحيح",
             total: "إجمالي الواجبات",
-            pendingFoot: "تسليمات بانتظار التصحيح",
+            pendingFoot: "مُسلّمة أو متأخرة",
             totalFoot: "كل الحالات",
           }}
         />
