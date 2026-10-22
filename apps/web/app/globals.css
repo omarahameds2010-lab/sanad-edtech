@@ -6427,6 +6427,10 @@ html[dir="rtl"] .lp-maker:focus-visible .lp-maker-arrow {
   .tc-canvas {
     padding: 24px 16px 112px;
   }
+  /* Keep the footer above the fixed bottom command bar. */
+  .tc-canvas > .lp-footer {
+    margin-bottom: 0;
+  }
 }
 
 /* ======================================================================

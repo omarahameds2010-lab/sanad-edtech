@@ -207,7 +207,9 @@ export function ActionCenter({
     >
       <header className="td-card-head">
         <div>
-          <span className="td-card-kicker">طابور التصحيح</span>
+          <span className="td-card-kicker">
+            {active === "review" ? "طابور التصحيح" : "اختبارات حية"}
+          </span>
           <h2 className="td-card-title">مركز الإجراءات</h2>
         </div>
         <Link className="td-soft-link" href={headerHref}>

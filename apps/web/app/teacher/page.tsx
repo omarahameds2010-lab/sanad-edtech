@@ -196,7 +196,7 @@ function KpiCard({
           ? `${label}: جارٍ التحميل`
           : failed
             ? `${label}: تعذر التحميل`
-            : `${label}: ${shownValue}`
+            : `${label}: ${shownValue}. ${foot}`
       }
       style={{ animationDelay: `${Math.min(index, 6) * 55}ms` }}
     >

@@ -247,11 +247,13 @@ export function AssistantRail({
         )}
 
         <p className="td-side-caption">
-          {liveExamsState === "failed"
-            ? "تعذر تحميل قائمة الاختبارات."
-            : liveCount === 0
-              ? "لا توجد اختبارات منشورة للطلاب."
-              : "اختبار منشور ومتاح للطلاب."}
+          {liveExamsState === "loading"
+            ? "بنجهّز قائمة الاختبارات من الخادم…"
+            : liveExamsState === "failed"
+              ? "تعذر تحميل قائمة الاختبارات."
+              : liveCount === 0
+                ? "لا توجد اختبارات منشورة للطلاب."
+                : "اختبار منشور ومتاح للطلاب."}
         </p>
 
         {liveExamsState === "ready" && liveRows.length > 0 ? (
