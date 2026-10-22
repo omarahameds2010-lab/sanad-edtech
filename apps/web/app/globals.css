@@ -8568,6 +8568,7 @@ html[dir="rtl"] .lp-maker:focus-visible .lp-maker-arrow {
 
   position: relative;
   isolation: isolate;
+  box-sizing: border-box;
   min-height: 100vh;
   margin-inline: -24px;
   margin-bottom: -64px;
@@ -8789,7 +8790,7 @@ html[dir="rtl"] .lp-maker:focus-visible .lp-maker-arrow {
   position: relative;
   box-sizing: border-box;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   grid-template-areas: "identity status actions";
   align-items: center;
   gap: 20px;
@@ -9545,6 +9546,8 @@ html[dir="rtl"] .lp-maker:focus-visible .lp-maker-arrow {
     gap: 10px;
   }
   .sw-filters {
+    width: 100%;
+    min-width: 0;
     flex-wrap: nowrap;
     overflow-x: auto;
     padding-bottom: 2px;
