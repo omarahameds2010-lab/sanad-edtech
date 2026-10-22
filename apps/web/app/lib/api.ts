@@ -658,6 +658,8 @@ export interface StudentAssignmentView {
     id: string;
     status: string;
     submittedAt: string;
+    content?: string | null;
+    attachments?: unknown[] | null;
   } | null;
 }
 

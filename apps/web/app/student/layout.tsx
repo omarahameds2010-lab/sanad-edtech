@@ -7,14 +7,14 @@ export default function StudentLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div style={{ minHeight: "100vh", background: "var(--bg-reading)" }}>
+    <div className="student-shell">
       <StudentCommandRegistrar />
       <StudentDock />
       <main
-        className="lp-container"
-        style={{ paddingTop: 24, paddingBottom: 64, maxWidth: 1020 }}
+        className="lp-container student-main"
+        style={{ paddingTop: 24, paddingBottom: 64 }}
       >
-        {(children as any)}
+        {children as any}
       </main>
     </div>
   );
