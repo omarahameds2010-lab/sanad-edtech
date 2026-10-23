@@ -26,6 +26,39 @@ function youTubeEmbedUrl(lesson: StudentLesson): string | null {
     : null;
 }
 
+function LockIcon() {
+  return (
+    <svg
+      className="ar-evidence-icon"
+      width="14"
+      height="14"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.3"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <rect x="5" y="10" width="14" height="10" rx="2" />
+      <path d="M8 10V7a4 4 0 0 1 8 0v3" />
+      <path d="M12 14v2" />
+    </svg>
+  );
+}
+
+function formatMoment(value: string): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "—";
+  return date.toLocaleString("ar-EG", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
 export default function AssignmentResultReview({
   token,
   assignmentTitle,
@@ -48,6 +81,13 @@ export default function AssignmentResultReview({
   const attachmentCount = Array.isArray(latest.attachments)
     ? latest.attachments.length
     : 0;
+  const feedback = latest.feedback?.trim() ?? "";
+  const answerType =
+    content && attachmentCount > 0
+      ? "مقالية + مرفقات"
+      : attachmentCount > 0
+        ? "مرفقات"
+        : "مقالية";
 
   async function toggleLesson() {
     if (!lessonId) return;
@@ -92,7 +132,7 @@ export default function AssignmentResultReview({
       </header>
 
       <div className="ar-review-grid">
-        <article className="ar-card ar-answer">
+        <article className="ar-card ar-answer" data-side="answer">
           <div className="ar-card-head">
             <span className="ar-kicker">إجابتك المقالية</span>
             <span className="ar-chip">من التسليم</span>
@@ -110,38 +150,64 @@ export default function AssignmentResultReview({
               {attachmentCount === 1 ? "مرفق" : "مرفقات"} محفوظة
             </p>
           ) : null}
+          <div className="ar-answer-meta">
+            <div>
+              <span>وقت التسليم</span>
+              <strong>{formatMoment(latest.submittedAt)}</strong>
+            </div>
+            <div>
+              <span>نوع الإجابة</span>
+              <strong>{answerType}</strong>
+            </div>
+          </div>
         </article>
 
-        <article className="ar-card ar-evaluation">
+        <article className="ar-card ar-evaluation" data-side="review">
           <div className="ar-card-head">
             <span className="ar-kicker">مراجعة المعلم</span>
-            <span className="ar-chip" data-tone={graded ? "green" : "muted"}>
+            <span className="ar-chip" data-tone={graded ? "green" : "amber"}>
               {graded ? "معتمدة" : "بانتظار المراجعة"}
             </span>
           </div>
 
-          <div className="ar-score-row">
-            <strong className="ar-score">
-              {graded ? `${latest.score}%` : "—"}
-            </strong>
-            <span>
-              {graded
-                ? hasGap
+          {graded ? (
+            <div className="ar-score-row">
+              <strong
+                className="ar-score"
+                data-gap={hasGap ? "true" : "false"}
+              >
+                {latest.score}%
+              </strong>
+              <span className="ar-score-note" data-gap={hasGap}>
+                {hasGap
                   ? "أقل من درجة النجاح المحددة للواجب"
-                  : "درجة معتمدة من المعلم"
-                : "لسه مفيش درجة معتمدة"}
-            </span>
-          </div>
+                  : "درجة معتمدة من المعلم"}
+              </span>
+            </div>
+          ) : (
+            <div className="ar-pending">
+              <span className="ar-pending-filament" aria-hidden />
+              <div className="ar-pending-copy">
+                <strong>إجابتك في أمان</strong>
+                <span>بانتظار نظرة المعلم المخصصة.</span>
+              </div>
+            </div>
+          )}
 
-          <p className="ar-feedback">
-            {latest.feedback?.trim()
-              ? latest.feedback
-              : "ملاحظات المعلم هتظهر هنا بعد اعتماد التصحيح."}
+          <p className="ar-feedback" data-empty={!feedback}>
+            {feedback
+              ? feedback
+              : graded
+                ? "مفيش ملاحظات إضافية محفوظة مع التصحيح."
+                : "ملاحظات المعلم هتظهر هنا بعد اعتماد التصحيح."}
           </p>
 
           <div className="ar-evidence" data-ready="false">
             <div className="ar-evidence-head">
-              <span>الدليل النصي من المرجع</span>
+              <span className="ar-evidence-title">
+                <LockIcon />
+                الدليل النصي من المرجع
+              </span>
               <span className="ar-chip">قيد الربط</span>
             </div>
             <p>

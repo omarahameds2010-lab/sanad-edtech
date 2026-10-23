@@ -28,6 +28,7 @@ type Phase =
   | "needs-login"
   | "intro"
   | "writing"
+  | "submitted"
   | "submitting"
   | "done"
   | "closed"
@@ -101,10 +102,45 @@ export default function StudentAssignmentRunnerPage({
         if (cancelled) return;
         setView(v);
         if (v.activeSubmission) {
+          const active = v.activeSubmission;
+          const hasAnswer =
+            Boolean(active.content?.trim()) ||
+            (Array.isArray(active.attachments) &&
+              active.attachments.length > 0);
+          setContent(active.content ?? "");
+
+          // The API uses SUBMITTED for two different states: an attempt the
+          // student only entered (content still empty) and an answer that was
+          // actually submitted. Content/attachments are the runtime signal.
+          if (hasAnswer) {
+            let mine: AssignmentSubmissionSummary[] = [];
+            try {
+              mine = await api.getMySubmissions(token, assignmentId);
+            } catch {
+              // Fall back to the active attempt so the answer still renders.
+            }
+            if (cancelled) return;
+            setSubmissions(
+              mine.length > 0
+                ? mine
+                : [
+                    {
+                      id: active.id,
+                      status: active.status,
+                      score: null,
+                      submittedAt: active.submittedAt,
+                      content: active.content,
+                      attachments: active.attachments,
+                    },
+                  ],
+            );
+            setPhase("submitted");
+            return;
+          }
+
           const timer = await api.getAssignmentTimer(token, assignmentId);
           if (cancelled) return;
           setExpiresAt(timer.expiresAt);
-          setContent(v.activeSubmission.content ?? "");
           setPhase("writing");
         } else if (v.canAttempt) {
           setPhase("intro");
@@ -233,11 +269,12 @@ export default function StudentAssignmentRunnerPage({
     headline: string,
     message: string,
     latest: AssignmentSubmissionSummary | null,
+    tone: "success" | "neutral" = "neutral",
   ) {
     return (
       <div className="sc-canvas">
         <div className="lp-container" style={{ maxWidth: 1040 }}>
-          <header className="ar-page-head">
+          <header className="ar-page-head" data-tone={tone}>
             <p className="sc-eyebrow" style={{ margin: 0 }}>
               {eyebrow}
             </p>
@@ -261,7 +298,7 @@ export default function StudentAssignmentRunnerPage({
             <QuietPanel text="تم حفظ الحالة، لكن تعذر تحميل تفاصيل التسليم الآن." />
           )}
 
-          <div className="sc-nav-row" style={{ marginTop: 18 }}>
+          <div className="ar-result-actions">
             {unlockedLessonIds[0] ? (
               <Link
                 href={`/student/lessons/${unlockedLessonIds[0]}`}
@@ -359,6 +396,16 @@ export default function StudentAssignmentRunnerPage({
     );
   }
 
+  if (phase === "submitted" && view) {
+    return renderResultPage(
+      "بانتظار التصحيح",
+      "تم استلام الواجب",
+      "تم استلام إجابتك بنجاح. الدرجة الرسمية هتظهر بعد اعتماد المعلم.",
+      submissions[0] ?? null,
+      "success",
+    );
+  }
+
   if (phase === "intro" && view) {
     return (
       <div className="sc-canvas">
@@ -439,9 +486,9 @@ export default function StudentAssignmentRunnerPage({
       "تم تسليم الواجب",
       result?.isLate
         ? "تم التسليم بعد انتهاء الوقت (متأخر). المراجعة الرسمية بعد اعتماد المعلم."
-        : (result?.message ??
-            "تم استلام إجابتك. المراجعة الرسمية بعد اعتماد المعلم."),
+        : "تم استلام إجابتك بنجاح. المراجعة الرسمية بعد اعتماد المعلم.",
       latest,
+      "success",
     );
   }
 
