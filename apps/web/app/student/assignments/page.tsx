@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import { useAuth } from "@/app/lib/auth";
 import {
   api,
@@ -1175,28 +1176,35 @@ export default function StudentAssignmentsPage() {
         </div>
       </div>
 
-      {praise ? (
-        <aside className="sw-praise-toast" role="status" aria-live="polite">
-          <span className="sw-praise-icon" aria-hidden>
-            <SparkIcon size={18} />
-          </span>
-          <div className="sw-praise-copy">
-            <span className="sw-praise-eyebrow">تقدير أكاديمي</span>
-            <strong>
-              تقدير متقن: درجة {praise.score}% في {praise.title}.
-            </strong>
-            <p>مراجعة معتمدة من المعلم — عمل يستحق التوقف.</p>
-          </div>
-          <button
-            type="button"
-            className="sw-praise-close"
-            onClick={dismissPraise}
-            aria-label="إغلاق التقدير"
-          >
-            ×
-          </button>
-        </aside>
-      ) : null}
+      {praise && typeof document !== "undefined"
+        ? createPortal(
+            <aside
+              className="sw-praise-toast"
+              role="status"
+              aria-live="polite"
+            >
+              <span className="sw-praise-icon" aria-hidden>
+                <SparkIcon size={18} />
+              </span>
+              <div className="sw-praise-copy">
+                <span className="sw-praise-eyebrow">تقدير أكاديمي</span>
+                <strong>
+                  تقدير متقن: درجة {praise.score}% في {praise.title}.
+                </strong>
+                <p>مراجعة معتمدة من المعلم — عمل يستحق التوقف.</p>
+              </div>
+              <button
+                type="button"
+                className="sw-praise-close"
+                onClick={dismissPraise}
+                aria-label="إغلاق التقدير"
+              >
+                ×
+              </button>
+            </aside>,
+            document.body,
+          )
+        : null}
     </div>
   );
 }
