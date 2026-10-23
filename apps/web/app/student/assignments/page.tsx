@@ -1052,6 +1052,7 @@ export default function StudentAssignmentsPage() {
                         latestGradedRow.item.lesson?.id ??
                         latestGradedRow.item.lessonId
                       }
+                      history={latestGradedRow.submissions}
                     />
                     {blueprint ? (
                       <AcademicBlueprint blueprint={blueprint} />

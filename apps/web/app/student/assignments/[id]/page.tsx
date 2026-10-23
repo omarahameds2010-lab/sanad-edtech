@@ -271,6 +271,14 @@ export default function StudentAssignmentRunnerPage({
     latest: AssignmentSubmissionSummary | null,
     tone: "success" | "neutral" = "neutral",
   ) {
+    const resultHasGap =
+      latest !== null &&
+      latest.status === "GRADED" &&
+      latest.score !== null &&
+      view?.passingScore !== null &&
+      view?.passingScore !== undefined &&
+      latest.score < view.passingScore;
+
     return (
       <div className="sc-canvas">
         <div className="lp-container" style={{ maxWidth: 1040 }}>
@@ -293,6 +301,7 @@ export default function StudentAssignmentRunnerPage({
               latest={latest}
               passingScore={view?.passingScore ?? null}
               lessonId={view?.lessonId ?? null}
+              history={submissions}
             />
           ) : (
             <QuietPanel text="تم حفظ الحالة، لكن تعذر تحميل تفاصيل التسليم الآن." />
@@ -310,8 +319,13 @@ export default function StudentAssignmentRunnerPage({
             {view?.lessonId ? (
               <Link
                 href={`/student/lessons/${view.lessonId}`}
-                className="sc-btn sc-btn-ghost"
+                className={`sc-btn sc-btn-ghost${
+                  resultHasGap ? " ar-action-guide" : ""
+                }`}
               >
+                {resultHasGap ? (
+                  <span className="ar-action-pulse" aria-hidden />
+                ) : null}
                 صفحة الدرس
               </Link>
             ) : null}
