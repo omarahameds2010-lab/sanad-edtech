@@ -7,8 +7,20 @@ import {
   api,
   ApiError,
   type AssignmentListItem,
+  type AssignmentSubmissionSummary,
   type StudentAssignmentView,
+  type StudentLesson,
 } from "@/app/lib/api";
+import AssignmentResultReview from "./components/AssignmentResultReview";
+import {
+  AcademicBlueprint,
+  BlueprintSummary,
+  GrowthBridge,
+} from "./components/ProgressModules";
+import {
+  buildGrowthSummary,
+  buildScoreBlueprint,
+} from "./lib/progress";
 
 type AssignmentState =
   "available" | "active" | "submitted" | "expired" | "unavailable" | "unknown";
@@ -22,6 +34,21 @@ interface AssignmentRow {
   state: AssignmentState;
   attempted: boolean;
   viewFailed: boolean;
+  latest: AssignmentSubmissionSummary | null;
+  submissions: AssignmentSubmissionSummary[];
+}
+
+interface RemedialState {
+  rowId: string;
+  loading: boolean;
+  data: StudentLesson | null;
+  error: string | null;
+}
+
+interface PraiseState {
+  submissionId: string;
+  title: string;
+  score: number;
 }
 
 const FILTERS: Array<{ id: FilterId; label: string }> = [
@@ -228,6 +255,54 @@ function PathIcon({ size = 15 }: { size?: number }) {
   );
 }
 
+function RefreshIcon({ size = 16 }: { size?: number }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.7"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <path d="M20 11a8 8 0 0 0-13.6-5.2L4 8" />
+      <path d="M4 4v4h4M4 13a8 8 0 0 0 13.6 5.2L20 16" />
+      <path d="M20 20v-4h-4" />
+    </svg>
+  );
+}
+
+function SparkIcon({ size = 16 }: { size?: number }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.4"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <path d="M12 3.5 13.7 9l5.3 1.8-5.3 1.8L12 18l-1.7-5.4L5 10.8 10.3 9z" />
+      <path d="M18.5 16.5 19.2 19l2.3.8-2.3.8-.7 2.4" />
+    </svg>
+  );
+}
+
+function lessonEmbedUrl(lesson: StudentLesson): string | null {
+  const video = lesson.videos.find(
+    (item) => item.provider === "youtube" && item.providerVideoId,
+  );
+  return video
+    ? `https://www.youtube-nocookie.com/embed/${video.providerVideoId}`
+    : null;
+}
+
 function hasSubmittedAnswer(view: StudentAssignmentView): boolean {
   const attempt = view.activeSubmission;
   if (!attempt) return false;
@@ -271,6 +346,9 @@ function statusCopy(row: AssignmentRow) {
       label: ITEM_STATUS_LABELS[row.item.status] ?? row.item.status,
       tone: "muted" as const,
     };
+  }
+  if (row.latest?.status === "GRADED" && row.latest.score !== null) {
+    return { label: "تم التصحيح", tone: "neutral" as const };
   }
   return STATE_COPY[row.state];
 }
@@ -316,6 +394,9 @@ export default function StudentAssignmentsPage() {
   const [reloadKey, setReloadKey] = useState(0);
   const [filter, setFilter] = useState<FilterId>("all");
   const [view, setView] = useState<ViewMode>("list");
+  const [remedial, setRemedial] = useState<RemedialState | null>(null);
+  const [remedialRowId, setRemedialRowId] = useState<string | null>(null);
+  const [praise, setPraise] = useState<PraiseState | null>(null);
 
   useEffect(() => {
     if (!ready) return;
@@ -335,7 +416,7 @@ export default function StudentAssignmentsPage() {
         if (cancelled) return;
 
         const enriched = await Promise.all(
-          result.assignments.map(async (item) => {
+          result.assignments.map(async (item): Promise<AssignmentRow> => {
             if (item.status !== "PUBLISHED") {
               return {
                 item,
@@ -343,31 +424,33 @@ export default function StudentAssignmentsPage() {
                 viewFailed: false,
                 state: "unavailable" as AssignmentState,
                 attempted: false,
+                latest: null,
+                submissions: [],
               };
             }
 
-            try {
-              const studentView = await api.getStudentAssignmentView(
-                token,
-                item.id,
-              );
-              const state = deriveState(item, studentView, false);
-              return {
-                item,
-                view: studentView,
-                viewFailed: false,
-                state,
-                attempted: state === "submitted",
-              };
-            } catch {
-              return {
-                item,
-                view: null,
-                viewFailed: true,
-                state: deriveState(item, null, true),
-                attempted: false,
-              };
-            }
+            const [viewResult, submissionsResult] = await Promise.allSettled([
+              api.getStudentAssignmentView(token, item.id),
+              api.getMySubmissions(token, item.id),
+            ]);
+            const studentView =
+              viewResult.status === "fulfilled" ? viewResult.value : null;
+            const submissions =
+              submissionsResult.status === "fulfilled"
+                ? submissionsResult.value
+                : [];
+            const viewFailed = viewResult.status === "rejected";
+            const state = deriveState(item, studentView, viewFailed);
+
+            return {
+              item,
+              view: studentView,
+              viewFailed,
+              state,
+              attempted: state === "submitted",
+              latest: submissions[0] ?? null,
+              submissions,
+            };
           }),
         );
 
@@ -426,6 +509,83 @@ export default function StudentAssignmentsPage() {
     };
   }, [rows]);
 
+  const allSubmissions = useMemo(
+    () => (rows ?? []).flatMap((row) => row.submissions),
+    [rows],
+  );
+  const growth = useMemo(
+    () => buildGrowthSummary(allSubmissions),
+    [allSubmissions],
+  );
+  const blueprint = useMemo(
+    () => buildScoreBlueprint(allSubmissions),
+    [allSubmissions],
+  );
+  const latestGradedRow = useMemo(() => {
+    const graded = (rows ?? []).filter(
+      (row) =>
+        row.latest?.status === "GRADED" && row.latest.score !== null,
+    );
+    return (
+      [...graded].sort((a, b) => {
+        const aDate = a.latest?.gradedAt ?? a.latest?.submittedAt ?? "";
+        const bDate = b.latest?.gradedAt ?? b.latest?.submittedAt ?? "";
+        return new Date(bDate).getTime() - new Date(aDate).getTime();
+      })[0] ?? null
+    );
+  }, [rows]);
+
+  useEffect(() => {
+    if (!latestGradedRow?.latest || latestGradedRow.latest.score === null) {
+      return;
+    }
+    const latest = latestGradedRow.latest;
+    const score = latest.score;
+    if (score === null || score < 90) return;
+
+    const key = `sanad:praise:${latest.id}`;
+    try {
+      if (window.localStorage.getItem(key) === "1") return;
+    } catch {
+      // A blocked storage API must not hide a real achievement.
+    }
+    setPraise({
+      submissionId: latest.id,
+      title: latestGradedRow.item.title,
+      score,
+    });
+  }, [latestGradedRow]);
+
+  useEffect(() => {
+    if (!praise) return;
+    const timer = window.setTimeout(() => {
+      try {
+        window.localStorage.setItem(
+          `sanad:praise:${praise.submissionId}`,
+          "1",
+        );
+      } catch {
+        // ignore storage failures
+      }
+      setPraise(null);
+    }, 10000);
+    return () => window.clearTimeout(timer);
+  }, [praise]);
+
+  function dismissPraise() {
+    if (praise) {
+      try {
+        window.localStorage.setItem(
+          `sanad:praise:${praise.submissionId}`,
+          "1",
+        );
+      } catch {
+        // ignore storage failures
+      }
+    }
+    setPraise(null);
+  }
+
   const visible = useMemo(
     () => (rows ?? []).filter((row) => matchesFilter(row, filter)),
     [rows, filter],
@@ -445,6 +605,43 @@ export default function StudentAssignmentsPage() {
   const sideLoading = !ready || loading;
   const showSidebar = !sideLoading && !!token && !error && rows !== null;
   const solo = !sideLoading && !showSidebar;
+
+  async function toggleRemedial(row: AssignmentRow) {
+    if (!token) return;
+    const lessonId = row.item.lesson?.id ?? row.item.lessonId;
+    if (!lessonId) return;
+    if (remedialRowId === row.item.id) {
+      setRemedialRowId(null);
+      return;
+    }
+    setRemedialRowId(row.item.id);
+    if (remedial?.rowId === row.item.id) return;
+    setRemedial({
+      rowId: row.item.id,
+      loading: true,
+      data: null,
+      error: null,
+    });
+    try {
+      const data = await api.getStudentLesson(token, lessonId);
+      setRemedial({
+        rowId: row.item.id,
+        loading: false,
+        data,
+        error: null,
+      });
+    } catch (cause) {
+      setRemedial({
+        rowId: row.item.id,
+        loading: false,
+        data: null,
+        error:
+          cause instanceof ApiError
+            ? cause.message
+            : "تعذر تحميل مراجعة الدرس",
+      });
+    }
+  }
 
   return (
     <div className="sw-canvas">
@@ -615,6 +812,23 @@ export default function StudentAssignmentsPage() {
                       const lessonId = row.item.lesson?.id ?? row.item.lessonId;
                       const canOpen = row.item.status === "PUBLISHED";
                       const titleId = `assignment-${row.item.id}-title`;
+                      const latest = row.latest;
+                      const latestScore = latest?.score ?? null;
+                      const graded =
+                        latest?.status === "GRADED" && latestScore !== null;
+                      const passingScore = row.view?.passingScore ?? null;
+                      const hasGap =
+                        graded &&
+                        passingScore !== null &&
+                        latestScore !== null &&
+                        latestScore < passingScore;
+                      const remedyOpen = remedialRowId === row.item.id;
+                      const primaryLabel =
+                        row.state === "active"
+                          ? "متابعة الحل"
+                          : row.state === "submitted"
+                            ? "عرض التسليم"
+                            : "فتح الواجب";
 
                       return (
                         <article
@@ -660,6 +874,15 @@ export default function StudentAssignmentsPage() {
                                     </span>
                                   </>
                                 ) : null}
+                                {latestScore !== null ? (
+                                  <>
+                                    <span className="sw-meta-sep" aria-hidden />
+                                    <span className="sw-meta-item sw-meta-score">
+                                      <CheckIcon size={13} />
+                                      <span dir="ltr">{latestScore}%</span>
+                                    </span>
+                                  </>
+                                ) : null}
                               </div>
                             </div>
                           </div>
@@ -676,12 +899,24 @@ export default function StudentAssignmentsPage() {
                           </div>
 
                           <div className="sw-card-actions">
-                            {canOpen ? (
+                            {hasGap ? (
+                              <button
+                                type="button"
+                                className="sw-btn sw-btn-primary"
+                                onClick={() => void toggleRemedial(row)}
+                                aria-expanded={remedyOpen}
+                              >
+                                {remedyOpen
+                                  ? "إغلاق المراجعة"
+                                  : "ردم الفجوة المعرفية الآن"}
+                                <RefreshIcon />
+                              </button>
+                            ) : canOpen ? (
                               <Link
                                 href={`/student/assignments/${row.item.id}`}
                                 className="sw-btn sw-btn-primary"
                               >
-                                فتح الواجب
+                                {graded ? "مراجعة النتيجة" : primaryLabel}
                                 <ArrowIcon />
                               </Link>
                             ) : (
@@ -692,7 +927,24 @@ export default function StudentAssignmentsPage() {
                                 غير متاح
                               </span>
                             )}
-                            {lessonId && canOpen ? (
+
+                            {hasGap ? (
+                              <Link
+                                href={`/student/assignments/${row.item.id}`}
+                                className="sw-btn sw-btn-secondary"
+                              >
+                                مراجعة النتيجة
+                              </Link>
+                            ) : graded && lessonId ? (
+                              <button
+                                type="button"
+                                className="sw-btn sw-btn-secondary"
+                                onClick={() => void toggleRemedial(row)}
+                                aria-expanded={remedyOpen}
+                              >
+                                {remedyOpen ? "إغلاق المراجعة" : "مراجعة أساس الواجب"}
+                              </button>
+                            ) : lessonId && canOpen ? (
                               <Link
                                 href={`/student/lessons/${lessonId}`}
                                 className="sw-btn sw-btn-secondary"
@@ -701,11 +953,110 @@ export default function StudentAssignmentsPage() {
                               </Link>
                             ) : null}
                           </div>
+
+                          {remedyOpen ? (
+                            <div className="sw-card-remedy">
+                              <div className="sw-remedy-head">
+                                <div>
+                                  <span className="sw-remedy-kicker">
+                                    {hasGap
+                                      ? "مراجعة موجهة للفجوة"
+                                      : "مراجعة أساس الواجب"}
+                                  </span>
+                                  <h3>
+                                    {remedial?.data?.lesson.title ??
+                                      row.item.lesson?.title ??
+                                      "درس الواجب"}
+                                  </h3>
+                                </div>
+                                <button
+                                  type="button"
+                                  className="sw-remedy-close"
+                                  onClick={() => setRemedialRowId(null)}
+                                  aria-label="إغلاق المراجعة"
+                                >
+                                  ×
+                                </button>
+                              </div>
+
+                              {remedial?.rowId !== row.item.id ||
+                              remedial.loading ? (
+                                <p className="sw-remedy-state">
+                                  بنجهّز مراجعة الدرس…
+                                </p>
+                              ) : remedial.error ? (
+                                <div className="sw-remedy-state">
+                                  <p>{remedial.error}</p>
+                                  {lessonId ? (
+                                    <Link
+                                      href={`/student/lessons/${lessonId}`}
+                                      className="sw-btn sw-btn-secondary"
+                                    >
+                                      افتح صفحة الدرس
+                                    </Link>
+                                  ) : null}
+                                </div>
+                              ) : remedial.data ? (
+                                remedial.data.access.isLocked ? (
+                                  <p className="sw-remedy-state">
+                                    الدرس مقفل حاليًا. كمّل الخطوة السابقة أولًا
+                                    عشان تفتح المراجعة.
+                                  </p>
+                                ) : lessonEmbedUrl(remedial.data) ? (
+                                  <div className="sw-remedy-video">
+                                    <iframe
+                                      src={
+                                        lessonEmbedUrl(remedial.data) as string
+                                      }
+                                      title={remedial.data.lesson.title}
+                                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                      allowFullScreen
+                                    />
+                                  </div>
+                                ) : (
+                                  <div className="sw-remedy-state">
+                                    <p>
+                                      الدرس متاح، لكن مفيش فيديو منشور له في
+                                      النسخة الحالية.
+                                    </p>
+                                    {lessonId ? (
+                                      <Link
+                                        href={`/student/lessons/${lessonId}`}
+                                        className="sw-btn sw-btn-secondary"
+                                      >
+                                        افتح صفحة الدرس
+                                      </Link>
+                                    ) : null}
+                                  </div>
+                                )
+                              ) : null}
+                            </div>
+                          ) : null}
                         </article>
                       );
                     })}
                   </div>
                 )}
+
+                {latestGradedRow?.latest && token ? (
+                  <div className="sw-main-extra">
+                    <AssignmentResultReview
+                      token={token}
+                      assignmentTitle={latestGradedRow.item.title}
+                      latest={latestGradedRow.latest}
+                      passingScore={
+                        latestGradedRow.view?.passingScore ?? null
+                      }
+                      lessonId={
+                        latestGradedRow.item.lesson?.id ??
+                        latestGradedRow.item.lessonId
+                      }
+                    />
+                    {blueprint ? (
+                      <AcademicBlueprint blueprint={blueprint} />
+                    ) : null}
+                  </div>
+                ) : null}
               </>
             )}
           </section>
@@ -745,6 +1096,7 @@ export default function StudentAssignmentsPage() {
                     ? "تعذر حساب النسبة لكل الواجبات"
                     : `${stats.completed.toLocaleString("en-US")} من ${stats.total.toLocaleString("en-US")} واجب تم تسليمه`}
                 </p>
+                <GrowthBridge summary={growth} />
               </article>
 
               <article className="sw-stat">
@@ -774,27 +1126,45 @@ export default function StudentAssignmentsPage() {
                 </div>
               </article>
 
-              <article className="sw-compass-card">
+              <article
+                className={`sw-compass-card${blueprint ? " sw-compass-card-data" : ""}`}
+              >
                 <div className="sw-compass-head">
                   <span className="sw-compass-icon" aria-hidden>
                     <CompassIcon />
                   </span>
                   <div>
-                    <h2>بوصلة التحصيل</h2>
-                    <span className="sw-chip">قيد الربط</span>
+                    <h2>{blueprint ? "خريطة النضوج" : "بوصلة التحصيل"}</h2>
+                    <span
+                      className="sw-chip"
+                      data-tone={blueprint ? "green" : undefined}
+                    >
+                      {blueprint ? "درجات معتمدة" : "قيد الربط"}
+                    </span>
                   </div>
                 </div>
-                <div className="sw-compass-visual" aria-hidden>
-                  <span className="sw-compass-ring sw-compass-ring-outer" />
-                  <span className="sw-compass-ring sw-compass-ring-inner" />
-                  <span className="sw-compass-axis sw-compass-axis-x" />
-                  <span className="sw-compass-axis sw-compass-axis-y" />
-                  <span className="sw-compass-needle" />
-                </div>
-                <p>
-                  هتظهر الفجوات المعرفية هنا بعد ربط تحليلات الإجابات. مفيش
-                  تقديرات مصطنعة قبل كده.
-                </p>
+                {blueprint ? (
+                  <>
+                    <BlueprintSummary blueprint={blueprint} />
+                    <p className="sw-compass-note">
+                      بوصلة الفجوات الدقيقة هتترسم بعد ربط تحليل سند لكل إجابة.
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <div className="sw-compass-visual" aria-hidden>
+                      <span className="sw-compass-ring sw-compass-ring-outer" />
+                      <span className="sw-compass-ring sw-compass-ring-inner" />
+                      <span className="sw-compass-axis sw-compass-axis-x" />
+                      <span className="sw-compass-axis sw-compass-axis-y" />
+                      <span className="sw-compass-needle" />
+                    </div>
+                    <p>
+                      هتظهر الفجوات المعرفية هنا بعد ربط تحليلات الإجابات. مفيش
+                      تقديرات مصطنعة قبل كده.
+                    </p>
+                  </>
+                )}
               </article>
 
               <p className="sw-side-note">
@@ -804,6 +1174,29 @@ export default function StudentAssignmentsPage() {
           ) : null}
         </div>
       </div>
+
+      {praise ? (
+        <aside className="sw-praise-toast" role="status" aria-live="polite">
+          <span className="sw-praise-icon" aria-hidden>
+            <SparkIcon size={18} />
+          </span>
+          <div className="sw-praise-copy">
+            <span className="sw-praise-eyebrow">تقدير أكاديمي</span>
+            <strong>
+              تقدير متقن: درجة {praise.score}% في {praise.title}.
+            </strong>
+            <p>مراجعة معتمدة من المعلم — عمل يستحق التوقف.</p>
+          </div>
+          <button
+            type="button"
+            className="sw-praise-close"
+            onClick={dismissPraise}
+            aria-label="إغلاق التقدير"
+          >
+            ×
+          </button>
+        </aside>
+      ) : null}
     </div>
   );
 }

@@ -20,6 +20,8 @@ import {
 import { formatCountdown } from "@/app/lib/exam";
 import { useCountdown } from "@/app/lib/useCountdown";
 import ConfirmDialog from "@/app/student/components/ConfirmDialog";
+import AssignmentResultReview from "../components/AssignmentResultReview";
+import SubmissionTheater from "../components/SubmissionTheater";
 
 type Phase =
   | "loading"
@@ -30,16 +32,6 @@ type Phase =
   | "done"
   | "closed"
   | "error";
-
-/** Submission lifecycle → student-facing Arabic. Unknown values pass through. */
-const SUBMISSION_STATUS_LABELS: Record<string, string> = {
-  IN_PROGRESS: "جارٍ",
-  SUBMITTED: "تم التسليم",
-  LATE: "تم التسليم (متأخر)",
-  GRADED: "تم التصحيح",
-  EXPIRED: "انتهى الوقت",
-  CANCELLED: "ملغي",
-};
 
 function QuietPanel({ text }: { text: ReactNode }) {
   return (
@@ -81,6 +73,9 @@ export default function StudentAssignmentRunnerPage({
   const [unlockedLessonIds, setUnlockedLessonIds] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [submitStartedAt, setSubmitStartedAt] = useState(0);
+  const [submitElapsedMs, setSubmitElapsedMs] = useState<number | null>(null);
+  const [theaterDone, setTheaterDone] = useState(false);
   const submitKeyRef = useRef<string>(newIdempotencyKey());
   const submittingRef = useRef(false);
 
@@ -109,6 +104,7 @@ export default function StudentAssignmentRunnerPage({
           const timer = await api.getAssignmentTimer(token, assignmentId);
           if (cancelled) return;
           setExpiresAt(timer.expiresAt);
+          setContent(v.activeSubmission.content ?? "");
           setPhase("writing");
         } else if (v.canAttempt) {
           setPhase("intro");
@@ -150,6 +146,11 @@ export default function StudentAssignmentRunnerPage({
     async (auto: boolean) => {
       if (!token || !assignmentId || submittingRef.current) return;
       submittingRef.current = true;
+      const startedAt =
+        typeof performance !== "undefined" ? performance.now() : Date.now();
+      setSubmitStartedAt(startedAt);
+      setSubmitElapsedMs(null);
+      setTheaterDone(false);
       setPhase("submitting");
       try {
         const res = await api.submitAssignment(
@@ -158,9 +159,39 @@ export default function StudentAssignmentRunnerPage({
           content,
           submitKeyRef.current,
         );
+        const elapsed = Math.max(
+          0,
+          Math.round(
+            (typeof performance !== "undefined"
+              ? performance.now()
+              : Date.now()) - startedAt,
+          ),
+        );
         setResult(res);
-        const mine = await api.getMySubmissions(token, assignmentId);
+        setSubmitElapsedMs(elapsed);
+        setTheaterDone(true);
+
+        // A delegated read failure must never turn a successful submission
+        // into an error. Keep the server-confirmed attempt as a local fallback.
+        let mine: AssignmentSubmissionSummary[] = [];
+        try {
+          mine = await api.getMySubmissions(token, assignmentId);
+        } catch {
+          // The review page can still render the confirmed submission below.
+        }
+        if (mine.length === 0) {
+          mine = [
+            {
+              id: res.attemptId,
+              status: res.status,
+              score: null,
+              submittedAt: res.submittedAt,
+              content,
+            },
+          ];
+        }
         setSubmissions(mine);
+        await new Promise((resolve) => window.setTimeout(resolve, 700));
         setPhase("done");
       } catch (e) {
         try {
@@ -179,6 +210,8 @@ export default function StudentAssignmentRunnerPage({
         } catch {
           // fall through
         }
+        setTheaterDone(false);
+        setSubmitElapsedMs(null);
         submittingRef.current = false;
         fail(e, auto ? "انتهى الوقت وتعذر التسليم" : "تعذر تسليم الواجب");
       }
@@ -195,12 +228,80 @@ export default function StudentAssignmentRunnerPage({
     handleExpire,
   );
 
+  function renderResultPage(
+    eyebrow: string,
+    headline: string,
+    message: string,
+    latest: AssignmentSubmissionSummary | null,
+  ) {
+    return (
+      <div className="sc-canvas">
+        <div className="lp-container" style={{ maxWidth: 1040 }}>
+          <header className="ar-page-head">
+            <p className="sc-eyebrow" style={{ margin: 0 }}>
+              {eyebrow}
+            </p>
+            <h1 className="sc-title" style={{ marginTop: 6 }}>
+              {headline}
+            </h1>
+            <p className="sc-meta" style={{ marginTop: 12, fontSize: 15 }}>
+              {message}
+            </p>
+          </header>
+
+          {latest && token ? (
+            <AssignmentResultReview
+              token={token}
+              assignmentTitle={view?.title ?? "الواجب"}
+              latest={latest}
+              passingScore={view?.passingScore ?? null}
+              lessonId={view?.lessonId ?? null}
+            />
+          ) : (
+            <QuietPanel text="تم حفظ الحالة، لكن تعذر تحميل تفاصيل التسليم الآن." />
+          )}
+
+          <div className="sc-nav-row" style={{ marginTop: 18 }}>
+            {unlockedLessonIds[0] ? (
+              <Link
+                href={`/student/lessons/${unlockedLessonIds[0]}`}
+                className="sc-btn sc-btn-primary"
+              >
+                الدرس المفتوح <span aria-hidden>←</span>
+              </Link>
+            ) : null}
+            {view?.lessonId ? (
+              <Link
+                href={`/student/lessons/${view.lessonId}`}
+                className="sc-btn sc-btn-ghost"
+              >
+                صفحة الدرس
+              </Link>
+            ) : null}
+            <Link
+              href="/student/assignments"
+              className="sc-btn sc-btn-ghost"
+            >
+              كل الواجبات
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   // ------------------------------ render ------------------------------
 
-  if (phase === "loading" || phase === "submitting") {
+  if (phase === "loading") {
+    return <Notice text="جاري التحميل…" />;
+  }
+
+  if (phase === "submitting") {
     return (
-      <Notice
-        text={phase === "loading" ? "جاري التحميل…" : "جاري تسليم الواجب…"}
+      <SubmissionTheater
+        startedAt={submitStartedAt}
+        elapsedMs={submitElapsedMs}
+        done={theaterDone}
       />
     );
   }
@@ -249,16 +350,22 @@ export default function StudentAssignmentRunnerPage({
     );
   }
 
-  if ((phase === "intro" || phase === "closed") && view) {
-    const lastSubmission = submissions[0];
+  if (phase === "closed" && view) {
+    return renderResultPage(
+      "المحاولات مستنفدة",
+      "النتيجة النهائية",
+      "استنفدت محاولاتك في هذا الواجب. دي مراجعة آخر تسليم محفوظ، والدرجة الرسمية بيعتمدها المعلم.",
+      submissions[0] ?? null,
+    );
+  }
+
+  if (phase === "intro" && view) {
     return (
       <div className="sc-canvas">
         <div className="lp-container" style={{ maxWidth: 880 }}>
           <article className="sc-panel">
             <div className="sc-body">
-              <p className="sc-eyebrow">
-                {phase === "intro" ? "واجب جاهز للبدء" : "المحاولات مستنفدة"}
-              </p>
+              <p className="sc-eyebrow">واجب جاهز للبدء</p>
               <h1 className="sc-title">{view.title}</h1>
               {view.description && (
                 <p
@@ -303,44 +410,21 @@ export default function StudentAssignmentRunnerPage({
                   </span>
                 </div>
               </div>
-              {phase === "intro" ? (
-                <div className="sc-nav-row">
-                  <button
-                    type="button"
-                    className="sc-btn sc-btn-primary"
-                    onClick={() => void startAttempt()}
-                  >
-                    ابدأ الواجب <span aria-hidden>←</span>
-                  </button>
-                  <Link
-                    href="/student/assignments"
-                    className="sc-btn sc-btn-ghost"
-                  >
-                    رجوع للواجبات
-                  </Link>
-                </div>
-              ) : (
-                <>
-                  <p
-                    className="sc-meta"
-                    style={{ marginTop: "var(--space-4)", fontSize: 14 }}
-                  >
-                    استنفدت محاولاتك في هذا الواجب.
-                    {lastSubmission?.score !== null &&
-                    lastSubmission?.score !== undefined
-                      ? ` آخر درجة: ${lastSubmission.score}٪.`
-                      : ""}
-                  </p>
-                  <div className="sc-nav-row">
-                    <Link
-                      href="/student/assignments"
-                      className="sc-btn sc-btn-ghost"
-                    >
-                      رجوع للواجبات
-                    </Link>
-                  </div>
-                </>
-              )}
+              <div className="sc-nav-row">
+                <button
+                  type="button"
+                  className="sc-btn sc-btn-primary"
+                  onClick={() => void startAttempt()}
+                >
+                  ابدأ الواجب <span aria-hidden>←</span>
+                </button>
+                <Link
+                  href="/student/assignments"
+                  className="sc-btn sc-btn-ghost"
+                >
+                  رجوع للواجبات
+                </Link>
+              </div>
             </div>
           </article>
         </div>
@@ -349,74 +433,15 @@ export default function StudentAssignmentRunnerPage({
   }
 
   if (phase === "done") {
-    const latest = submissions[0];
-    return (
-      <div className="sc-canvas">
-        <div className="lp-container" style={{ maxWidth: 880 }}>
-          <article className="sc-panel">
-            <div className="sc-body">
-              <p className="sc-eyebrow">تم التسليم بنجاح</p>
-              <h1 className="sc-title">تم تسليم الواجب</h1>
-              <p
-                className="sc-meta"
-                style={{ marginTop: "var(--space-3)", fontSize: 15 }}
-              >
-                {result?.isLate
-                  ? "تم التسليم بعد انتهاء الوقت (متأخر)."
-                  : (result?.message ?? "تم استلام إجابتك بنجاح.")}
-              </p>
-              {latest && (
-                <div className="sc-spec-grid">
-                  <div className="sc-spec">
-                    <span className="sc-spec-label">الحالة</span>
-                    <span className="sc-spec-value">
-                      {SUBMISSION_STATUS_LABELS[latest.status] ?? latest.status}
-                    </span>
-                  </div>
-                  <div className="sc-spec">
-                    <span className="sc-spec-label">الدرجة</span>
-                    <span className="sc-spec-value">
-                      {latest.score !== null && latest.score !== undefined
-                        ? `${latest.score}٪`
-                        : "بانتظار التصحيح"}
-                    </span>
-                  </div>
-                </div>
-              )}
-              {latest?.feedback && (
-                <div
-                  className="sc-spec"
-                  style={{ marginTop: "var(--space-2)" }}
-                >
-                  <span className="sc-spec-label">ملاحظات المدرس</span>
-                  <span
-                    className="sc-spec-value"
-                    style={{ fontWeight: 500, lineHeight: 1.9 }}
-                  >
-                    {latest.feedback}
-                  </span>
-                </div>
-              )}
-              <div className="sc-nav-row">
-                {unlockedLessonIds[0] ? (
-                  <Link
-                    href={`/student/lessons/${unlockedLessonIds[0]}`}
-                    className="sc-btn sc-btn-primary"
-                  >
-                    الدرس المفتوح <span aria-hidden>←</span>
-                  </Link>
-                ) : null}
-                <Link
-                  href="/student/assignments"
-                  className="sc-btn sc-btn-ghost"
-                >
-                  كل الواجبات
-                </Link>
-              </div>
-            </div>
-          </article>
-        </div>
-      </div>
+    const latest = submissions[0] ?? null;
+    return renderResultPage(
+      "تم التسليم بنجاح",
+      "تم تسليم الواجب",
+      result?.isLate
+        ? "تم التسليم بعد انتهاء الوقت (متأخر). المراجعة الرسمية بعد اعتماد المعلم."
+        : (result?.message ??
+            "تم استلام إجابتك. المراجعة الرسمية بعد اعتماد المعلم."),
+      latest,
     );
   }
 

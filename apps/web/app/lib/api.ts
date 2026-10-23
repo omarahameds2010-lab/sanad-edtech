@@ -698,6 +698,9 @@ export interface AssignmentSubmissionSummary {
   score: number | null;
   feedback?: string | null;
   submittedAt: string;
+  content?: string | null;
+  attachments?: unknown[] | null;
+  gradedAt?: string | null;
 }
 
 export interface AssignmentDetail {
