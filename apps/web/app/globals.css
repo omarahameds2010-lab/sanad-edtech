@@ -8537,11 +8537,21 @@ html[dir="rtl"] .lp-maker:focus-visible .lp-maker-arrow {
    a full black canvas, a subtle breathing mesh, and the same elevated
    surface language as the teacher dashboard.
    ====================================================================== */
+html:has(.sc-canvas),
+html:has(.sw-canvas) {
+  background: #000000;
+  color-scheme: dark;
+}
+body:has(.sc-canvas),
+body:has(.sw-canvas) {
+  background: #000000;
+}
 .student-shell {
   min-height: 100vh;
   background: var(--bg-reading);
 }
-.student-shell:has(.sw-canvas) {
+.student-shell:has(.sw-canvas),
+.student-shell:has(.sc-canvas) {
   background: #000000;
 }
 .student-main {
@@ -8549,6 +8559,11 @@ html[dir="rtl"] .lp-maker:focus-visible .lp-maker-arrow {
 }
 .student-main:has(.sw-canvas) {
   max-width: 1320px;
+}
+/* The dark lesson/assignment/exam canvas must bleed to the viewport edge.
+   The inner .lp-container keeps the readable content width. */
+.student-main:has(.sc-canvas) {
+  max-width: none;
 }
 
 .sw-canvas {
