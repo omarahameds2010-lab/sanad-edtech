@@ -54,7 +54,12 @@ export default function NodeLedger({
           <li key={node.id} className="sc-ledger-row">
             <CheckGlyph />
             <p className="sc-ledger-name">{node.title}</p>
-            <span style={{ fontSize: 12, color: "rgba(244,244,246,.4)" }}>
+            <span
+              style={{
+                fontSize: 12,
+                color: "var(--sc-muted, rgba(244,244,246,.4))",
+              }}
+            >
               {nodeTypeLabel(node.type)}
             </span>
           </li>

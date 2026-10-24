@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { useCommandPalette } from "@/app/hooks/useCommandPalette";
+import { useTheme } from "@/app/lib/theme-provider";
 import StudentOrb from "./StudentOrb";
 
 type DockIconName =
@@ -91,15 +92,50 @@ function DockIcon({ name }: { name: DockIconName }) {
   }
 }
 
+function ThemeIcon() {
+  const common = {
+    width: 18,
+    height: 18,
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: "currentColor",
+    strokeWidth: 1.4,
+    strokeLinecap: "round" as const,
+    strokeLinejoin: "round" as const,
+    "aria-hidden": true,
+  };
+  return (
+    <>
+      <svg
+        {...common}
+        className="sd-theme-icon sd-theme-icon--sun"
+        data-theme-icon="sun"
+      >
+        <circle cx="12" cy="12" r="3.7" />
+        <path d="M12 2.8v2.1M12 19.1v2.1M4.5 4.5l1.5 1.5M18 18l1.5 1.5M2.8 12h2.1M19.1 12h2.1M4.5 19.5 6 18M18 6l1.5-1.5" />
+      </svg>
+      <svg
+        {...common}
+        className="sd-theme-icon sd-theme-icon--moon"
+        data-theme-icon="moon"
+      >
+        <path d="M20 14.2A8.1 8.1 0 0 1 9.8 4a8.3 8.3 0 1 0 10.2 10.2Z" />
+      </svg>
+    </>
+  );
+}
+
 export default function StudentDock() {
   const pathname = usePathname();
   const { open: openPalette } = useCommandPalette();
+  const { theme, toggleTheme } = useTheme();
   const [compact, setCompact] = useState(false);
   const [thumb, setThumb] = useState({ left: 0, width: 0, ready: false });
   const [focus, setFocus] = useState(false);
   const refs = useRef<(HTMLAnchorElement | null)[]>([]);
 
-  const dark = pathname === "/student";
+  const dark = theme === "dark";
+  const onDashboard = pathname === "/student";
   const activeIndex = Math.max(
     0,
     items.findIndex((it) =>
@@ -154,7 +190,6 @@ export default function StudentDock() {
       <nav
         aria-label="تنقل الطالب"
         className={`sd-nav${compact ? " is-compact" : ""}`}
-        data-theme={dark ? "dark" : "light"}
       >
         <span
           aria-hidden="true"
@@ -194,7 +229,7 @@ export default function StudentDock() {
           <DockIcon name="search" />
           <kbd>⌘K</kbd>
         </button>
-        {dark && (
+        {onDashboard && (
           <button
             type="button"
             className={`sd-action${focus ? " is-on" : ""}`}
@@ -206,6 +241,19 @@ export default function StudentDock() {
             <DockIcon name="target" />
           </button>
         )}
+        <button
+          type="button"
+          className="sd-action sd-theme-toggle"
+          onClick={toggleTheme}
+          aria-label={
+            dark ? "التحويل إلى الوضع الأكاديمي المضيء" : "التحويل إلى الوضع المظلم"
+          }
+          title={
+            dark ? "الوضع الأكاديمي المضيء" : "الوضع المظلم"
+          }
+        >
+          <ThemeIcon />
+        </button>
       </nav>
     </div>
   );

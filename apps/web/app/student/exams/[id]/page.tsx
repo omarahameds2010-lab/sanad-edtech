@@ -257,7 +257,7 @@ export default function StudentExamRunnerPage({
                 style={{
                   marginTop: "var(--space-3)",
                   fontSize: 15,
-                  color: "rgba(252, 165, 165, 0.92)",
+                  color: "var(--sc-danger, rgba(252, 165, 165, 0.92))",
                 }}
               >
                 {error ?? "حدث خطأ غير متوقع"}
@@ -299,7 +299,7 @@ export default function StudentExamRunnerPage({
                   style={{
                     marginTop: "var(--space-2)",
                     fontSize: 14,
-                    color: "rgba(244, 244, 246, 0.75)",
+                    color: "var(--sc-instructions, rgba(244, 244, 246, 0.75))",
                     lineHeight: 1.9,
                   }}
                 >

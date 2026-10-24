@@ -98,7 +98,7 @@ export default function FeaturedCourseCard({ entry }: { entry: CourseEntry }) {
             alignItems: "center",
             gap: 8,
             fontWeight: 700,
-            color: "#ffffff",
+            color: "var(--sc-cta-color, #ffffff)",
           }}
         >
           متابعة المسار

@@ -163,7 +163,7 @@ export default function StudentCoursesPage() {
                       alignItems: "center",
                       gap: 8,
                       fontWeight: 700,
-                      color: "#ffffff",
+                      color: "var(--sc-cta-color, #ffffff)",
                     }}
                   >
                     متابعة

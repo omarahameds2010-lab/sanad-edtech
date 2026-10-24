@@ -66,7 +66,7 @@ export default function ConfirmDialog({
             marginTop: "var(--space-3)",
             fontSize: 14.5,
             lineHeight: 1.9,
-            color: "rgba(244, 244, 246, 0.78)",
+            color: "var(--sc-instructions, rgba(244, 244, 246, 0.78))",
           }}
         >
           {body}

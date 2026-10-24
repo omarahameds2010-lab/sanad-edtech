@@ -49,7 +49,7 @@ export default function ProgressHorizon({
               cy="74"
               r={radius}
               fill="none"
-              stroke="rgba(255,255,255,.08)"
+              stroke="var(--sc-hairline, rgba(255,255,255,.08))"
               strokeWidth="6"
               strokeLinecap="round"
               strokeDasharray={`${arc} ${circumference}`}
@@ -106,14 +106,14 @@ export default function ProgressHorizon({
                 display: "flex",
                 justifyContent: "space-between",
                 alignItems: "baseline",
-                borderBottom: "1px solid rgba(255,255,255,.05)",
+                borderBottom: "1px solid var(--sc-hairline, rgba(255,255,255,.05))",
                 paddingBottom: "var(--space-2)",
               }}
             >
               <dt
                 style={{
                   fontSize: 13,
-                  color: "rgba(244,244,246,.6)",
+                  color: "var(--sc-muted, rgba(244,244,246,.6))",
                   margin: 0,
                 }}
               >

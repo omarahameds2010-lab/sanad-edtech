@@ -606,6 +606,8 @@ export function ChainSimulator() {
             >
               <button
                 type="button"
+                className="cc-chain-node"
+                data-state={done ? "done" : activeNode ? "active" : "locked"}
                 onClick={() => advance(i)}
                 title={label}
                 aria-label={`${label} — ${done ? "مفتوح" : activeNode ? "الحالي" : "مقفل"}`}
@@ -613,13 +615,13 @@ export function ChainSimulator() {
                   width: 44,
                   height: 44,
                   borderRadius: "50%",
-                  border: `1px solid ${done || activeNode ? "var(--tenant-accent)" : "rgba(255,255,255,0.2)"}`,
+                  border: `1px solid ${done || activeNode ? "var(--tenant-accent)" : "var(--cc-chain-line)"}`,
                   background: done
                     ? "var(--tenant-accent)"
                     : activeNode
-                      ? "rgba(4, 120, 87, 0.18)"
+                      ? "var(--cc-chain-active-bg)"
                       : "transparent",
-                  color: "#F4F4F6",
+                  color: "var(--cc-chain-icon)",
                   fontSize: 18,
                   cursor: "pointer",
                   flexShrink: 0,
@@ -635,7 +637,7 @@ export function ChainSimulator() {
                 <div
                   style={{
                     fontSize: 11,
-                    color: "rgba(244,244,246,0.75)",
+                    color: "var(--cc-chain-label)",
                     fontWeight: 700,
                   }}
                 >
@@ -651,7 +653,7 @@ export function ChainSimulator() {
                     background:
                       i < stage
                         ? "var(--tenant-accent)"
-                        : "rgba(255,255,255,0.12)",
+                        : "var(--cc-chain-connector)",
                     boxShadow:
                       i < stage ? "0 0 8px 1px rgba(4,120,87,0.4)" : "none",
                     transition: "all 300ms ease",
@@ -666,7 +668,7 @@ export function ChainSimulator() {
         style={{
           fontSize: 12,
           lineHeight: 1.9,
-          color: "rgba(244, 244, 246, 0.6)",
+          color: "var(--cc-chain-note)",
           margin: 0,
         }}
       >
