@@ -1,5 +1,23 @@
 # Video Content Protection Specification
 
+> **Current implementation status — 25 October 2026.** This is a design specification; the verified runtime status is maintained in [`CURRENT-STATE.md`](CURRENT-STATE.md). Read this banner before treating any control below as shipped.
+>
+> **What exists in the repository now**
+>
+> - `BunnyStreamProvider` with upload URL/TUS token, status, delete, and webhook verification helpers.
+> - `VdoCipherProvider` is an explicit stub.
+> - `SignedTokenService` (HMAC playback token), `WatermarkEngine` (deterministic positions + HMAC payload), and playback-session/risk primitives.
+> - Teacher can attach an unlisted YouTube id; the current student demo player is the YouTube IFrame API (`youtube-nocookie.com`).
+>
+> **What does not exist / is not active**
+>
+> - There is **no video webhook HTTP route**. Provider webhook helpers are not exposed.
+> - There is **no `WatermarkOverlay` React component** in `apps/web`; the overlay/tamper-detection UI described below is a specification, not current UI.
+> - The current YouTube demo path does not use the Bunny token/watermark pipeline.
+> - The playback token TTL default is **5 minutes** (`VIDEO_TOKEN_TTL_MS=300000`), not 2 hours.
+> - Video protection is deterrence/traceability, not DRM. Do not claim unbreakable protection.
+> - Locked-lesson enforcement is advisory in student API views; see `CURRENT-STATE.md`.
+
 ## Overview
 Video content protection for the Learning Platform. The goal is **not** 100% piracy prevention (impossible), but to:
 - Make piracy harder and traceable
@@ -13,9 +31,9 @@ Video content protection for the Learning Platform. The goal is **not** 100% pir
 |--------|------------|--------|------------|
 | Screen recording (native app) | High | Medium | FLAG_SECURE / UIScreen.isCaptured → blackout |
 | Screen recording (web) | High | Medium | Watermark + tamper detection + risk scoring |
-| Video download (HLS segments) | Medium | High | Short-lived signed tokens (2h), token bound to session |
+| Video download (HLS segments) | Medium | High | Short-lived signed tokens (5 min default), token bound to session |
 | Credential sharing | Medium | High | Device fingerprinting, concurrent session limit, risk scoring |
-| Token theft | Low | High | Short TTL (2h), session binding, IP/domain lock |
+| Token theft | Low | High | Short TTL (5 min default), session binding, IP/domain lock |
 | CDN token leakage | Low | High | Short TTL, HMAC signing, token bound to session |
 
 ## Architecture
@@ -57,8 +75,8 @@ interface VideoProvider {
 ```
 
 **Implemented:**
-- `BunnyStreamProvider`: Full implementation (TUS upload, HMAC webhook, JWT tokens)
-- `VdoCipherProvider`: Stub (official integration pending)
+- `BunnyStreamProvider`: upload URL/TUS token, status, delete, and webhook verification helper. The HTTP webhook route is **not** wired.
+- `VdoCipherProvider`: Stub (official integration pending).
 
 ### 2. WatermarkEngine
 Deterministic, cryptographically signed, tamper-evident watermark.
@@ -113,7 +131,7 @@ Short-lived JWT-like tokens for playback authorization.
 **Token Format:** `header.payload.signature` (base64url)
 - **Header**: `{ "alg": "HS256", "typ": "JWT" }`
 - **Signature**: HMAC-SHA256 with `VIDEO_TOKEN_SECRET`
-- **TTL**: 2 hours (configurable via `VIDEO_TOKEN_TTL_MS`)
+- **TTL**: 5 minutes by default (`VIDEO_TOKEN_TTL_MS=300000`; configurable). The older 2-hour claim in this document was stale.
 
 ### 4. PlaybackSessionService
 Manages playback sessions with security controls.
@@ -148,7 +166,7 @@ AUTHORIZE → ACTIVE (heartbeat every 15-30s) → END / REVOKE
 - **HIGH (60-79)**: Revoke session / require re-auth
 - **CRITICAL (80+)**: Block / admin review
 
-### 4. WatermarkOverlay (React Component)
+### 4. WatermarkOverlay (React Component — specification only; not shipped)
 ```tsx
 <WatermarkOverlay
   lines={["Ahmed Mohamed", "01012345678", "Student #123", "Teacher Academy", "01:23:45"]}
@@ -178,7 +196,7 @@ AUTHORIZE → ACTIVE (heartbeat every 15-30s) → END / REVOKE
 | Technique | Effectiveness |
 |-----------|---------------|
 | Watermark + HMAC | Traceability + tamper evidence |
-| Short-lived tokens (2h) | Limits token reuse window |
+| Short-lived tokens (5 min default) | Limits token reuse window |
 | Token bound to session | Prevents token sharing |
 | Visibility/Focus monitoring | Detects tab switching |
 | DevTools detection | Detects inspection attempts |
@@ -217,7 +235,7 @@ Per-tenant (configurable via plan):
 | Max stored hours | 100 hours | Before upload URL issued |
 | Max concurrent sessions | 1 | Session creation |
 | Max devices | 2 | Device registration |
-| Token TTL | 2 hours | JWT exp claim |
+| Token TTL | 5 minutes default | Signed token exp claim |
 | Session heartbeat | 15-30s | Auto-revoke on timeout |
 
 ## Audit & Monitoring
@@ -252,8 +270,8 @@ Per-tenant (configurable via plan):
 VIDEO_WATERMARK_HMAC_SECRET="change-in-production"  # HMAC for watermark payload
 VIDEO_TOKEN_SECRET="change-in-production"           # JWT signing for playback tokens
 VIDEO_TOKEN_ISSUER="learning-platform"
-VIDEO_TOKEN_TTL_MS="300000"                         # 5 minutes (access token)
-# Playback token TTL handled in SignedTokenService (2h default)
+VIDEO_TOKEN_TTL_MS="300000"                         # 5 minutes default
+# Playback token TTL is read by SignedTokenService (5 min default)
 
 # Bunny Stream
 BUNNY_STREAM_API_KEY=""
@@ -300,6 +318,8 @@ VDOCIPHER_BASE_URL="https://dev.vdocipher.com/api"
 ```
 
 ## Testing Requirements
+
+> The checklists below are acceptance criteria for the protection design, not a statement that every test exists today. The current API suite is **311/311**; the video module has a service spec, but there is no browser `WatermarkOverlay` test because no such component is shipped. Do not mark a box complete without a real test.
 
 ### Unit Tests
 - [ ] `WatermarkEngine.positionAt()` deterministic with same seed
@@ -406,11 +426,11 @@ NEXT LESSON becomes available
 
 ### Progression Trigger
 **Current implementation:**
-- Student enters Assignment (POST /assignments/:id/attempts)
+- Student enters Assignment (`POST /api/v1/assignments/:id/enter`)
   → record ENTER_ASSIGNMENT
   → linked Exam becomes available
 
-- Student enters Exam (POST /exams/:id/attempts)
+- Student enters Exam (`POST /api/v1/exams/:id/enter`)
   → record ENTER_EXAM
   → next lesson becomes available
 
@@ -529,11 +549,11 @@ NEXT LESSON becomes available
 
 ### Progression Trigger
 **Current implementation:**
-- Student enters Assignment (POST /assignments/:id/attempts)
+- Student enters Assignment (`POST /api/v1/assignments/:id/enter`)
   → record ENTER_ASSIGNMENT
   → linked Exam becomes available
 
-- Student enters Exam (POST /exams/:id/attempts)
+- Student enters Exam (`POST /api/v1/exams/:id/enter`)
   → record ENTER_EXAM
   → next lesson becomes available
 
@@ -558,6 +578,8 @@ NEXT LESSON becomes available
 ---
 
 ## Testing Requirements
+
+> The checklists below are acceptance criteria for the protection design, not a statement that every test exists today. The current API suite is **311/311**; the video module has a service spec, but there is no browser `WatermarkOverlay` test because no such component is shipped. Do not mark a box complete without a real test.
 
 ### Unit Tests
 - [ ] `WatermarkEngine.positionAt()` deterministic with same seed

@@ -20,7 +20,30 @@
 
 ### *Protected by architecture, not by promises. Every claim below cites code.*
 
-[![RLS](https://img.shields.io/badge/RLS-FORCE-4169E1?style=for-the-badge&logo=postgresql&logoColor=white)](#-5-tenancy--isolation-rls-the-last-wall)
+> **Current security posture — verified 25 October 2026.** Read [`CURRENT-STATE.md`](CURRENT-STATE.md) for the canonical state. This document is a threat model and control catalogue; the dated dashboard below is a historical snapshot.
+>
+> **Active controls**
+>
+> - Argon2id password hashing; JWT access cookie (15 min); rotating opaque refresh cookie (HttpOnly, hashed at rest).
+> - JWT `tenantId` bound to the host-resolved tenant; CSRF origin guard; CORS fail-closed when `ALLOWED_ORIGINS` is unset.
+> - `JwtAuthGuard` + `AuthorizationGuard` + `@RequirePermission` on domain routes; explicit public routes.
+> - Paymob/Fawry webhook signature verification with raw-body retention, constant-time comparison, deduplication, idempotency, and atomic settlement.
+> - Refund idempotency, CAS transitions, ledger reversal, and entitlement revocation.
+> - Audit/security event writes for sensitive actions.
+> - DB-side: 138 RLS policies on 43 application tables, `FORCE ROW LEVEL SECURITY`, and per-request tenant context injection (runtime enforcement is **not** active; see the caveat below).
+>
+> **Critical caveat**
+>
+> - **RLS is not enforcing production traffic yet.** The runtime selects `MIGRATION_DATABASE_URL` first and connects with owner/superuser credentials. Until the runtime URL is `app_user` and the preference is flipped, application `tenantId` filters are the active isolation control.
+> - There is no video webhook route; the video webhook design below is not exposed.
+> - There is no outbox dispatcher.
+> - Published course/lesson/exam content has **no immutable version/snapshot layer yet**; the “publish = immutable snapshot” language below is a target control, not a current guarantee.
+> - Assignment attempts are `AssignmentSubmission` rows, not a separate `IN_PROGRESS` attempt table. The unique `(assignmentId, studentId)` constraint blocks retakes regardless of `maxAttempts`.
+> - Exam auto-submit is client-driven; the API marks a late submit `TIMED_OUT`, but no scheduled worker submits abandoned attempts.
+> - Rate limiting, 2FA, KMS/Vault, SIEM/Sentry/Prometheus, and WAF are not implemented.
+> - Do not treat the older “178 + 26 policies” or `20240101000000_init_rls.sql` references as current; the migration chain is now 7 migrations with 138 policies on 43 tables.
+
+[![RLS](https://img.shields.io/badge/RLS-policies_ready%2C_runtime_pending-4169E1?style=for-the-badge&logo=postgresql&logoColor=white)](#-5-tenancy--isolation-rls-the-last-wall)
 [![Argon2id](https://img.shields.io/badge/Hashing-Argon2id-2D3748?style=for-the-badge)](#-31-password-security-argon2id-real)
 [![HMAC](https://img.shields.io/badge/Webhooks-HMAC_verified-DC2626?style=for-the-badge)](#-62-webhook-security-verify-before-you-trust)
 [![Ledger](https://img.shields.io/badge/Ledger-Double_entry-059669?style=for-the-badge)](#-64-ledger-append-only-money)
@@ -53,9 +76,13 @@
 
 ---
 
-### 🖥️ SECURITY POSTURE DASHBOARD (Actual Project State — Verified 2026-10-08)
+### 🖥️ SECURITY POSTURE DASHBOARD (HISTORICAL — Verified 2026-10-08, superseded by the banner above)
 
+> **Historical table below:** it records the 8 October snapshot. Its RLS policy counts, migration filenames, and “needs live proof” statuses are superseded by the 25 October banner. Use `CURRENT-STATE.md` for current claims.
+>
 > Status: ✅ **REAL** (code read, cited) · 🧪 **NEEDS LIVE PROOF** (compiles, not run against prod-like env) · � **PLANNED** (documented, not built)
+>
+> **Current note:** rows that describe RLS policies or the `app_user` cage are database-side facts. The runtime still connects with owner/superuser credentials, so RLS is **not active** on Railway. See the banner at the top of this document.
 
 | # | Control | Status | Evidence (file:line) |
 |---|---------|--------|----------------------|
@@ -65,12 +92,12 @@
 | 4 | PolicyEngine: 22 actions, RBAC + conditions | ✅ | `modules/authorization/policy-engine.ts:27,215,407` |
 | 5 | `redeem` action exists (old gap CLOSED) | ✅ | `policy-engine.ts:47` |
 | 6 | Entitlement model (5 sources × 4 statuses) | ✅ | `policy-engine.ts:62,69` |
-| 7 | RLS migration coverage (178 + 26 policies) | ✅ | `prisma/migrations/20240101000000_init_rls.sql` · `20261007000000_lms_rls/migration.sql` |
-| 8 | `app_user`: LOGIN + CRUD-only + REVOKE BYPASSRLS + FORCE per table | ✅ | `docker/postgres/init/01-create-app-user.sql:9,21,31,34` |
+| 7 | RLS policy coverage (current: **138 policies / 43 tables**) | ✅ DB-side · runtime pending | `prisma/migrations/20261016000000_rls_hardening` + `20261007000000_lms_rls` · `20261017000001_student_lesson_unlocks` |
+| 8 | `app_user`: LOGIN + CRUD-only + REVOKE BYPASSRLS + FORCE per table | ✅ DB-side · not runtime | `docker/postgres/init/01-create-app-user.sql:9,21,31,34` |
 | 9 | Tenant-scoped UNIQUE constraints (idempotency, attempts, enrollments) | ✅ | `prisma/schema.prisma:137,394,514,998` |
 | 10 | Paymob HMAC-SHA512 + constant-time compare | ✅ | `payments/providers/paymob/paymob.provider.ts:151,334,338` |
 | 11 | Fawry signature + constant-time compare | ✅ | `payments/providers/fawry/fawry.provider.ts:186,201` |
-| 12 | Bunny webhook HMAC + constant-time compare | ✅ | `video/providers/bunny-stream.provider.ts:324,338,343` |
+| 12 | Bunny webhook HMAC helper + constant-time compare | ⚠️ helper only; no HTTP route | `video/providers/bunny-stream.provider.ts:324,338,343` |
 | 13 | Watermark HMAC + verify | ✅ | `video-protection/services/watermark-engine.ts:115,130` |
 | 14 | Playback token HMAC sign/verify | ✅ | `video-protection/services/signed-token.service.ts:103,153,174,179` |
 | 15 | Webhook inbox (provider interface + service) | ✅ | `payments/webhooks/webhook-inbox.service.ts:51` · `payment-provider.interface.ts:131` |
@@ -582,7 +609,7 @@ async gradeAttempt(@Param() p, @Body() dto, @Req() req) {
 ```
 1. Every tenant-scoped row carries tenantId. No exceptions (migrations enforce NOT NULL).
 2. Every read/write filters (tenantId, id) — application layer AND database layer.
-3. RLS FORCE on every tenant table — even table owners obey (no escape hatch).
+3. RLS FORCE on every tenant table — database-side only. The runtime must connect as `app_user` for this to enforce; a superuser/owner URL bypasses it.
 4. Runtime connects ONLY as app_user (LOGIN, CRUD, no BYPASSRLS, no DDL).
 5. Tenant context is TRANSACTION-LOCAL (set_config ..., true) — never session/global (pool-safe).
 6. No tenant context = ZERO rows (default-deny at the database itself).
@@ -596,7 +623,7 @@ CREATE ROLE app_user WITH LOGIN PASSWORD 'app_user_password';          -- line 9
 GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO app_user;  -- line 21 (CRUD ONLY: no TRUNCATE/DROP/ALTER)
 ALTER DEFAULT PRIVILEGES ... GRANT SELECT, INSERT, UPDATE, DELETE ...  -- line 27 (future tables caged too)
 REVOKE BYPASSRLS ON ALL TABLES IN SCHEMA public FROM app_user;         -- line 31 (explicit, defense in depth)
-ALTER TABLE public.tenants FORCE ROW LEVEL SECURITY;                   -- line 34 (+40 tables follow: domains, users,
+ALTER TABLE public.tenants FORCE ROW LEVEL SECURITY;                   -- line 34 (+42 tables follow: domains, users,
 -- devices, sessions, courses, sections, lessons, enrollments, lesson_progress, exams, attempts, orders,
 -- payment_transactions, refunds, vouchers, ... — read lines 34-70 for the full roster)
 ```
@@ -612,10 +639,14 @@ ALTER TABLE public.tenants FORCE ROW LEVEL SECURITY;                   -- line 3
 
 ## 5.3 MIGRATION COVERAGE (VERIFIED COUNTS — NOT Promises)
 
-| File | Policies (ENABLE+CREATE+FORCE refs) | Covers |
-|------|-------------------------------------|--------|
-| `prisma/migrations/20240101000000_init_rls.sql` | **178** (verified by grep) | Core: tenants, domains, config, users, devices, sessions, courses, sections, lessons, enrollments, progress, exams, attempts, orders, payments, refunds, vouchers, ledger, outbox, audit |
-| `prisma/migrations/20261007000000_lms_rls/migration.sql` | **26** (verified by grep) | LMS: assignments, exam extensions, progression events, grading |
+| Migration | Current role |
+|-----------|--------------|
+| `prisma/migrations/20261007000000_lms_rls` | Early LMS RLS layer; superseded/completed by the hardening migration |
+| `prisma/migrations/20261016000000_rls_hardening` | CamelCase policies on all application tables + `FORCE ROW LEVEL SECURITY`; creates `app_user` behind a superuser check |
+| `prisma/migrations/20261016000001_tenant_resolution_fn` | `app_resolve_tenant_by_domain` (`SECURITY DEFINER`) for pre-auth host resolution |
+| `prisma/migrations/20261017000001_student_lesson_unlocks` | 43rd application table + its own 4-policy RLS set |
+
+**Current verified total:** **138 policies across 43 application tables**. The old “178 + 26” count referenced a deleted loose SQL file that was never applied; do not use it.
 
 ```sql
 -- NORMATIVE policy shape (every table gets SELECT/INSERT/UPDATE/DELETE variants):
@@ -947,7 +978,7 @@ Teacher config change mid-attempt: running attempts keep snapshot (fairness); ne
 | Browser clock rollback | Server `NOW()` only; client clock never read |
 | Double-ENTER race (2 timers?) | Partial unique `(studentId, parentId)` WHERE `IN_PROGRESS` → one wins, other resumes |
 | `?extraTime=true` / body `expiresAt` | DTO strips time fields; any client time = 422 + event |
-| Tab-open-past-expiry | BullMQ delayed job + sweeper → EXPIRED + auto-submit (server timestamped) |
+| Tab-open-past-expiry | API treats `expiresAt` as authoritative and rejects late writes; **no BullMQ delayed job/sweeper is registered yet** |
 | Answer write after expiry | Write carries server receipt time; post-expiry writes rejected with proof |
 
 ## 8.2 ANSWER EXCLUSION — Solutions Never Leave the Server
@@ -1365,9 +1396,11 @@ Q20 Compliance certificates? → SAQ-A (PCI) + PDPL file + DPAs 📋 — tracked
 ## 10.10 ROADMAP (Security Track — Dated Ambition)
 
 ```
-DONE ✅: Argon2id · rotation · PolicyEngine(22) · redeem · RLS(178+26) · app_user cage ·
-  HMAC paymob/fawry/bunny/watermark/tokens · inbox interface · tenant uniques · boot validator.
-NEXT (pre-1.0): isolation E2E green (live DB) · golden-flow green · rate limits live ·
+DB-SIDE DONE: RLS policy set (138 policies / 43 tables) + `app_user` role + FORCE.
+RUNTIME NOT ACTIVE: API still connects with owner/superuser credentials; tenant filters are the active control.
+CODE DONE: Argon2id · refresh rotation · PolicyEngine · redeem · HMAC paymob/fawry/bunny-helper/watermark/tokens ·
+  inbox interface · tenant uniques · boot validator.
+NEXT (P1): activate RLS on Railway as `app_user` · isolation E2E green on that role · rate limits live ·
   answers-absent CI gate · log-grep CI · RLS-coverage CI · external pentest (money+isolation) ·
   backup-restore drill · secret hunt in release PRs.
 P1: TOTP enforced · KMS/Vault + PII envelope · Cloudflare WAF/bot/rate-limit · IP allowlists ·
@@ -1433,6 +1466,7 @@ DELIVERABLE: findings with SEVERITY + REPRO (requestIds) + retest window. Fix SL
 |-----|------|--------|
 | v0.1 | 2026-10-04 | Original 430-line spec (architecture + policies, pre-verification) |
 | v1.0 | 2026-10-08 | Full rewrite, 4000+ lines: 10 parts + appendices; EVERY control cited to code (file:line) or marked 🧪/📋; posture dashboard from live grep (Argon2, rotation, 22 actions, redeem-closed, RLS 178+26, HMAC ×5 surfaces, boot validator); 6 runbooks; STRIDE ×6 domains; Egypt PDPL/PCI/minors; pentest scope |
+| v2.0 | 2026-10-25 | Current-state banner; RLS counts corrected to 138 policies / 43 tables with runtime activation pending; Bunny webhook marked helper-only; outbox/Bull/video-route gaps called out; token TTL confirmed 5 minutes; local test/build evidence recorded |
 
 ---
 
@@ -2443,7 +2477,7 @@ jobs:
       - uses: pnpm/action-setup@v4
         with: { version: ${{ env.PNPM_VERSION }} }
       - run: pnpm install --frozen-lockfile
-      - run: npx prisma migrate deploy
+      - run: pnpm exec prisma migrate deploy
         working-directory: apps/api
         env: { MIGRATION_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test }
       - run: pnpm --filter api test:e2e -- rls-isolation golden-flow voucher-race timer-stability webhook-storm
@@ -2838,7 +2872,7 @@ log_lock_waits = on                     # deadlock/hog forensics (pairs with sta
 log_statement = 'ddl'                   # ALL schema changes logged (migration audit trail)
 log_min_duration_statement = 500        # slow-query log (perf + injection-long-query signal)
 log_line_prefix = '%m [%p] %u@%d/%a %h '  # time pid user@db/app ip — joinable with app requestId via app_name
-# application_name: API sets `lp-api:{pod}` + BullMQ `lp-worker:{q}` (trace slow queries to callers)
+# application_name: API sets `lp-api:{pod}` (a planned BullMQ worker would use `lp-worker:{q}`)
 # ── resource guards (DoS containment) ────────────────────────────────
 statement_timeout = 15000               # 15s: analytics gone wild dies (matches DATABASE_STATEMENT_TIMEOUT)
 idle_in_transaction_session_timeout = 60000  # leaked tx (forgotten ROLLBACK holding locks) killed at 60s
@@ -2880,7 +2914,7 @@ user lp-api on >${API_PASS} ~lp:* +@all -@dangerous  # keyspace prefix cage: can
 user lp-worker on >${WORKER_PASS} ~lp:queue:* ~lp:outbox:* +@all -@dangerous
 user healthcheck on >${HC_PASS} ~* +ping +info  # monitoring needs almost nothing
 maxmemory 2gb
-maxmemory-policy noeviction              # QUEUE DATA MUST NEVER EVICT (BullMQ jobs > cache comfort):
+maxmemory-policy noeviction              # QUEUE DATA MUST NEVER EVICT (planned BullMQ jobs > cache comfort):
                                         # cache keys carry explicit TTLs instead (entitlement 60s, flags 5m).
 appendonly yes                           # survive restarts without losing delayed exam-submit jobs
 appendfsync everysec
@@ -3233,7 +3267,7 @@ TAIL-SWALLOW-T-->
 | C-AUTHZ-05 | Guard coverage (all routes declared) | check-guards.sh CI | platform | every PR |
 | C-AUTHZ-06 | TOCTOU in-tx re-checks | service tx patterns + review Q-list | backend | per money/state PR |
 | C-TEN-01 | app_user cage (CRUD, no bypass/DDL) | init script:9,21,27,31 | dba | quarterly queries S1 |
-| C-TEN-02 | RLS 4 policies + FORCE per table | migrations (178+26) + check-rls CI | dba/backend | every migration |
+| C-TEN-02 | RLS policies + FORCE on all 43 application tables (DB-side); runtime activation pending | migrations + manual SQL review | dba/backend | every migration |
 | C-TEN-03 | Tx-local tenant context | set_config pattern + interceptor | backend | per new module |
 | C-TEN-04 | Fetch-by-(tenantId,id) | SEC001 lint + service review | backend | every PR |
 | C-TEN-05 | Domain allowlist + verification | domains flow + 404 default | platform | quarterly |
@@ -3858,7 +3892,7 @@ TAIL-SWALLOW-AB (final historical tail, invisible):
 ## AC1. SIGN-OFF SHEET (Fill Before 1.0 Tag — No Blanks Allowed)
 
 ```
-Release tag: security-1.0 · Date: ____ · Branch: master @ ____ (sha)
+Release tag: security-2.0 · Date: ____ · Branch: main @ ____ (sha)
 J7 gates (10.6 + App.J7): [ ] all binary-checked (link release issue with outputs)
 Pentest: report ____ (date) · criticals fixed+retested [ ] · highs accepted (signed) [ ]
 Drills: RB-__ rehearsed (date) · backup restore timed RTO=__ RPO=__ · SEV-1 page tested [ ]
@@ -3876,9 +3910,10 @@ Hold items (if any): #1 ____ (owner, date) · #2 ____ (owner, date) — holds ar
 (Get-Content docs/SECURITY.md).Count
 # 2. No dead S-placeholders remain (expect ZERO):
 Select-String -Path docs/SECURITY.md -Pattern '<!-- S[0-9]+ -->' | Measure-Object -Line
-# 3. RLS coverage counts (expect 178 + 26):
-Select-String -Path apps/api/prisma/migrations/20240101000000_init_rls.sql -Pattern 'ENABLE ROW LEVEL SECURITY|CREATE POLICY|FORCE' | Measure-Object -Line
-Select-String -Path apps/api/prisma/migrations/20261007000000_lms_rls/migration.sql -Pattern 'ENABLE ROW LEVEL SECURITY|CREATE POLICY|FORCE' | Measure-Object -Line
+# 3. RLS coverage after applying migrations (expect 43 tables with RLS, 138 policies):
+#    Run against the migrated database; replace the connection string locally.
+psql "$env:DATABASE_URL" -c "SELECT count(*) AS policies FROM pg_policies WHERE schemaname = 'public';"
+psql "$env:DATABASE_URL" -c "SELECT count(*) AS rls_tables FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace WHERE n.nspname = 'public' AND c.relrowsecurity;"
 # 4. HMAC surfaces present (expect matches in 5 files):
 Select-String -Path apps/api/src -Pattern 'timingSafeEqual' | Select-Object Path -Unique
 # 5. Argon2 present (expect auth.service + users.service):

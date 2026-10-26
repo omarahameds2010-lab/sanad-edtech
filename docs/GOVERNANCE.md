@@ -1,107 +1,101 @@
 # Repository Governance — Ports, Branches, Commit Gates
 
-> Applies to every human and every agent working in this repo.
-> Source of truth alongside `AGENTS.md` and `docs/HANDOFF.md`.
+> Applies to every human and agent working in this repo.
+> Current state: [`CURRENT-STATE.md`](CURRENT-STATE.md). Agent rules: [`AGENTS.md`](../AGENTS.md).
 
----
+## 1. Canonical ports
 
-## 1. Canonical ports (locked)
+| Module | Port | Enforced by |
+| --- | --- | --- |
+| Web (Next.js) | **3001** | `apps/web/package.json` → `next dev -p 3001` |
+| API (NestJS) | **3002** | `apps/api/src/main.ts` → `process.env.PORT \|\| 3002` |
+| Database | Railway public proxy | `apps/api/.env` (git-ignored; never printed) |
+| Redis | `6379` | `docker-compose.yml` |
 
-| Module        | Port                 | Enforced by                                           |
-| ------------- | -------------------- | ----------------------------------------------------- |
-| Web (Next.js) | **3001**             | `apps/web/package.json` → `next dev -p 3001`          |
-| API (NestJS)  | **3002**             | `apps/api/src/main.ts` → `process.env.PORT \|\| 3002` |
-| Database      | Railway public proxy | `apps/api/.env` (git-ignored, never printed)          |
-
-A module that defaults to any other port is a bug, because it lets a second
-process quietly squat on the wrong port and produce "phantom" 404s — the exact
-failure `HANDOFF §7.1` documents.
+A workspace that defaults to any other port is a bug. It lets a second process squat on the wrong port and produce “phantom” 404s.
 
 ```powershell
-# List stray listeners on any dev port
+# List listeners on 3000/3001/3002
 pnpm ports
 
-# Kill strays on 3000/3001. Port 3002 is deliberately SKIPPED: a script that
-# kills the API it was just invoked alongside would be unusable.
+# Kill strays on 3000/3001; port 3002 is deliberately skipped
 pnpm ports:kill
 ```
 
-> Note on the kill rule: the governance text says to kill anything occupying
-> `:3001`. `scripts/ports.ps1` implements that, and additionally spares `:3002`
-> so the command can never take down the API it runs next to. This is a
-> deliberate, documented divergence, not an omission.
+`scripts/ports.ps1` spares `:3002` so the command cannot take down the API it was invoked beside. That is intentional.
 
----
+## 2. Branches and production
 
-## 2. No direct push to `master`
+- **Production branch:** `main`. Vercel and Railway deploy from it.
+- **Legacy branch:** `master`. `.husky/pre-push` blocks direct pushes to `master` and points at a feature branch.
+- Do not create new work on `master`.
+- There is no local proof of GitHub branch protection. Confirm the actual rules in the GitHub repository settings before claiming required reviews or protected branches.
 
-`master` is protected. All work lands through a short-lived feature branch and
-a reviewed Pull Request.
+Recommended flow:
 
 ```powershell
-git switch -c feat/<scope>        # e.g. feat/ai-module, fix/refresh-rotation
-# ... work, commit ...
-git push -u origin feat/<scope>   # then open a PR
+git switch -c feat/<scope>
+# ... work, verify, commit ...
+git push -u origin feat/<scope>
+# open a PR, then merge to main
 ```
 
-CI (`typecheck`, `lint`, `test-unit`, `build`, `e2e refs`) must be green before
-merge. Agents create branches the same way — never commit straight to `master`.
-
----
+Direct pushes to `main` have been used for this project's recent releases. If branch protection is enabled later, update this section and the release runbook.
 
 ## 3. Pre-commit gate
 
-`.husky/pre-commit` runs three checks and **refuses the commit** if any fails:
+`.husky/pre-commit` runs three checks and refuses the commit if any fails:
 
-1. `lint-staged` — eslint on staged API sources
-2. `tsc --noEmit` — a **full-project** typecheck (not just staged files), which
-   is what actually catches a duplicate property
-3. `nest build` — validates decorators and the DI graph, which `tsc` does not
+1. `lint-staged` — ESLint on staged API sources.
+2. `tsc --noEmit` — full API typecheck, not just staged files.
+3. `nest build` — validates decorators and the Nest DI graph.
 
-### Why it is scoped instead of running `pnpm build`
-
-A root `pnpm build` runs Turborepo across every workspace, including
-`packages/design-system` — whose `tsup` build has **24 pre-existing errors**
-that predate this work and are explicitly out of scope
-(`docs/HANDOFF.md §5`: _"packages/design-system ... لا تلمسه"_).
-
-Running the root build here would make the hook fail on **every commit,
-forever** — which is how a security gate gets switched off within a week.
-
-`husky init` writes `npm test` by default; that is wrong twice over here: it
-violates the pnpm-only rule, and it fans out to the web suite, which carries 8
-pre-existing failures from the `3001 → 3002` port drift in
-`apps/web/app/lib/api.ts` (`api.test.ts` still asserts `:3001`).
-
-**Verified:** a deliberately duplicated interface property is rejected with
-`error TS2300: Duplicate identifier` and exit code 2; removing it returns the
-typecheck to exit code 0.
-
----
-
-## 4. Ignored files and cleanup
-
-`.gitignore` blocks the log/scratch patterns this repo has historically
-produced (`*.txt`, `*-out.txt`, `build*.txt`, `*.bak`, `*.tsbuildinfo`) plus
-ad-hoc probe scripts. Anything whose only purpose is to prove a run happened
-belongs there, not in a commit — some of those files have held live secrets.
-
-### ⚠️ `git clean -fdX` is destructive here — read before running it
-
-`-X` removes **every git-ignored file**, not just junk. On this repo that
-means it would delete:
-
-- `apps/api/.env` — the live Railway database credentials
-- `node_modules/` — every workspace, requiring a full reinstall
-- `dist/`, `.next/`, `.turbo/` — all build caches
-
-`.env` being git-ignored is precisely why it is _not protected_. Please use a
-targeted cleanup of the specific junk patterns instead, after confirming
-`.env` is untracked:
+The gate is intentionally scoped to the API. It does **not** run the web suite or the root Turborepo build, so those remain required manual checks before a release:
 
 ```powershell
-git check-ignore -v apps/api/.env    # must list .gitignore — proof it is untracked
-git status --short                   # review what is actually there first
+pnpm --filter web test
+pnpm --filter api exec jest --config jest.config.js --runInBand
+pnpm build
 ```
 
-Then delete by explicit pattern, never with `-X`.
+Current expected results: **137/137 web**, **311/311 API**, **4/4 build**.
+
+Older versions of this document claimed the design-system build had 24 pre-existing errors and the web suite had 8 port-drift failures. Those conditions are no longer true at `4951e49`; do not use them to justify skipping gates.
+
+## 4. Commit content
+
+- Commit source, tests, migrations, and documentation.
+- Never commit `.env`, credentials, tokens, database URLs, or provider keys.
+- Never commit generated proof logs, scratch `.txt` files, or screenshot dumps. The root `.gitignore` blocks common log/scratch patterns; `git status` is still the final check.
+- A schema change needs a migration, RLS policies/grants, and a tenant-scoped query review.
+- A webhook change needs signature verification, raw-body handling, replay handling, and a test.
+
+## 5. Ignored files and cleanup
+
+`git clean -fdX` is destructive here. `-X` removes **every** ignored file, including:
+
+- `apps/api/.env` (live database credentials);
+- `node_modules/`;
+- `dist/`, `.next/`, `.turbo/`.
+
+Do not run it. Use a targeted cleanup after checking what is ignored:
+
+```powershell
+git check-ignore -v apps/api/.env
+git status --short
+```
+
+Then delete only the specific scratch files you intend to remove.
+
+## 6. Release evidence
+
+A release note must include:
+
+- commit and branch;
+- web/API test counts;
+- build result;
+- live health check;
+- any migration change;
+- any known gap that changed.
+
+Do not cite CI as green, a provider as live, or RLS as enforcing unless the corresponding run actually happened. The current evidence is in [`STATUS.md`](STATUS.md).

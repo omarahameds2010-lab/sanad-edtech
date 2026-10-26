@@ -13,17 +13,29 @@
 | DB          | PostgreSQL + Prisma ORM                                                                                                                                                                      |
 | Auth        | JWT (short access) + rotating refresh tokens (HttpOnly cookies)                                                                                                                              |
 | Isolation   | Shared DB + `tenant_id` + **PostgreSQL RLS (FORCE ROW LEVEL SECURITY)** — ✅ DB-side complete + runtime injection landed; activation = runtime connects as `app_user` (see Verified Reality) |
-| Cache/Queue | Redis + BullMQ (⚠️ deps installed; no processors/relay wired)                                                                                                                                |
-| Storage     | Cloudflare R2 / S3                                                                                                                                                                           |
-| Video       | Bunny Stream / VdoCipher (initial)                                                                                                                                                           |
-| Payments    | Paymob, Fawry, Vouchers                                                                                                                                                                      |
+| Cache/Queue | Redis + Bull (deps installed; no processors/relay wired)                                                                                                                                     |
+| Storage     | Cloudflare R2 / S3 (signing helpers; not part of verified demo)                                                                                                                              |
+| Video       | Bunny Stream (implemented) / VdoCipher (stub) / unlisted YouTube (current demo)                                                                                                              |
+| Payments    | Paymob, Fawry, Vouchers (live code + local smokes); Instapay/Vodafone/e&money are scaffolding                                                                                                |
 | Monorepo    | pnpm + Turborepo                                                                                                                                                                             |
-| CI/CD       | GitHub Actions                                                                                                                                                                               |
+| CI/CD       | GitHub Actions workflow exists; local tests/build are the release evidence                                                                                                                     |
 | Infra       | Docker + Terraform (later)                                                                                                                                                                   |
 
-## ⚠️ Verified Reality (2026-10-16 Audit) — Read Before Building
+## Current verified release — 2026-10-25
 
-> Full report: `docs/AUDIT-2026-10-16.md`. The claims above describe the intended architecture, not today's runtime. Everything below was verified by reading the code.
+> Canonical document: `docs/CURRENT-STATE.md`. This is the state to use for answers and documentation. Older entries below are an audit trail.
+
+- Production branch `main`; verified app release `4951e49` (later docs-only commits do not change runtime code). Web `https://sanad-edtech.vercel.app`; API `https://sanad-edtech-production.up.railway.app`.
+- `/api/health` = **200**, database **up**; `sanad-demo` has 3 published Arabic prep courses + exam/assignment.
+- Tests: **311/311 API** (31 suites), **137/137 web** (8 files), build **4/4**, `tsc --noEmit` clean.
+- 43 Prisma models, 7 migrations, 138 RLS policies / 43 tables.
+- RLS runtime **inactive** (runtime uses owner/superuser URL); outbox has no dispatcher; no video webhook; no Bull processors.
+- Student curriculum/lesson redesign shipped (Heritage Manuscript); dark default + light mode; session restore on reload.
+- Demo passwords remain in `docs/CURRENT-STATE.md`; this file intentionally does not repeat them.
+
+## ⚠️ Verified Reality (audit trail — current release is above)
+
+> Full report: `docs/AUDIT-2026-10-16.md`. The dated entries below are kept as an audit trail. Use the **Current verified release — 2026-10-25** block above for today's runtime.
 
 **Railway go-live — 2026-10-20 (API is LIVE).** API live at `https://sanad-edtech-production.up.railway.app` — verified `/api/health` **200** (`{"status":"ok","database":"up"}`), teacher login `01000000001` **200**, `/api/tenants/current` → `sanad-demo`, `/api/v1/teacher/courses` → 3 seeded courses. Two root causes fixed:
 1. **Tenant middleware path bug (`9f57ee8`).** `TenantResolverMiddleware` checked `req.path.startsWith("/api/health")` — but Nest mounts `forRoutes("*")` middleware under the global prefix (`app.use("/api/*")`), and Express rewrites `req.path` to `/` inside a wildcard mount. The exemption never matched: every cloud request (including health) hit tenant resolution and 404'd with `Tenant not found` until `tenant_domains` had the host. Fix reads `req.originalUrl` (`apps/api/src/modules/tenants/tenant-resolver.middleware.ts`), regression spec `tenant-resolver.middleware.spec.ts` (4 tests), api suite **311/311**.
@@ -34,6 +46,8 @@
 **Web session persistence — 2026-10-20 (`d2d9258`, `de74f5d`).** The SPA held the access token in React memory only, so every hard reload silently emptied the authenticated pages: the teacher greeting fell back to «أستاذ», KPIs read 0, and the grading queue stayed on «جارٍ قراءة طابور التصحيح…» forever (the effects are gated on `token`). Root cause confirmed in a real browser. `AuthProvider` now restores on mount — `POST /api/auth/refresh` (HttpOnly cookie) → `GET /api/users/me` → state — and exposes a `ready` flag; the teacher layout redirects to `/login` after a failed restore (deny by default) and the student page shows the skeleton until `ready`. The greeting renders `أستاذ ${userName}`. Logout now calls `POST /api/auth/logout` first, because an in-memory logout is undone by the next reload (verified: logout → refresh **401** → `/student` shows «سجّل الدخول أولًا»). Seed names are env-overridable (`DEMO_TEACHER_NAME`, `DEMO_TENANT_NAME`) for a real teacher persona. Browser E2E: login → «صباح الخير، أستاذ صالح حسين» → reload → name + 3 published courses restored; web tests **86/86**; `next build` EXIT 0.
 
 **Student Academic Light Mode — 2026-10-24 (`a60fc3f`, web LIVE).** The student Topbar now has a thin Moon/Sun toggle at the far left. Theme defaults to **dark**, persists in `localStorage` under `sanad:theme`, and is applied pre-paint through `html[data-theme]` (inline bootstrap in `apps/web/app/layout.tsx`, no flash). `ThemeProvider` + `useTheme()` live in `apps/web/app/lib/theme-provider.tsx`; `toggleTheme()` reads the painted DOM attribute before flipping, so the first click after reload works. Every light rule is scoped under `html[data-theme="light"]` in `apps/web/app/globals.css` (parchment `#F7F4EB/#F4EFE3`, emerald `#047857/#065F46`, ivory `#FFFFFF`, hairline `#E4E2DB`, emerald asteroids ≤ 0.04), so the graphite dark register is untouched. No backend, schema, or migration change. Local proof: web tests **101/101**; root `pnpm build` **4/4** after regenerating the stale local Prisma client (no code change); CDP QA at 1440/1000/390 across dashboard, assignment list/runner/result, courses, exams, profile, confirm dialog, and submission theater in both themes with no document-level horizontal overflow. Live: `https://sanad-edtech.vercel.app/login` includes the pre-paint theme script; the deployed production CSS contains `--hl-bg`; `/api/health` **200**.
+
+**Student curriculum / lesson redesign — 2026-10-25 (`4951e49`, web LIVE).** The student course page is now a manuscript-like curriculum board (`/student/courses/[id]`) with real task counts, section/lesson rows, task chips, progress, and direct assignment/exam/lesson links. The lesson workspace (`/student/lessons/[id]`) handles video, exam brief, assignment brief, and locked-video prerequisite state, with dark/light parity and mobile layouts. Browser QA at 1440/1000/390 verified course tasks/links, video lesson, exam brief, assignment brief, locked-video state, and theme toggle; final local evidence: `tsc --noEmit` EXIT 0, web **137/137**, root build **4/4**. This replaces the old “cards on a dark stage” description in earlier notes.
 
 **Seed state (Railway DB):** `pnpm seed:path2` applied with `PROD_TENANT_DOMAINS=sanad-edtech-production.up.railway.app` (teacher `01000000001` / `Joker-Arabic#2026`, student `01000000002` / `Student123!`, 3 Arabic prep courses, exam + assignment). Local `.env` `DATABASE_URL`/`MIGRATION_DATABASE_URL` reach this DB (7/7 migrations). Runtime still connects as the DB owner — **RLS activation (app_user) remains pending**.
 
@@ -57,13 +71,15 @@
 - **Progression unlock types beyond ENTER_*** (COMPLETE_*/PASS_EXAM/SCORE_THRESHOLD/TIME_ELAPSED, per-student MANUAL) are still future extension points; locked lessons still return content in student views (the lock is advisory in presentation — audit §6.2).
 - **Word-level answer↔review highlighting is not persisted yet.** `AssignmentSubmission` stores only `content`, `score`, and `feedback`; the result review links the student answer and teacher review with an honest aggregate bridge. Real per-word evidence spans require a migration-first change to persist and expose the evaluator's `criteria[].evidence` / `knowledge_gaps`; never simulate highlights.
 - **Transactional outbox has no dispatcher** — events are written and never sent.
-- **Payment webhooks work now — including the full round trip** (bundle B, `035a838` + `7ebc124`): HMAC-signed callback → PAID → CONFIRMED → ledger + entitlement + intent SUCCEEDED in ONE transaction; PENDING claims resume; orphan paid events FAIL as `INTENT_NOT_FOUND`; queue rejections cannot crash the API. Live smoke **25/25**; api **276/276**. The checkout funnel is open (`ee766e2` — see above) and refunds/refund-callbacks are live (bundle C, `69063d2` + fixes — see the refunds bullet above): live smoke **26/26**; api **307/307**. Still absent: the video webhook route.
+- **No Bull processors** — Redis/Bull dependencies exist, but no `@Processor`/worker is registered. Reconciliation has models but no live worker.
+- **No video webhook route** — Bunny has a webhook verification helper, not an HTTP endpoint. VdoCipher is a stub. The current demo uses unlisted YouTube, which does not exercise the Bunny token/watermark pipeline.
+- **Payment webhooks work now — including the full round trip** (bundle B, `035a838` + `7ebc124`): HMAC-signed callback → PAID → CONFIRMED → ledger + entitlement + intent SUCCEEDED in ONE transaction; PENDING claims resume; orphan paid events FAIL as `INTENT_NOT_FOUND`; queue rejections cannot crash the API. At the time of bundle B: live smoke **25/25**; api **276/276**. Checkout (`ee766e2`) and refunds (bundle C, `69063d2` + fixes) also landed: live smoke **26/26**. Current suite at `4951e49`: **311/311**. Still absent: the video webhook route.
 - Canonical ports: **web :3001, api :3002** (older docs still say `:3000` in places).
 - Dual jest configs: run API tests as `jest --config jest.config.js` inside `apps/api`.
 
 **Rules that follow:**
 
-1. P0 is closed; P1 isolation core has landed and is verified locally. Remaining P1 = **activate on Railway**: rotate the DB password by hand → apply migrations (`migrate resolve --applied` for the 3 pre-baseline histories, then `migrate deploy`) → point the runtime URL at `app_user` → flip the env preference in `prisma.service.ts`.
+1. P1 isolation core has landed and is verified locally. Remaining P1 = **activate on Railway**: rotate the DB password by hand → apply all 7 migrations (`migrate resolve --applied` only for pre-baseline histories) → point the runtime `DATABASE_URL` at `app_user` → remove/avoid `MIGRATION_DATABASE_URL` in runtime → flip the preference in `prisma.service.ts` → re-run RLS e2e 5/5.
 2. Claims about RLS / flags / outbox / webhooks / progression / funnel & idempotency must cite working code — not intent.
 3. Secrets live only in `.env` (gitignored). Never paste credentials into source, logs, or chat.
 
@@ -86,7 +102,7 @@
 | **Host-header tenant resolution**                               | No hardcoded domains; `tenant_domains` table maps domain → `tenant_id`                  |
 | **Transactional Outbox**                                        | DB commit + event in same transaction → no lost events                                  |
 | **Idempotency keys**                                            | Every financial mutation has unique key → safe retries                                  |
-| **Versioned content (courses/lessons/exams)**                   | Published snapshots never mutate; old attempts point to old versions                    |
+| **Content versioning (planned — not implemented)**             | Publishing currently updates the live row; there is no separate course/lesson/exam version table yet              |
 | **Entitlements separate from feature flags**                    | Entitlements = resource access (per-student); Flags = feature toggles (per-tenant/plan) |
 | **Config over code for tenant customization**                   | Branding, limits, feature toggles via JSON config; no per-tenant code forks             |
 | **Transaction = source of truth**                               | Payment confirmed → ledger + enrollment + outbox in SAME transaction                    |
@@ -104,36 +120,38 @@
 
 ## Code Rules
 
-- Shared code → workspace packages under `packages/` (`@lp/ui`, `@lp/auth`, `@lp/types`, `@lp/event-contracts`)
-- Each package: `package.json` with `"name"`, `"main"`, `"types"`/`"exports"`
-- Root `tsconfig.base.json` + path alias `"@/*": ["apps/api/src/*"]` inside `apps/api`
-- **No `../../../` cross-module imports** — use `@/modules/...` or workspace package imports
-- Prisma models in `apps/api/prisma/schema.prisma`; RLS migration in `prisma/migrations/`
-- Enums in Prisma schema = TypeScript enums (no string unions)
+- Shared code → workspace packages under `packages/` (`@lp/design-system`, `@lp/motion`).
+- Each package: `package.json` with `"name"`, `"main"`, `"types"`/`"exports"`.
+- Each workspace owns its TypeScript config; there is **no root `tsconfig.base.json`**.
+- The API path alias `"@/*": ["src/*"]` lives in `apps/api/tsconfig.json`.
+- **No `../../../` cross-module imports** — use `@/modules/...` or workspace package imports.
+- Prisma models in `apps/api/prisma/schema.prisma`; RLS migration in `prisma/migrations/`.
+- Enums in Prisma schema = TypeScript enums (no string unions).
 
 ## Commands (PowerShell-safe)
 
 ```powershell
-# Install deps (run from repo root)
+# Install deps (repo root)
 pnpm install
 
-# Generate Prisma client (run from apps/api)
-cd apps/api; npx prisma generate
+# Generate Prisma client (from apps/api)
+cd apps/api; pnpm exec prisma generate
 
-# Build all
+# Build all (repo root)
 pnpm build
 
 # Run API in dev (from apps/api)
 cd apps/api; pnpm run dev
 
-# Docker compose (from repo root)
+# Docker compose (repo root)
 docker compose up -d
 
 # Prisma migrate (from apps/api)
-cd apps/api; npx prisma migrate dev --name <name>
+cd apps/api; pnpm exec prisma migrate dev --name <name>
 
 # Tests
-pnpm test
+pnpm --filter web test
+pnpm --filter api exec jest --config jest.config.js --runInBand
 ```
 
 ## Working Agreement
@@ -144,64 +162,42 @@ pnpm test
 - **Never claim success without `pnpm build` passing and showing output**
 - Prefer small PRs over big rewrites
 
-## LMS Core Requirements (New Phase)
+## LMS Core — Verified Behavior
 
-### Content Progression System
+### Progression by entry
 
-- **Progression by Entry** (not score-based):
-  - ENTER_ASSIGNMENT → unlock EXAM
-  - ENTER_EXAM → unlock NEXT LESSON
-- **Assignment Timer**: 300 minutes (5 hours) default
-- **Exam Timer**: 70 minutes default
-- No score-based unlocking, no pass requirements for progression
-- Timer is server-authoritative (expiresAt is source of truth)
+- **ENTER_ASSIGNMENT** unlocks the linked exam lesson.
+- **ENTER_EXAM** unlocks the next lesson.
+- No score-based prerequisite and no pass requirement.
+- Only these two unlock types are active. `COMPLETE_*`, `PASS_EXAM`, `SCORE_THRESHOLD`, `TIME_ELAPSED`, and manual unlocks are extension points.
+- Grants are server-side, per student, stored in `student_lesson_unlocks`, and protected by `@@unique([tenantId, userId, lessonId])`.
+- The frontend never decides lock state and the API never accepts a client-supplied unlocked state.
 
-### Assignment Rules
+### Assignment timer and submission
 
-- Timer starts at `startedAt = server time`, `expiresAt = startedAt + configured duration`
-- Frontend only displays remaining time (never source of truth)
-- Attempt lifecycle: IN_PROGRESS → SUBMITTED / EXPIRED / CANCELLED → GRADED
-- Maximum attempts per assignment configurable
-- Teacher grading flow: Submission → Graded (score + feedback)
+- Default timer: **300 minutes (5 hours)**; configurable per assignment, maximum 10,080 minutes.
+- Starting an assignment creates an `AssignmentSubmission` row; its server-set `submittedAt` is the timer start.
+- `expiresAt` is derived as `submittedAt + timerMinutes`; it is not a stored column.
+- The frontend displays only derived remaining time. Refresh/resume returns the same row.
+- Statuses are `SUBMITTED`, `LATE`, `REJECTED`, `GRADED`, `RETURNED`.
+- `allowLateSubmission` is enforced on submit; teacher grading writes score + feedback.
+- **Current limitation:** `@@unique([assignmentId, studentId])` gives one submission row per student/assignment, so `maxAttempts` does not yet provide working retakes.
 
-### Exam Rules
+### Exam timer and attempt
 
-- Default timer: 70 minutes (4200 seconds)
-- Server-authoritative timer (expiresAt is authoritative)
-- Attempt states: IN_PROGRESS, SUBMITTED, GRADED, EXPIRED, CANCELLED
-- Auto-submit on expiration
-- Question types: MCQ, TRUE_FALSE, SHORT_ANSWER, ESSAY, MATCHING
-- Never expose correct answers to students
+- Default timer: **70 minutes (4,200 seconds)**.
+- `expiresAt` is derived from `startedAt + timerMinutes`; no `expiresAt` column exists on `ExamAttempt`.
+- Actual states: `IN_PROGRESS`, `SUBMITTED`, `GRADED`, `TIMED_OUT`, `CANCELLED`.
+- The student client auto-submits when the timer reaches zero. The API records a late submission as `TIMED_OUT`; there is no background auto-submit worker.
+- Question types: MCQ, TRUE_FALSE, SHORT_ANSWER, ESSAY, MATCHING.
+- Correct answers are never returned in the student exam view.
+- On refresh, the timer is recomputed from `startedAt`; the server clock is authoritative.
 
-### Assignment/Exam Progression Rules
+### Assignment/exam progression rules
 
-- ENTER_ASSIGNMENT → unlock linked Exam
-- ENTER_EXAM → unlock NEXT LESSON
-- No score/pass requirements for progression
-- Future unlock types: COMPLETE_ASSIGNMENT, COMPLETE_EXAM, PASS_EXAM, SCORE_THRESHOLD, TIME_ELAPSED, MANUAL
-
-### Assignment Timer
-
-- Default: 300 minutes (5 hours / 18000 seconds)
-- Server-authoritative: `expiresAt = startedAt + configured duration`
-- Frontend displays remaining time only (derived from expiresAt)
-- Refresh/browser restart must NOT reset timer
-
-### Exam Timer
-
-- Default: 70 minutes (4200 seconds)
-- Server-authoritative: `expiresAt = startedAt + configured duration`
-- On refresh: expiresAt unchanged
-- On browser clock manipulation: server time authoritative
-
-### Content Progression System
-
-- **Progression by Entry** (not completion):
-  - ENTER_ASSIGNMENT → unlock EXAM
-  - ENTER_EXAM → unlock NEXT LESSON
-- No score-based prerequisites
-- No complex prerequisite engine
-- Timer starts on ENTER, not on page load
+- `ENTER_ASSIGNMENT` unlocks the linked exam.
+- `ENTER_EXAM` unlocks the next lesson.
+- No score or pass requirement is attached to progression.
 
 ### Content Unlock Security
 
@@ -224,32 +220,44 @@ pnpm test
 
 ## Repo Structure
 
-```
+```text
 learning-platform/
 ├── AGENTS.md                    ← this file
+├── README.md                    ← public overview
+├── SECURITY.md                  ← vulnerability reporting
 ├── docs/
-│   ├── ARCHITECTURE.md
-│   ├── VIDEO_PROTECTION.md
-│   ├── SECURITY.md
-│   └── STATUS.md
+│   ├── CURRENT-STATE.md         ← canonical verified snapshot
+│   ├── STATUS.md                ← short status dashboard
+│   ├── ARCHITECTURE.md          ← current runtime architecture
+│   ├── DEPLOY.md                ← Vercel/Railway/RLS runbook
+│   ├── SECURITY.md              ← threat model and controls
+│   ├── VISUAL_IDENTITY.md       ← design system / Heritage Manuscript
+│   ├── COMMAND-CENTER.md        ← student dashboard contract
+│   ├── VIDEO_PROTECTION.md      ← video protection spec + limits
+│   ├── DEMO.md                  ← demo runbook
+│   ├── DEMO-SCRIPT.md           ← honest demo script
+│   ├── GOVERNANCE.md            ← ports/branches/commit gates
+│   ├── PROJECT_STATE.md         ← Arabic status brief
+│   └── AUDIT-2026-10-16.md      ← historical audit (dated snapshot)
 ├── turbo.json
 ├── pnpm-workspace.yaml
 ├── package.json
-├── .env.example
-├── .gitignore
+├── Dockerfile                   ← Railway API build
+├── railway.json                 ← DOCKERFILE builder
+├── docker-compose.yml           ← local PostgreSQL + Redis
 ├── apps/
-│   ├── api/                     ← NestJS API
+│   ├── api/                     ← NestJS 10 API
 │   │   ├── prisma/
 │   │   │   ├── schema.prisma
-│   │   │   └── migrations/
-│   │   └── src/
-│   └── web/                     ← Next.js (later)
+│   │   │   └── migrations/      ← 7 migrations
+│   │   └── src/modules/         ← 13 domain modules
+│   └── web/                     ← Next.js 15 App Router
+│       └── app/                 ← 35 pages, student/teacher/public
 ├── packages/
-│   ├── ui/                      ← shared UI components
-│   ├── auth/                    ← shared auth utilities
-│   ├── types/                   ← shared TypeScript types
-│   └── event-contracts/         ← domain event schemas
-└── docker-compose.yml
+│   ├── design-system/           ← @lp/design-system tokens
+│   └── motion/                  ← @lp/motion tokens
+├── docker/postgres/init/        ← local app_user bootstrap
+└── scripts/                     ← ports/dev helpers
 ```
 
 ## Key Files to Know
@@ -266,10 +274,15 @@ learning-platform/
 | `apps/api/src/modules/entitlements/entitlements.service.ts`          | Entitlement grants/checks                                                                                                                                                      |
 | `apps/api/src/modules/video-protection/services/watermark-engine.ts` | Deterministic watermark positions                                                                                                                                              |
 | `apps/api/src/modules/payments/payment-orchestrator.service.ts`      | Order → Intent → Provider → Ledger flow                                                                                                                                        |
-| `docs/AUDIT-2026-10-16.md`                                           | Latest verified reality (2026-10-16) — read before trusting any other doc                                                                                                      |
+| `docs/CURRENT-STATE.md`                                              | Canonical current state — release, tests, shipped surface, known gaps                                                                                                          |
+| `docs/STATUS.md`                                                     | Short status dashboard and acceptance criteria for open gaps                                                                                                                  |
+| `docs/DEPLOY.md`                                                     | Vercel/Railway deployment, migrations, RLS activation runbook                                                                                                                 |
+| `docs/AUDIT-2026-10-16.md`                                           | Historical audit (dated snapshot) — use `CURRENT-STATE.md` for current claims                                                                                                 |
 | `apps/web/app/lib/dashboard.ts`                                      | Pure dashboard math for `/student` (progress, stats, streak, badges, agenda) — 26 unit tests in `dashboard.test.ts`                                                            |
 | `apps/web/app/lib/theme.ts` + `theme-provider.tsx`                   | Theme key/bootstrap + provider/toggle; all light rules live in `apps/web/app/globals.css` under `html[data-theme="light"]`                                                     |
 | `apps/web/app/student/components/command-center/widgets.tsx`         | Student Command Center widgets — every number derives from server payloads; no mock/fabricated data                                                                            |
+| `apps/web/app/student/courses/[id]/`                                 | Heritage Manuscript curriculum board — real task counts, task chips, progress, direct links                                                                                    |
+| `apps/web/app/student/lessons/[id]/`                                 | Lesson workspace — video, exam brief, assignment brief, locked-video prerequisite state                                                                                       |
 | `docs/COMMAND-CENTER.md`                                             | Student Command Center spec — data sources, design rules, focus mode, deferred widgets                                                                                         |
 
 ---

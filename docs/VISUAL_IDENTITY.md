@@ -19,12 +19,30 @@
 
 ### *Do NOT build "a nice LMS." Build a recognizable digital learning brand.*
 
-[![Design Tokens](https://img.shields.io/badge/Tokens-CSS_plus_TS-8B5CF6?style=for-the-badge&logo=css3&logoColor=white)](../../packages/design-system/tokens.css)
+[![Design Tokens](https://img.shields.io/badge/Tokens-CSS_plus_TS-8B5CF6?style=for-the-badge&logo=css3&logoColor=white)](../packages/design-system/tokens.css)
 [![Motion](https://img.shields.io/badge/Motion-Language-EC4899?style=for-the-badge&logo=framer&logoColor=white)](#-motion--interaction-system)
 [![RTL First](https://img.shields.io/badge/RTL-First-059669?style=for-the-badge)](#-rtl-motion)
 [![A11y](https://img.shields.io/badge/A11y-WCAG_AA-2563EB?style=for-the-badge)](#-animation-and-accessibility)
 [![Reduced Motion](https://img.shields.io/badge/Reduced_Motion-Respected-6B7280?style=for-the-badge)](#-reduced-motion)
 [![Subjects](https://img.shields.io/badge/Subjects-6_DNA-F59E0B?style=for-the-badge)](#-subject-visual-dna)
+
+> **Current implementation — 25 October 2026.** This document is a large design specification. Treat unbuilt sections as specifications, not shipped UI.
+>
+> **Shipped now**
+>
+> - RTL-first student and teacher surfaces; 35 App Router pages.
+> - Dark theme by default; optional Academic Light Mode (“Heritage Manuscript”) across student surfaces, persisted under `sanad:theme` and applied before paint.
+> - Student curriculum board and lesson workspace (`lc-*` surfaces) with real API data, task chips, progress, and locked/available states.
+> - Student Command Center (`cc-*`, `sd-*`) with server-derived numbers.
+> - Arabic-first typography (`IBM Plex Sans Arabic`, `Inter` fallback) and the parchment/emerald token set in `apps/web/app/globals.css`.
+>
+> **Not shipped / do not present as current**
+>
+> - Six subject DNA systems and the full 100-motion catalogue.
+> - Storybook, RUM, the full SANAD output card, and the teacher-portal shared-element transition.
+> - Full dark marketing pages; the verified theme coverage is the app surfaces.
+>
+> The canonical runtime/test state is in [`CURRENT-STATE.md`](CURRENT-STATE.md).
 
 ---
 
@@ -55,7 +73,7 @@
 
 ---
 
-### 🎯 P0 SCOPE (LOCKED — DO NOT EXPAND WITHOUT ADR)
+### 🎯 P0 SCOPE (HISTORICAL PLAN — DO NOT EXPAND WITHOUT ADR)
 
 > The user locked P0. Building 6 subjects × 6 visual systems × 6 motion systems now = death by scope.
 > Prove the **architecture** with ONE real tenant + THREE signatures. The rest stays documented.
@@ -91,6 +109,72 @@ P0 IMPLEMENTATION
 | Reduced-motion baseline | GSAP hero choreography (P1), Lenis (P1) |
 
 **Demo narrative:** *"We don't build a different platform for every teacher. We have ONE learning universe that adapts its identity without changing its core system."*
+
+---
+
+## CURRENT SHIPPED DESIGN — HERITAGE MANUSCRIPT (25 Oct 2026)
+
+This section supersedes older “P0 next commits” language where it disagrees. It describes what a user can actually see in the deployed build.
+
+### A. Two registers, one system
+
+| Register | Surface | Tokens |
+| --- | --- | --- |
+| Graphite (default) | App shell, student dashboard, curriculum, lesson, exam/assignment runner | `ink-950` background, glass cards, emerald action accent |
+| Heritage Manuscript (light) | Same student surfaces after the Moon/Sun toggle | parchment `#F7F4EB` / `#F4EFE3`, ink text, emerald `#047857` / `#065F46`, ivory `#FFFFFF`, hairline `#E4E2DB` |
+
+- Theme is applied before paint via the inline bootstrap in `apps/web/app/layout.tsx`.
+- Default is **dark**; a saved `sanad:theme=light` wins.
+- All light rules live under `html[data-theme="light"]` in `apps/web/app/globals.css`.
+- Emerald asteroids/glows are capped at low opacity in light mode so the parchment stays readable.
+
+### B. Typography and geometry
+
+- Arabic: `IBM Plex Sans Arabic`, with `Inter`/system fallback for Latin.
+- Type scale: 6 steps, no ad-hoc sizes.
+- Cards: 1px hairline, 20–32px radius, restrained shadow; no neon or gradient text.
+- Icons: line icons with consistent stroke; no emoji in product UI.
+- RTL: logical properties (`padding-inline`, `border-inline-start`, `inset-inline-end`) rather than left/right hacks.
+
+### C. Student curriculum board (`/student/courses/[id]`)
+
+- A manuscript-like hero: course title, progress, section/lesson/task counts.
+- Sections read as chapters; lessons as rows with real task chips (video, assignment, exam).
+- Available/locked state and progress come from the API, never from a local mock.
+- Direct task links preserve the course context.
+- Responsive: the rail collapses below the content on narrow screens; no document-level horizontal scroll.
+
+### D. Lesson workspace (`/student/lessons/[id]`)
+
+- A cinematic player for video lessons, with a lesson rail beside it.
+- Exam lessons show a brief with question count, timer, and attempts.
+- Assignment lessons show the brief, timer, and entry action.
+- Locked video prerequisite state is explicit and explains what unlocks it.
+- The workspace uses the same two-register theme system as the curriculum.
+
+### E. Student Command Center
+
+- The dashboard is a bento of server-derived widgets: progress orbit, stats, resume, agenda, signal chart, passports, badges, feedback.
+- Focus Mode and the command palette are part of the shipped interaction model.
+- The dock carries the theme toggle and command trigger.
+
+### F. Evidence
+
+- Web suite: **137/137**, including **26** dashboard math tests and **36** curriculum tests.
+- Monorepo build: **4/4**.
+- Live browser QA at 1440/1000/390 widths across dashboard, curriculum, lesson, assignment, exam, profile, confirm dialog, and both themes, with no document-level horizontal overflow.
+- Deployed at `4951e49`.
+
+### G. Explicitly not shipped
+
+- Six subject DNA galleries.
+- The full 100-motion catalogue and Storybook.
+- Shared-element teacher-card → teacher-space transition.
+- SANAD output card as a live student surface.
+- RUM/performance dashboards.
+- Full dark marketing pages.
+
+If a section below describes one of these, it is a specification for future work.
 
 ---
 
@@ -4938,7 +5022,7 @@ Graduation: review bank (L3) used correctly on someone else's PR (kind + firm).
 [ ] P0 box locked + H worked example + I2 run sheet + J1 migration + L2 demo script
 [ ] S1 semantic code + R reduced code + H2 SVG snippets all copy-paste valid
 [ ] Zero dead placeholders (no P2/P3-style markers remain — verify by grep)
-[ ] Changelog current (v2.0) · footer counts honest · pushed to master
+[ ] Changelog current (v2.0) · footer counts honest · pushed to main
 ```
 
 ## P3. VERIFICATION COMMANDS (Run Before Marking Done)
@@ -4967,7 +5051,7 @@ Unsigned roles = unreviewed surfaces. No signature, no ship.
 [ ] P0 box locked + H worked example + I2 run sheet + J1 migration + L2 demo script
 [ ] S1 semantic code + R reduced code + H2 SVG snippets all copy-paste valid
 [ ] Zero dead placeholders (no P2/P3-style markers remain — verify by grep)
-[ ] Changelog current (v2.0) · footer counts honest · pushed to master
+[ ] Changelog current (v2.0) · footer counts honest · pushed to main
 ```
 
 ---

@@ -1,632 +1,258 @@
-# Learning Platform Architecture
+# Architecture — Learning Platform
 
-## Overview
-Multi-tenant white-label learning platform for Egyptian teachers. One core platform serves many teachers (tenants) with isolated data, branding, courses, students, payments, and analytics.
+> **Current runtime architecture, verified 25 October 2026.** This replaces the older aspirational architecture notes. For exact release/test facts see [`CURRENT-STATE.md`](CURRENT-STATE.md). For deployment steps see [`DEPLOY.md`](DEPLOY.md).
 
-## High-Level Architecture
+## 1. System shape
 
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                              INTERNET                                       │
-└─────────────────────────────────────────────────────────────────────────────┘
-                                     │
-                            ┌────────▼────────┐
-                            │   Cloudflare    │
-                            │  CDN + WAF +    │
-                            │  DNS + DDoS     │
-                            └────────┬────────┘
-                                     │
-              ┌──────────────────────┼──────────────────────┐
-              │                      │                      │
-         Static Assets           API / Web              Video CDN
-              │                      │                      │
-              ▼                      ▼                      ▼
-         CDN Cache            Next.js + NestJS         Bunny Stream /
-                              (Modular Monolith)       VdoCipher
-```
+```mermaid
+flowchart TB
+    subgraph Client
+        B[Browser / RTL React UI]
+    end
 
-## Technology Stack
+    subgraph Vercel
+        W[Next.js 15 App Router]
+    end
 
-| Layer | Technology |
-|-------|------------|
-| Web | Next.js 16 + App Router + TypeScript |
-| API | NestJS 10 (Modular Monolith) |
-| Database | PostgreSQL 15 + Prisma ORM |
-| Auth | JWT (15min access) + Rotating Refresh Tokens (HttpOnly cookies) |
-| Isolation | Shared DB + `tenant_id` + **PostgreSQL RLS (FORCE ROW LEVEL SECURITY)** |
-| Cache/Queue | Redis 7 + BullMQ |
-| Storage | Cloudflare R2 / S3 |
-| Video | Bunny Stream (primary) / VdoCipher (stub) |
-| Payments | Paymob, Fawry, Vouchers |
-| Monorepo | pnpm + Turborepo |
-| CI/CD | GitHub Actions |
-| Infra | Docker + Terraform (planned) |
-| Monitoring | Prometheus + Grafana + Sentry (planned) |
+    subgraph Railway
+        A[NestJS 10 API]
+        P[(PostgreSQL)]
+        R[(Redis)]
+    end
 
-## Core Architectural Principles
-
-### 1. Modular Monolith First
-Not microservices from day one. Modules are isolated with clear boundaries. Extract to services only when operationally justified (independent scaling, different runtime, team ownership).
-
-### 2. Multi-Tenancy via Shared DB + RLS
-- Single PostgreSQL database
-- Every tenant-scoped table has `tenant_id` column
-- **PostgreSQL Row Level Security (RLS)** enforced at database level
-- `FORCE ROW LEVEL SECURITY` on all tenant-scoped tables
-- Runtime user `app_user` has **no BYPASSRLS** privilege
-- Tenant context set via `set_config('app.tenant_id', ..., true)` per transaction
-
-### 3. Defense in Depth
-```
-Host Header → Tenant Resolution → Auth → Authorization → RLS → Database
-```
-No single layer is trusted. Even if application code has a bug, RLS is the last line of defense.
-
-### 4. Transactional Outbox Pattern
-All domain events written to `outbox_events` table in same transaction as business data. Separate worker publishes to message bus. No lost events.
-
-### 5. Idempotency Keys
-Every financial mutation requires `Idempotency-Key` header. 24h TTL. Prevents duplicate charges, enrollments, refunds.
-
-### 6. Versioned Content
-Courses, Lessons, Exams are immutable once published. Each publish creates a new version. Student attempts reference the exact version they started.
-
-### 7. Entitlements ≠ Feature Flags
-- **Entitlements**: Per-student resource access (granted by purchase/voucher/subscription)
-- **Feature Flags**: Per-tenant feature toggles (plan rules + tenant overrides)
-
-## Module Structure
-
-```
-apps/api/src/modules/
-├── tenants/           # Tenant resolution, config, domains
-├── auth/              # JWT, refresh tokens, login/register
-├── users/             # User management, devices, sessions
-├── authorization/     # PolicyEngine, Guards, Decorators
-├── entitlements/      # Resource access grants
-├── feature-flags/     # Plan rules + tenant overrides
-├── plans/             # Pricing tiers, subscriptions
-├── courses/           # Courses, sections, lessons
-├── exams/             # Exams, questions, attempts
-├── payments/          # Orders, payments, refunds, vouchers, ledger
-├── video/             # Video upload, streaming, providers
-├── video-protection/  # Watermark, tokens, sessions, risk
-├── entitlements/      # Resource access grants
-├── feature-flags/     # Feature toggles
-├── plans/             # Pricing & subscriptions
-├── video/             # Video management
-├── video-protection/  # Security layer
-├── payments/          # Payments & billing
-├── audit/             # Audit logging
-├── outbox/            # Transactional outbox
-├── notifications/     # (planned)
-├── analytics/         # (planned)
-└── ...
+    B -->|HTTPS| W
+    W -->|same-origin /api rewrite| A
+    A -->|Prisma 5.22| P
+    A -.->|dependencies present; no processors| R
+    A -->|signed checkout| PAY[Paymob / Fawry]
+    A -->|upload/sign| BUN[Bunny Stream]
+    B -->|unlisted embed| YT[YouTube]
+    PAY -->|HMAC webhook| A
 ```
 
-## Database Design
+- **Web:** Next.js 15, React 19, App Router, RTL-first.
+- **API:** NestJS 10 modular monolith, global prefix `/api`.
+- **DB:** PostgreSQL + Prisma, shared schema with `tenantId` on every tenant-owned row.
+- **Cache/jobs:** Redis and Bull dependencies exist, but no processors are registered.
+- **Deploy:** Vercel (web) + Railway (API/PostgreSQL), root `Dockerfile` for the API.
 
-### Core Models
-- **Tenant**: Root aggregate, owns all data
-- **User**: Scoped to tenant, roles (STUDENT, TEACHER, ADMIN, PARENT, SUPER_ADMIN)
-- **Course/Section/Lesson**: Hierarchical content with versioning
-- **Enrollment**: Student ↔ Course with dates, status
-- **Exam/Question/Attempt**: Versioned exams with attempts
-- **Video**: Provider-abstracted, status machine (UPLOADING→PROCESSING→READY→PUBLISHED)
+## 2. Modules
 
-### RLS Policy Pattern
-```sql
-ALTER TABLE table_name ENABLE ROW LEVEL SECURITY;
-CREATE POLICY policy_name ON table_name
-  FOR SELECT USING (current_setting('app.tenant_id', true) = tenant_id::text);
--- Repeat for INSERT, UPDATE, DELETE
-```
-All tenant-scoped tables have `FORCE ROW LEVEL SECURITY`.
+`apps/api/src/modules/` contains 13 domain modules:
 
-### Runtime User
-- `app_user` role: LOGIN, no SUPERUSER, no BYPASSRLS
-- Grants: SELECT, INSERT, UPDATE, DELETE on tenant-scoped tables only
-- Migration user (`postgres`) used ONLY for `prisma migrate`
+| Module | Responsibility |
+| --- | --- |
+| `tenants` | Host resolution, tenant config, Prisma tenant-context proxy |
+| `auth` | Login/register, JWT access cookie, rotating refresh sessions, cookie policy |
+| `authorization` | Policy engine, guards, `@RequirePermission` |
+| `users` | Profiles and user administration |
+| `courses` | Courses, sections, lessons, resources, assignments, exams, progress, progression, public/student views, publishing |
+| `entitlements` | Resource access grants/checks, separate from feature flags |
+| `feature-flags` | Tenant/plan feature toggles |
+| `plans` | Plans and subscriptions |
+| `payments` | Orders, intents, providers, ledger, refunds, webhooks, idempotency |
+| `video` | Video records, provider abstraction, YouTube attach, upload/signing |
+| `video-protection` | Signed playback tokens, watermark engine, playback sessions |
+| `audit` | Audit and security event writes |
+| `outbox` | Transactional event rows (no dispatcher) |
 
-## Payment Architecture
+The `courses` module contains subfolders for assignments, exams, lessons, resources, enrollments, progress, and progression; they are not separate top-level Nest modules.
 
-### Provider Abstraction
-```typescript
-interface PaymentProvider {
-  createPayment(input): Promise<CreatePaymentResult>;
-  getPaymentStatus(input): Promise<PaymentStatus>;
-  verifyPayment(input): Promise<PaymentStatus>;
-  refund?(input): Promise<RefundResult>;
-  verifyWebhook(payload, headers): Promise<boolean>;
-}
-```
+The module list is the source of truth; older diagrams that show a separate AI/RAG service inside this repo are inaccurate. The SANAD evaluation call is an HTTP client to an external service.
 
-### Implemented Providers
-- **Paymob**: Hosted checkout, HMAC webhook verification
-- **Fawry**: Charge/status/refund, signature verification
-- **Voucher**: Atomic redeem (codeHash + FOR UPDATE), course entitlements
-- **Instapay/Vodafone Cash/e& money**: Stubs (official integration pending)
+## 3. Request lifecycle
 
-### Orchestration Flow
-```
-Order → PaymentIntent → Provider → Verified Webhook →
-  Payment = PAID → Ledger + Enrollment + Outbox Events
-```
-
-### Ledger (Double-Entry)
-```
-Payment PAID:
-  DEBIT: PLATFORM_RECEIVABLE
-  CREDIT: CUSTOMER_CLEARING
-
-Refund:
-  CREDIT: PLATFORM_RECEIVABLE
-  DEBIT: CUSTOMER_CLEARING
-
-Settlement:
-  DEBIT: PLATFORM_CASH
-  CREDIT: TEACHER_PAYABLE
+```text
+Request
+  → Next.js page/rewrite
+  → TenantResolverMiddleware
+      host → tenant_domains lookup (SECURITY DEFINER)
+      → AsyncLocalStorage tenant scope
+  → JwtAuthGuard (access cookie)
+  → AuthorizationGuard + @RequirePermission
+  → Controller/DTO validation
+  → Domain service
+      → PrismaService extended client
+          → short transaction
+          → set_config('app.tenant_id', <id>, true)
+          → query/update
+      → audit/outbox writes (same transaction where required)
+  → JSON response
 ```
 
-### Reconciliation
-Daily job compares internal state vs provider state. Mismatches → investigation queue. No auto-correction.
+### Tenant resolution details
 
-## Video Architecture
+- Host is taken from the `Host` header; the port is stripped.
+- `health` and `ready` are exempt.
+- The lookup uses `app_resolve_tenant_by_domain`, a `SECURITY DEFINER` function, because the request has no tenant context yet.
+- Resolved tenant ids are cached briefly in the middleware; the tenant context is still set per request.
+- JWT `tenantId` is checked against the host-resolved tenant. A mismatch is rejected.
 
-### Provider Abstraction
-```typescript
-interface VideoProvider {
-  createUpload(input): Promise<CreateUploadResult>;  // Direct upload URL
-  getStatus(videoId): Promise<VideoStatusResult>;
-  getPlaybackToken(videoId, sessionId, tenantId, studentId): Promise<PlaybackTokenResult>;
-  deleteVideo(videoId): Promise<DeleteVideoResult>;
-  handleWebhook(payload): Promise<void>;
-  verifyWebhook(payload, headers): Promise<boolean>;
-}
+### Prisma tenant context
+
+`PrismaService` returns an extended client. Each operation runs inside a short transaction with `set_config(..., true)` so the setting cannot leak through connection pooling.
+
+Interactive `$transaction` callbacks are not automatically wrapped; those sites call `applyTenantContext(tx)` explicitly.
+
+### RLS status
+
+The database side is installed:
+
+- 7 migrations;
+- 43 application tables;
+- 138 policies;
+- `FORCE ROW LEVEL SECURITY` on application tables;
+- `app_user` role created by the bootstrap.
+
+The runtime side is **not active** on Railway yet: `PrismaService` selects `MIGRATION_DATABASE_URL` before `DATABASE_URL`, and the deployed service uses the migration/owner URL. A table owner with `FORCE` still obeys RLS, but a superuser bypasses it; in either case the intended non-owner role is not in use.
+
+**Therefore:** application-level `tenantId` filters are still required on every query. See `docs/DEPLOY.md` for activation.
+
+## 4. Data model
+
+43 Prisma models, grouped:
+
+| Group | Models |
+| --- | --- |
+| Tenancy | `Tenant`, `TenantDomain`, `TenantConfig` |
+| Identity | `User`, `Device`, `Session` |
+| Content | `Course`, `Section`, `Lesson`, `Resource`, `Video` |
+| Learning | `Enrollment`, `LessonProgress`, `StudentLessonUnlock`, `Assignment`, `AssignmentSubmission`, `Exam`, `ExamQuestion`, `ExamAttempt` |
+| Access | `Entitlement`, `Subscription` (feature flags are stored in tenant/plan config; there is no separate `FeatureFlag` model) |
+| Money | `Order`, `OrderItem`, `PaymentIntent`, `Payment`, `PaymentAttempt`, `Refund`, `LedgerEntry`, `Voucher`, `VoucherRedemption`, `Settlement`, `SettlementItem`, `ReconciliationRun`, `ReconciliationItem`, `PaymentRiskEvent`, `PaymentAuditLog` |
+| Platform | `AuditLog`, `SecurityEvent`, `OutboxEvent`, `WebhookEvent`, `IdempotencyKey` |
+| Video | `PlaybackSession`, `CaptureEvent` |
+
+Enums are Prisma enums and are used as TypeScript enums (no string unions for domain states).
+
+Money columns are stored in minor units and serialized as strings. The global JSON patch in `apps/api/src/common/serialization/json.ts` prevents `BigInt` serialization failures.
+
+## 5. Auth and sessions
+
+- Password hashing: Argon2id.
+- Access token: JWT, 15 minutes by default, delivered in an HttpOnly cookie.
+- Refresh token: 32 random bytes, opaque, HttpOnly cookie, hashed at rest, rotated on use.
+- The SPA keeps only the access token in React memory.
+- On mount, `AuthProvider` calls `POST /api/auth/refresh` and then `GET /api/users/me`; protected routes wait for `ready`.
+- Logout revokes the refresh family and clears cookies.
+- CSRF: origin-checking guard for browser mutations; `ALLOWED_ORIGINS` is required in production.
+- JWT `tenantId` is bound to the request host tenant.
+
+## 6. LMS domain
+
+### Content
+
+`Course → Section → Lesson → Resource`. Lessons can be `VIDEO`, `EXAM`, or `ASSIGNMENT`. Publishing changes the current row; there is **no separate content version/snapshot table yet**, so old attempts are not guaranteed to point at an immutable content version.
+
+### Attempts
+
+Assignment and exam timers are server-owned, but the two models differ:
+
+- **Assignment:** starting creates an `AssignmentSubmission`; its server-set `submittedAt` is the timer start. `expiresAt` is derived (`submittedAt + timerMinutes`) and is not stored in a column. The unique `(assignmentId, studentId)` constraint currently allows one submission row, so the `maxAttempts` field does not yet enable retakes.
+- **Exam:** `ExamAttempt.startedAt` is the timer start. `expiresAt` is derived (`startedAt + timerMinutes`) and is not stored in a column.
+- The UI only displays remaining time; refresh does not extend it.
+- Expiration is computed server-side. The exam client auto-submits at zero; the API records a late submit as `TIMED_OUT`. No background auto-submit worker is registered.
+- Submissions are idempotent.
+
+Default durations: assignments **300 minutes**, exams **70 minutes**.
+
+### Progression
+
+Active rules:
+
+```text
+ENTER_ASSIGNMENT → unlock the linked exam lesson for that student
+ENTER_EXAM       → unlock the next lesson for that student
 ```
 
-### Implemented Providers
-- **BunnyStreamProvider**: TUS direct upload, HMAC webhook, JWT playback tokens
-- **VdoCipherProvider**: Stub (official integration pending)
+`StudentLessonUnlock` has a unique `(tenantId, userId, lessonId)` constraint. The grants are written in one transaction with `createMany` + `skipDuplicates`, so retries are idempotent. The enter response includes the resulting `unlocked` state.
 
-### Video State Machine
-```
-UPLOADING → PROCESSING → READY → PUBLISHED
-                ↓
-              FAILED → (retry or manual)
-```
+Future unlock types are not active. Locks are currently advisory in student content views: locked lessons can still return content. Do not claim server-enforced lock confidentiality until that is fixed.
 
-### Security Layers
-1. **Direct Upload**: Browser → Provider (TUS), never through API
-2. **Quotas**: Per-tenant max file size & stored hours (enforced before upload URL)
-3. **Playback Token**: Short-lived JWT (2h), bound to session + student
-4. **Watermark**: Deterministic HMAC-signed payload (name, phone, studentId, tenant), position via `mulberry32` PRNG
-5. **Session Binding**: Device fingerprint, single active session, heartbeat risk scoring
-6. **Capture Detection**: Screenshot, recording, watermark tamper, focus loss, devtools
-7. **Risk Engine**: LOW/MEDIUM/HIGH/CRITICAL → allow/challenge/revoke
+## 7. Payments
 
-### Watermark Algorithm
-- **Payload**: `studentName|studentPhone|studentId|tenantName|enrollmentId|issuedAt|expiresAt|seed`
-- **Signature**: HMAC-SHA256 with `VIDEO_WATERMARK_HMAC_SECRET`
-- **Positions**: `mulberry32` PRNG seeded per session, changes every 7s in safe zones (4-60% x, 6-82% y)
-- **Client**: React overlay with tamper detection (MutationObserver + interval check)
-
-## Security Implementation
-
-### Authentication
-- Access Token: 15min JWT (RS256), in memory
-- Refresh Token: 7d, rotating, HttpOnly Secure cookie, reuse detection → revoke family
-- Argon2id password hashing
-- Device fingerprint tracking
-
-### Authorization
-```typescript
-can(user, action, resource) // Central PolicyEngine
-```
-Checks: Tenant isolation → RBAC → Ownership → Entitlements → Feature Flags → Plan Limits
-
-### Webhook Security
-1. HMAC signature verification (provider-specific)
-2. Replay protection: `UNIQUE(provider, external_event_id)` + inbox table
-3. Idempotent processing
-4. Inbox table → queue → normalize → state machine
-
-### Secrets Management
-- **Runtime**: `DATABASE_URL` (app_user), `JWT_SECRET`, `VIDEO_TOKEN_SECRET`, `VIDEO_WATERMARK_HMAC_SECRET`, provider keys
-- **Migration only**: `MIGRATION_DATABASE_URL` (postgres superuser)
-- **Production**: Refuses to start if any secret equals default value
-- `.env` in `.gitignore`, secrets in Vault/Secret Manager in prod
-
-### Production Hardening
-- `app_user` created via Docker init script, minimal grants
-- `REVOKE BYPASSRLS` explicit
-- `FORCE ROW LEVEL SECURITY` on all tenant tables
-- Production secret validation on startup (refuses default values)
-- Structured logging: `tenantId`, `userId`, `requestId` only (no PII)
-
-## Data Flow Examples
-
-### Student Watches Video
-```
-1. GET /api/video/videos/:videoId/playback-token (sessionId)
-2. Verify entitlement + enrollment + video status
-3. Provider.getPlaybackToken() → signed JWT + HLS URL
-3. Client (hls.js) requests manifest with token
-4. CDN validates token → serves segments
-5. Player renders WatermarkOverlay (HMAC-verified payload)
-6. Heartbeat every 15s → risk scoring
-7. Capture event → risk engine → revoke if HIGH/CRITICAL
+```text
+Order
+  → PaymentIntent (idempotent)
+  → Provider (Paymob / Fawry / voucher)
+  → PaymentAttempt / Payment
+  → LedgerEntry (double-entry)
+  → Entitlement
+  → OutboxEvent
 ```
 
-### Teacher Uploads Video
-```
-1. POST /api/video/lessons/:lessonId/videos (metadata)
-2. Check quotas (file size, stored hours)
-3. Provider.createUpload() → signed TUS URL
-3. Browser → Provider (TUS, direct, chunked)
-4. Provider webhook → Video state: UPLOADING → PROCESSING → READY
-4. Sync status → update Video record
-5. Teacher publishes → status = PUBLISHED
-```
-
-### Student Buys Course
-```
-1. POST /api/payments/intents (orderId, paymentMethod)
-2. Server calculates price, creates PaymentIntent
-3. Provider.createPayment() → redirect URL / client token
-3. Student pays on provider page
-4. Provider webhook → verify signature → idempotency check
-4. Payment = PAID → Ledger + Enrollment + Outbox
-4. Outbox worker → EnrollmentService → Entitlements + Notifications
-```
-
-## Deployment
-
-### Local Development
-```powershell
-docker compose up -d          # PostgreSQL + Redis
-pnpm install                  # root
-cd apps/api; npx prisma generate
-npx prisma migrate deploy
-pnpm build
-cd apps/api; pnpm run dev
-```
-
-### Production Checklist
-- [ ] All secrets rotated from defaults
-- [ ] `MIGRATION_DATABASE_URL` used only for CI/CD migrations
-- [ ] `DATABASE_URL` uses `app_user` credentials
-- [ ] `app_user` created via init script, no BYPASSRLS
-- [ ] `FORCE ROW LEVEL SECURITY` on all tenant tables
-- [ ] `JWT_SECRET`, `VIDEO_TOKEN_SECRET`, `VIDEO_WATERMARK_HMAC_SECRET` rotated
-- [ ] Provider webhook secrets configured
-- [ ] Sentry + Prometheus + Grafana connected
-- [ ] Backup + restore tested
-- [ ] Load tested (10k concurrent students)
-
-## Future Extraction Candidates
-When operationally justified, these modules can become independent services:
-1. **Video** (transcoding, CDN, DRM)
-2. **Payments** (PCI compliance, provider diversity)
-3. **AI** (GPU workloads, model serving)
-4. **Analytics** (OLAP, heavy queries)
-5. **Notifications** (email/WhatsApp/push volume)
-6. **Search** (Meilisearch/Elasticsearch)
-6. **LMS Core** (content progression, assignment/exam timers)
-
----
-## LMS Core: Content Progression & Timer Architecture
-
-### Content Progression System (Progression by Entry)
-
-**Current active progression rules:**
-```
-ENTER_ASSIGNMENT
-    ↓
-EXAM becomes available
-
-ENTER_EXAM
-    ↓
-NEXT LESSON becomes available
-```
-
-**Active unlock types (current phase):**
-- `ENTER_ASSIGNMENT` → unlock linked Exam
-- `ENTER_EXAM` → unlock NEXT LESSON
-
-**Future extension points (not implemented yet):**
-- `COMPLETE_ASSIGNMENT` → unlock next
-- `COMPLETE_EXAM` → unlock next
-- `PASS_EXAM` → unlock next
-- `SCORE_THRESHOLD` → unlock next
-- `TIME_ELAPSED` → unlock after time
-- `MANUAL` → teacher manual unlock
-
-### Progression Trigger
-**Current implementation:**
-- Student enters Assignment (POST /assignments/:id/attempts)
-  → record ENTER_ASSIGNMENT
-  → linked Exam becomes available
-
-- Student enters Exam (POST /exams/:id/attempts)
-  → record ENTER_EXAM
-  → next lesson becomes available
-
-**Progression does NOT require:**
-- SUBMITTED
-- GRADED
-- PASS
-- Score threshold
-
-### Progression Security
-- **Frontend MUST NOT control unlock state**
-- Unlock decisions happen on server:
-  - Student Request → Auth → Tenant → Authorization → Enrollment → Entitlement → Business Rule → Transaction → Progression Update → Audit/Event
-- Frontend receives only: `isLocked: boolean`, `unlockType: ContentUnlockType`
-
-### Idempotency for Progression
-- Progression updates must be idempotent
-- Use idempotency keys for unlock operations
-- Database constraints prevent duplicate unlocks
-- Transaction + database constraints protect against concurrent requests
-
-### Timer Security
-- **Timer state belongs to the individual attempt record**
-- Store: `startedAt`, `expiresAt` (authoritative)
-- Do NOT store only `remainingSeconds` (derived value)
-- Canonical: `expiresAt = source of truth`
-- `remainingSeconds = derived display value`
-
-#### Assignment Timer
-- **Default**: 300 minutes (5 hours / 18000 seconds)
-- **Server-authoritative**: `expiresAt = startedAt + configured duration`
-- **Frontend displays**: remaining time only (derived from expiresAt)
-- **Refresh/browser restart must NOT reset timer**
-- **Timer belongs to the attempt**, not the generic assignment
-- Once an attempt starts: `expiresAt` is authoritative
-- Starting the same attempt again MUST NOT reset the timer
-
-#### Exam Timer
-- **Default**: 70 minutes (4200 seconds)
-- **Server-authoritative**: `expiresAt = startedAt + configured duration`
-- **On refresh**: expiresAt unchanged
-- **On browser clock manipulation**: server time authoritative
-- Each attempt has its own timer (no shared timer)
-
-#### Timer Storage Decision
-- Store: `startedAt`, `expiresAt` (authoritative)
-- Do NOT store only `remainingSeconds` (derived value)
-- Canonical: `expiresAt = source of truth`
-- `remainingSeconds = derived display value`
-
-### Timer Security
-- **Timer state belongs to the individual attempt record**
-- Store: `startedAt`, `expiresAt` (authoritative)
-- Do NOT store only `remainingSeconds` (derived value)
-- Canonical: `expiresAt = source of truth`
-- `remainingSeconds = derived display value`
-
-#### Assignment Timer
-- **Default**: 300 minutes (5 hours / 18000 seconds)
-- **Server-authoritative**: `expiresAt = startedAt + configured duration`
-- **Frontend displays**: remaining time only (derived from expiresAt)
-- **Refresh/browser restart must NOT reset timer**
-- **Timer belongs to the attempt**, not the generic assignment
-- Once an attempt starts: `expiresAt` is authoritative
-- Starting the same attempt again MUST NOT reset the timer
-
-#### Exam Timer
-- **Default**: 70 minutes (4200 seconds)
-- **Server-authoritative**: `expiresAt = startedAt + configured duration`
-- **On refresh**: expiresAt unchanged
-- **On browser clock manipulation**: server time authoritative
-- Each attempt has its own timer (no shared timer)
-
-#### Timer Storage Decision
-- Store: `startedAt`, `expiresAt` (authoritative)
-- Do NOT store only `remainingSeconds` (derived value)
-- Canonical: `expiresAt = source of truth`
-- `remainingSeconds = derived display value`
-
-### Content Progression System (Progression by Entry)
-
-**Current active progression rules:**
-```
-ENTER_ASSIGNMENT
-    ↓
-EXAM becomes available
-
-ENTER_EXAM
-    ↓
-NEXT LESSON becomes available
-```
-
-**Active unlock types (current phase):**
-- `ENTER_ASSIGNMENT` → unlock linked Exam
-- `ENTER_EXAM` → unlock NEXT LESSON
-
-**Future extension points (not implemented yet):**
-- `COMPLETE_ASSIGNMENT` → unlock next
-- `COMPLETE_EXAM` → unlock next
-- `PASS_EXAM` → unlock next
-- `SCORE_THRESHOLD` → unlock next
-- `TIME_ELAPSED` → unlock after time
-- `MANUAL` → teacher manual unlock
-
-### Progression Trigger
-**Current implementation:**
-- Student enters Assignment (POST /assignments/:id/attempts)
-  → record ENTER_ASSIGNMENT
-  → linked Exam becomes available
-
-- Student enters Exam (POST /exams/:id/attempts)
-  → record ENTER_EXAM
-  → next lesson becomes available
-
-**Progression does NOT require:**
-- SUBMITTED
-- GRADED
-- PASS
-- Score threshold
-
-### Progression Security
-- **Frontend MUST NOT control unlock state**
-- Unlock decisions happen on server:
-  - Student Request → Auth → Tenant → Authorization → Enrollment → Entitlement → Business Rule → Transaction → Progression Update → Audit/Event
-- Frontend receives only: `isLocked: boolean`, `unlockType: ContentUnlockType`
-
-### Idempotency for Progression
-- Progression updates must be idempotent
-- Use idempotency keys for unlock operations
-- Database constraints prevent duplicate unlocks
-- Transaction + database constraints protect against concurrent requests
-
----
-
-## LMS Core: Assignment/Exam Architecture
-
-### Assignment/Exam Domain Models
-
-#### Assignment
-- **Fields**: title, description, instructions, timerMinutes (default 300), passingScore, maxAttempts, deadline, status
-- **AssignmentAttempt** lifecycle: IN_PROGRESS → SUBMITTED / EXPIRED / CANCELLED → GRADED
-- **Timer**: 300 minutes default, server-authoritative (expiresAt authoritative)
-- **Submission**: text + file attachments
-- **Grading**: teacher grades submission → score + feedback
-
-#### Exam
-- **Fields**: title, description, timerMinutes (default 70), passingScore, maxAttempts, shuffle
-- **ExamAttempt** lifecycle: IN_PROGRESS → SUBMITTED / EXPIRED / CANCELLED → GRADED
-- **Timer**: 70 minutes default, server-authoritative (expiresAt authoritative)
-- **Question types**: MCQ, TRUE_FALSE, SHORT_ANSWER, ESSAY, MATCHING
-- **Never expose correct answers** to students
-
-#### Assignment/Exam Progression
-- **ENTER_ASSIGNMENT** → unlock linked Exam
-- **ENTER_EXAM** → unlock NEXT LESSON
-- No score/pass requirements for progression
-- Timer starts on ENTER, not on page load
-
-### Assignment/Exam Timer Architecture
-
-#### Timer Security
-- **Timer state belongs to the individual attempt record**
-- Store: `startedAt`, `expiresAt` (authoritative)
-- Do NOT store only `remainingSeconds` (derived value)
-- Canonical: `expiresAt = source of truth`
-- `remainingSeconds = derived display value`
-
-#### Assignment Timer
-- **Default**: 300 minutes (5 hours / 18000 seconds)
-- **Server-authoritative**: `expiresAt = startedAt + configured duration`
-- **Frontend displays**: remaining time only (derived from expiresAt)
-- **Refresh/browser restart must NOT reset timer**
-- **Timer belongs to the attempt**, not the generic assignment
-- Once an attempt starts: `expiresAt` is authoritative
-- Starting the same attempt again MUST NOT reset the timer
-
-#### Exam Timer
-- **Default**: 70 minutes (4200 seconds)
-- **Server-authoritative**: `expiresAt = startedAt + configured duration`
-- **On refresh**: expiresAt unchanged
-- **On browser clock manipulation**: server time authoritative
-- Each attempt has its own timer (no shared timer)
-
-#### Timer Storage Decision
-- Store: `startedAt`, `expiresAt` (authoritative)
-- Do NOT store only `remainingSeconds` (derived value)
-- Canonical: `expiresAt = source of truth`
-- `remainingSeconds = derived display value`
-
-### Content Progression System (Progression by Entry)
-
-**Current active progression rules:**
-```
-ENTER_ASSIGNMENT
-    ↓
-EXAM becomes available
-
-ENTER_EXAM
-    ↓
-NEXT LESSON becomes available
-```
-
-**Active unlock types (current phase):**
-- `ENTER_ASSIGNMENT` → unlock linked Exam
-- `ENTER_EXAM` → unlock NEXT LESSON
-
-**Future extension points (not implemented yet):**
-- `COMPLETE_ASSIGNMENT` → unlock next
-- `COMPLETE_EXAM` → unlock next
-- `PASS_EXAM` → unlock next
-- `SCORE_THRESHOLD` → unlock next
-- `TIME_ELAPSED` → unlock after time
-- `MANUAL` → teacher manual unlock
-
-### Progression Trigger
-**Current implementation:**
-- Student enters Assignment (POST /assignments/:id/attempts)
-  → record ENTER_ASSIGNMENT
-  → linked Exam becomes available
-
-- Student enters Exam (POST /exams/:id/attempts)
-  → record ENTER_EXAM
-  → next lesson becomes available
-
-**Progression does NOT require:**
-- SUBMITTED
-- GRADED
-- PASS
-- Score threshold
-
-### Progression Security
-- **Frontend MUST NOT control unlock state**
-- Unlock decisions happen on server:
-  - Student Request → Auth → Tenant → Authorization → Enrollment → Entitlement → Business Rule → Transaction → Progression Update → Audit/Event
-- Frontend receives only: `isLocked: boolean`, `unlockType: ContentUnlockType`
-
-### Idempotency for Progression
-- Progression updates must be idempotent
-- Use idempotency keys for unlock operations
-- Database constraints prevent duplicate unlocks
-- Transaction + database constraints protect against concurrent requests
-
----
-
-## Security Implementation
-
-### LMS Core Security Requirements
-
-#### Timer Security
-- **Timer state belongs to the individual attempt record**
-- Store: `startedAt`, `expiresAt` (authoritative)
-- Do NOT store only `remainingSeconds` (derived value)
-- Canonical: `expiresAt = source of truth`
-- `remainingSeconds = derived display value`
-
-#### Assignment Timer
-- **Default**: 300 minutes (5 hours / 18000 seconds)
-- **Server-authoritative**: `expiresAt = startedAt + configured duration`
-- **Frontend displays**: remaining time only (derived from expiresAt)
-- **Refresh/browser restart must NOT reset timer**
-- **Timer belongs to the attempt**, not the generic assignment
-- Once an attempt starts: `expiresAt` is authoritative
-- Starting the same attempt again MUST NOT reset the timer
-
-#### Exam Timer
-- **Default**: 70 minutes (4200 seconds)
-- **Server-authoritative**: `expiresAt = startedAt + configured duration`
-- **On refresh**: expiresAt unchanged
-- **On browser clock manipulation**: server time authoritative
-- Each attempt has its own timer (no shared timer)
-
-#### Timer Storage Decision
-- Store: `startedAt`, `expiresAt` (authoritative)
-- Do NOT store only `remainingSeconds` (derived value)
-- Canonical: `expiresAt = source of truth`
-- `remainingSeconds = derived display value`
-
----
-
-*Last updated: 2026-10-05*
-*Source of truth: `AGENTS.md` + `docs/STATUS.md` + `docs/VIDEO_PROTECTION.md` + `docs/SECURITY.md`*
+Key invariants:
+
+- Every financial mutation has an idempotency key.
+- The provider call is preceded by a CAS claim (`PENDING → PROCESSING`).
+- Settlement uses a CAS transition and one transaction for payment/order/ledger/entitlement/outbox.
+- Webhooks verify the provider signature before state change and retain the raw payload.
+- Replays are deduplicated by provider event id.
+- A paid event without a `PROCESSING` intent fails visibly as `INTENT_NOT_FOUND`; retry is explicit.
+- Refunds claim the key before validation, reverse ledger entries, revoke only the matching entitlement, and restore voucher redemption where applicable.
+- `SECOND_CHARGE_DETECTED` is raised for a second paid transaction on a settled order; no automatic double settlement.
+
+Paymob and Fawry are implemented. Instapay, Vodafone Cash, and e&money are scaffolding, not live methods.
+
+## 8. Video
+
+- `VideoProvider` abstraction with Bunny Stream implementation; VdoCipher is an explicit stub.
+- Teacher can attach an unlisted YouTube id; the demo uses this path.
+- Student player uses the YouTube IFrame API with `youtube-nocookie.com`.
+- Signed playback token: HMAC, default 5 minutes.
+- Watermark engine: deterministic positions + HMAC payload.
+- Playback sessions and capture events are modeled.
+- The provider webhook HTTP route is absent. Bunny's webhook verification helper is not exposed.
+
+Do not describe the platform as DRM-complete. It is a layered deterrent plus provider controls, not unbreakable DRM.
+
+## 9. Frontend
+
+- 35 App Router pages.
+- Student area: dashboard, courses, course curriculum, lessons, assignments, exams, profile.
+- Teacher area: dashboard, analytics, courses/builder/preview/publish, lessons, assignments, exams, grading, students, payments, settings.
+- Public: landing, teachers, teacher space, course catalog and course detail, login, signup.
+- Global providers: `ThemeProvider`, `CommandPaletteProvider`, `AuthProvider`, `LangProvider`.
+- Theme: dark default; light is `html[data-theme="light"]`; key `sanad:theme`; pre-paint script in `app/layout.tsx`.
+- Design system: `@lp/design-system` tokens are imported in `app/layout.tsx`; component styling for the student redesign lives in `app/globals.css` (`lc-*` surfaces).
+
+### Student curriculum / lesson design
+
+The October 2026 redesign replaced the old “cards on a dark stage” course page with a manuscript-like curriculum:
+
+- a course hero with real progress and task counts;
+- section/lesson rows with explicit task chips (video, assignment, exam);
+- locked/available states derived from the API;
+- a lesson workspace with a cinematic player, lesson rail, and task brief;
+- direct links into the assignment/exam runner;
+- light and dark parity, RTL-first spacing, and mobile layouts.
+
+No mock data is allowed in these surfaces. Every count and state comes from the API.
+
+## 10. Deployment
+
+| Layer | Platform | Notes |
+| --- | --- | --- |
+| Web | Vercel | `main` production branch; `/api/*` rewrite to Railway |
+| API | Railway | root `Dockerfile`; `railway.json` `DOCKERFILE` builder; `nixpacks.toml` fallback |
+| DB | Railway PostgreSQL | 7 migrations applied; runtime currently owner/superuser |
+| Redis | Railway | dependency present; no jobs registered |
+
+Vercel fail-safes:
+
+- `next.config.mjs` defaults `API_PROXY_TARGET` to the Railway API on Vercel, `http://localhost:3002` locally.
+- `app/lib/api.ts` defaults the browser to same-origin, the server to the production origin on Vercel.
+
+## 11. Known architectural gaps
+
+1. RLS runtime activation.
+2. Outbox dispatcher.
+3. Video webhook route.
+4. Background job processors.
+5. Lock enforcement in student API views.
+6. Persisted word-level review evidence.
+7. Provider sandbox verification.
+8. Reconciliation worker.
+9. CI workflow verification (local evidence is authoritative for `4951e49`).
+
+These are tracked with acceptance criteria in [`STATUS.md`](STATUS.md) and [`CURRENT-STATE.md`](CURRENT-STATE.md).

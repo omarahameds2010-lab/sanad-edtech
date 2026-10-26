@@ -1,183 +1,289 @@
-# Go-Live Runbook — Sanad on Railway + Vercel
+# Deployment Runbook — Vercel + Railway
 
-Triangle: **Web on Vercel → API on Railway → Postgres on Railway.**
-Order matters: database first, then API, then web. Nothing here needs new code.
+> **Current production:** web on Vercel, API and PostgreSQL on Railway.
+> **Verified 25 October 2026:** production branch `main`, verified app commit `4951e49` (later docs-only commits do not change runtime code), `/api/health` **200** with database **up**.
+> Canonical state: [`CURRENT-STATE.md`](CURRENT-STATE.md).
 
-**Costs (Oct 2026):** Vercel Hobby = free (personal / non-commercial — fine for
-the prize demo). Railway's old free tier is gone: one-time $5 trial credit, then
-Hobby ≈ $5/month + usage (Postgres, Redis and the API share it). A custom domain
-is ~$10–15/year — optional to boot, but see §4 (cookies).
+## 0. Topology
 
-**Deployable branch:** the current work lives on `feat/go-live-deploy`. Direct
-pushes to `master` are blocked by the pre-push hook — either point both
-dashboards at `feat/go-live-deploy` (Vercel → Settings → Git → Production
-Branch; Railway service → Settings → Source), or merge it into `master` through
-a GitHub Pull Request.
+```text
+Browser
+  → https://sanad-edtech.vercel.app        (Next.js 15, Vercel)
+      /api/* ─────────────────────────────→ https://sanad-edtech-production.up.railway.app
+                                              (NestJS 10, Railway)
+                                              → PostgreSQL (Railway)
+                                              → Redis (Railway; no processors yet)
+```
 
-## 0) Prereqs (on your machine)
+- Web project: `sanad-edtech`
+- Web production branch: `main`
+- API service: `sanad-edtech-production`
+- API health: `/api/health`
+- API docs: `/api/docs` (served by the API when running)
 
-- Railway project with a **running** Postgres service (dashboard shows Active, not Paused). Reuse the existing project if you already have one.
-- This repo pushed to GitHub (branch with `railway.json` at root — `feat/go-live-deploy`).
-- **Password hygiene first:** if this database's password ever transited a chat, ticket or log — rotate it **before** anything else (Postgres service → Settings → rotate credentials), then use the new string everywhere below. Rotating later means redoing §2.
+## 1. Before deploying
 
-## 1) Database: migrate + seed (one time, from your machine)
+1. Confirm `main` is the intended commit:
+
+   ```powershell
+   git fetch origin
+   git status -sb
+   git log -1 --oneline origin/main
+   ```
+
+2. Confirm the local gates:
+
+   ```powershell
+   pnpm --filter web test
+   pnpm --filter api exec jest --config jest.config.js --runInBand
+   pnpm build
+   ```
+
+   Current expected evidence: **137/137 web**, **311/311 API**, **4/4 build**.
+
+3. Do not commit `.env`, logs, or generated scratch files.
+
+## 2. Railway API
+
+### Build configuration
+
+Railway builds from the repository root `Dockerfile`. `railway.json` selects the `DOCKERFILE` builder; `nixpacks.toml` is only a fallback.
+
+The Docker image runs:
+
+```text
+pnpm install --frozen-lockfile --prod=false
+pnpm --filter api exec prisma generate
+pnpm --filter api run build
+node apps/api/dist/src/main
+```
+
+The root `Dockerfile` is intentional: Railway's automatic pnpm-monorepo plan previously failed with `No start command could be found`.
+
+### Required environment
+
+At minimum:
+
+```text
+DATABASE_URL=postgresql://...
+MIGRATION_DATABASE_URL=postgresql://...   # migration/owner connection
+JWT_SECRET=<random-secret>
+JWT_EXPIRES_IN=15m
+NODE_ENV=production
+PORT=3002
+ALLOWED_ORIGINS=https://sanad-edtech.vercel.app
+VIDEO_TOKEN_SECRET=<random-secret>
+VIDEO_WATERMARK_HMAC_SECRET=<random-secret>
+```
+
+Add provider/video keys only when they are actually configured:
+
+```text
+PAYMOB_API_KEY
+PAYMOB_INTEGRATION_ID
+PAYMOB_IFRAME_ID
+PAYMOB_HMAC_SECRET
+FAWRY_MERCHANT_CODE
+FAWRY_SECRET_KEY
+FAWRY_SECURE_HASH_KEY
+BUNNY_STREAM_API_KEY
+BUNNY_STREAM_LIBRARY_ID
+BUNNY_STREAM_CDN_HOSTNAME
+BUNNY_STREAM_SIGNING_KEY
+SANAD_BASE_URL
+SANAD_API_KEY
+```
+
+> `ALLOWED_ORIGINS` must be the exact ASCII origin. Invisible Unicode marks survive `.trim()` and break exact matching. If browser login fails with 403 while curl works, delete and re-paste the value.
+
+### Health checks
+
+```powershell
+Invoke-RestMethod https://sanad-edtech-production.up.railway.app/api/health
+Invoke-RestMethod https://sanad-edtech.vercel.app/api/health
+```
+
+Both must return HTTP 200 and `database: up`.
+
+### Deploy
+
+Push to `main`. Railway builds the root Dockerfile. There is no separate `railway up` step required for the normal flow.
+
+If a build fails, inspect the Railway build log before changing configuration. Do not switch builders blindly; the Dockerfile path is the known-good path.
+
+## 3. Vercel web
+
+### Configuration
+
+- Framework: Next.js
+- Root directory: repository root (the workspace build is resolved by pnpm)
+- Install command: `pnpm install`
+- Build command: `pnpm --filter web build` (or the project equivalent)
+- Output: Next.js default
+- Production branch: `main`
+
+### API proxy
+
+`apps/web/next.config.mjs` rewrites `/api/:path*` to:
+
+1. `API_PROXY_TARGET` when set;
+2. `https://sanad-edtech-production.up.railway.app` on Vercel when unset;
+3. `http://localhost:3002` locally.
+
+This default exists because a production build without `API_PROXY_TARGET` once baked `http://localhost:3002`; Vercel refuses to proxy to a private host (`X-Vercel-Error: DNS_HOSTNAME_RESOLVED_PRIVATE`), so every `/api/*` call 404'd.
+
+`apps/web/app/lib/api.ts` has the same fail-safe split:
+
+- browser: same-origin (`""`), so cookies stay first-party;
+- server: production API origin on Vercel, `localhost:3002` elsewhere.
+
+Do not set `NEXT_PUBLIC_API_URL` to `http://localhost:3002` in a Vercel production environment.
+
+### Verify
+
+```powershell
+Invoke-WebRequest https://sanad-edtech.vercel.app/login -UseBasicParsing
+Invoke-RestMethod https://sanad-edtech.vercel.app/api/health
+```
+
+Then log in through the browser as the teacher and load `/teacher/courses`; confirm three published courses.
+
+## 4. Database migrations
+
+The repository has **7** migrations:
+
+```text
+0_init
+20261007000000_lms_rls
+20261010000000_auth_cookie_sessions
+20261016000000_rls_hardening
+20261016000001_tenant_resolution_fn
+20261017000000_webhook_raw_payload
+20261017000001_student_lesson_unlocks
+```
+
+Apply with the migration/owner URL. Prisma's datasource reads `DATABASE_URL`, so set it to the owner URL for the migration command:
 
 ```powershell
 cd apps/api
-$env:DATABASE_URL="<paste Railway Postgres connection string>"
-$env:MIGRATION_DATABASE_URL=$env:DATABASE_URL
-npx prisma migrate deploy
-$env:PROD_TENANT_DOMAINS="<web-domain>,<api-domain>"   # filled in steps 2–3, re-run seed after
-$env:DEMO_YOUTUBE_ID="dQw4w9WgXcQ"
+$env:MIGRATION_DATABASE_URL="<owner-connection-string>"
+$env:DATABASE_URL=$env:MIGRATION_DATABASE_URL
+pnpm exec prisma migrate deploy
+pnpm exec prisma migrate status
+```
+
+For a database whose history predates the baseline, resolve the already-applied migrations first, then deploy:
+
+```powershell
+pnpm exec prisma migrate resolve --applied 0_init
+# repeat for each pre-baseline migration actually present
+pnpm exec prisma migrate deploy
+```
+
+Do not run `migrate reset` against production.
+
+### Seed
+
+```powershell
+cd apps/api
+$env:MIGRATION_DATABASE_URL="<owner-connection-string>"
+$env:DATABASE_URL=$env:MIGRATION_DATABASE_URL
+$env:PROD_TENANT_DOMAINS="sanad-edtech-production.up.railway.app"
+$env:DEMO_YOUTUBE_ID="<unlisted-youtube-id>"
 pnpm seed:path2
 ```
 
-Why `PROD_TENANT_DOMAINS`: tenant resolution is Host-based and the seed
-only registers `localhost`. Without the cloud domains every request
-answers `404 Tenant not found`. Re-running seed is idempotent — safe to
-repeat after the domains are known. Include **both** the web domain and
-the API domain — the browser calls the API directly, so the API's own
-`Host` header is what gets resolved.
+The seed is idempotent: tenant, teacher/student accounts, three published courses, sections/lessons, exam/assignment, enrollment, and entitlements.
 
-Expect **7/7 migrations** from `prisma migrate deploy` (baseline + 6). The
-`rls_hardening` migration creates `app_user` with LOGIN but **no password** —
-set one in §2.5 before the runtime switches to it.
+## 5. RLS activation — still pending
 
-## 2) API service on Railway
+The policies are installed, but production is **not** yet enforcing them because the API connects with the migration/owner URL.
 
-1. Railway → **+ New → GitHub Repo** → select `sanad-edtech` (same project
-   as Postgres is fine).
-2. Service Settings → **Root Directory**: repo root (default). `railway.json`
-   at root is auto-detected: the build installs with `--prod=false`, runs
-   `prisma generate`, then `nest build`. Start = `node apps/api/dist/src/main`,
-   healthcheck = `/api/health`.
+`apps/api/src/modules/tenants/prisma.service.ts` currently does:
 
-   > Why `--prod=false`: with `NODE_ENV=production` set below, pnpm 9 skips
-   > devDependencies — and the build needs `@nestjs/cli`, `typescript` and
-   > `prisma`. Generation lives in the Railway build command, not in the api
-   > `build` script: on Windows the running dev API locks Prisma's query
-   > engine and `prisma generate` would fail with EPERM on every commit.
-
-3. **Variables** tab — set exactly these (no more, no less to start):
-
-| Variable                      | Value                                                                                         |
-| ----------------------------- | --------------------------------------------------------------------------------------------- |
-| `DATABASE_URL`                | Reference: `${{Postgres.DATABASE_URL}}` to boot, then switch to the `app_user` string in §2.5 |
-| `NODE_ENV`                    | `production`                                                                                  |
-| `JWT_SECRET`                  | generated (see below — never reuse demo value)                                                |
-| `VIDEO_TOKEN_SECRET`          | generated                                                                                     |
-| `VIDEO_WATERMARK_HMAC_SECRET` | generated                                                                                     |
-| `STORAGE_SIGNING_SECRET`      | generated                                                                                     |
-| `ALLOWED_ORIGINS`             | `https://<your-vercel-domain>` (step 3; update after)                                         |
-| `REDIS_URL`                   | Railway Redis reference (add Redis addon if boot fails on BullMQ connect)                     |
-
-> **Do NOT set `MIGRATION_DATABASE_URL` on Railway.** `prisma.service.ts`
-> prefers it when present — which would keep the runtime on the superuser and
-> silently bypass FORCE RLS. It belongs on your machine, for migrations only.
-
-Generate each secret **on your own machine, never send them to anyone**:
-
-```powershell
-node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+```ts
+const url = process.env.MIGRATION_DATABASE_URL || process.env.DATABASE_URL;
 ```
 
-> `main.ts:validateSecrets()` **refuses to boot** in production on default
-> secrets — this is intentional. Real values are mandatory, not optional.
+Activation requires all of the following, in order:
 
-4. Deploy → wait for `/api/health` to answer `200` at
-   `https://<api-domain>/api/health`. **Write down `<api-domain>`.**
+1. **Rotate the Railway database password by hand** in the dashboard.
+2. Confirm `app_user` exists and is not a superuser / does not have `BYPASSRLS`:
 
-### 2.5) Activate RLS — run the API as `app_user`, not the superuser
+   ```sql
+   SELECT rolname, rolsuper, rolbypassrls
+   FROM pg_roles
+   WHERE rolname = 'app_user';
+   ```
 
-FORCE RLS never applies to superusers, so the runtime must connect as
-`app_user` (non-superuser, NOBYPASSRLS — created by the `rls_hardening`
-migration, but without a password).
+3. Confirm grants for `app_user` on the application tables.
+4. Apply all migrations as the owner.
+5. Set the runtime environment:
 
-1. Generate a password locally (same `node -e` command as above).
-2. Railway → Postgres service → **Data** tab → run once, as the admin:
-   `ALTER ROLE app_user WITH PASSWORD '<generated>';`
-3. On the API service, replace `DATABASE_URL` with:
-   `postgresql://app_user:<generated>@<same-host>:<same-port>/<same-db>`
-   (copy host/port/db from the Postgres service's own `DATABASE_URL`; when the
-   API and Postgres live in the same Railway project, prefer the private host —
-   e.g. `postgres.railway.internal`).
-4. Redeploy. Logs must show `✅ Database connected`. From now on a
-   cross-tenant query returns 0 rows even if a route forgets a `tenantId`
-   filter — that is RLS, live.
+   ```text
+   DATABASE_URL=postgresql://app_user:<password>@<host>:<port>/<db>?schema=public
+   # Do NOT set MIGRATION_DATABASE_URL in the runtime service.
+   ```
 
-## 3) Web on Vercel
+6. Change the runtime preference in `prisma.service.ts` to:
 
-1. Vercel → Add New Project → Import `sanad-edtech`. (Production Branch: set
-   it to `feat/go-live-deploy` while `master` lags behind — Settings → Git.)
-2. **Root Directory**: `apps/web` (Framework preset: Next.js).
-3. **Environment Variables** — the browser only calls the web's own origin;
-   Next.js proxies `/api/*` to the API (`apps/web/next.config.mjs`):
+   ```ts
+   const url = process.env.DATABASE_URL || process.env.MIGRATION_DATABASE_URL;
+   ```
 
-   | Variable              | Value                                         |
-   | --------------------- | --------------------------------------------- |
-   | `NEXT_PUBLIC_API_URL` | `https://<web-domain>` — the web's own domain |
-   | `API_PROXY_TARGET`    | `https://<api-domain>` from step 2            |
+   (The migration command still uses `MIGRATION_DATABASE_URL` explicitly.)
 
-   Same-origin proxy = first-party cookies + no CORS. (The project's
-   `*.vercel.app` domain shows up under Settings → Domains right after
-   import.)
+7. Redeploy and re-run the isolation proof with `RLS_ADMIN_URL` and `RLS_APP_URL`:
 
-4. Deploy → open `https://<web-domain>`. **Write down `<web-domain>`.**
-5. Back in Railway API service: set `ALLOWED_ORIGINS` to `https://<web-domain>`
-   (redeploy happens automatically) — the API validates the `Origin` of every
-   unsafe request against it, proxied requests included.
+   ```powershell
+   cd apps/api
+   pnpm exec jest --config ./test/jest-e2e.json --runInBand rls-isolation
+   ```
 
-## 4) Cookies — why the no-domain setup works
+   Expected: **5/5** (scoped SELECT; cross-tenant UPDATE/DELETE = 0 rows; cross-tenant INSERT rejected; empty context = 0 rows).
 
-The browser only ever talks to the **web origin**: `/api/*` is proxied from
-Vercel to the Railway API (`API_PROXY_TARGET` in §3), so session cookies are
-first-party and the default `SameSite=Strict` policy just works — no custom
-domain, no `COOKIE_SAMESITE=none`.
+8. Verify a normal login, course list, and student lesson after the switch.
 
-Only if you bypass the proxy (point `NEXT_PUBLIC_API_URL` straight at the API
-domain) do cookies become cross-site — then:
+### Rollback
 
-1. **Same parent domain (recommended):** web on `app.example.com`, API on
-   `api.example.com` — same site, default cookies just work.
-   - Vercel → Project → Domains → add the web domain (Vercel prints the DNS records for your registrar).
-   - Railway → API service → Settings → Domains → add `api.example.com` (CNAME to the service).
-   - Re-run the seed with `PROD_TENANT_DOMAINS` including **both** new domains.
-   - Set `ALLOWED_ORIGINS=https://app.example.com` on the API service.
-2. **No domain yet (fallback):** set `COOKIE_SAMESITE=none` on the API service
-   (requires HTTPS, which Railway/Vercel give by default). Works on most
-   desktop Chrome setups, but can still break on browsers that block
-   third-party cookies — fine for a short demo, not for real students.
+If the app cannot connect as `app_user`:
 
-Per-teacher vanity subdomains (`teacher1.example.com`) need Vercel Pro for
-wildcards (on Hobby, add each subdomain explicitly) and a small
-tenant-resolution follow-up beyond this single-tenant launch.
+- restore the previous Railway service variables;
+- keep `MIGRATION_DATABASE_URL` available to operators but not the runtime;
+- redeploy the previous image;
+- do not disable RLS policies or drop the app role.
 
-## 5) Live smoke test (5 minutes, proves the loop)
+RLS being inactive is a known P1 gap, not a reason to claim isolation is complete.
 
-1. Open `/signup` → register a student → land on `/student`.
-2. `/courses/<slug>` → enroll → open course → enter exam → answer → submit.
-3. Login as teacher (seeded `01000000001`) → grading queue → grade.
-4. Student result screen shows score. Done = the platform is live.
-5. Leave the tab open 15+ minutes → navigate → session survives. That proves
-   the refresh-cookie path from §4 is configured right.
+## 6. Production verification checklist
 
-## Troubleshooting (symptom → cause → fix)
+| Check | Expected |
+| --- | --- |
+| Web `/login` | 200, page renders |
+| Web `/api/health` | 200, `database: up` |
+| Direct API `/api/health` | 200, `database: up` |
+| Teacher login (`01000000001`) | 200, role `TEACHER` |
+| `/api/tenants/current` | `sanad-demo` |
+| `/api/v1/teacher/courses` | 3 published courses |
+| Student login (`01000000002`) | 200 |
+| `/student/courses` | enrolled courses |
+| Course curriculum | tasks and progress render from API |
+| Lesson | video/exam/assignment state renders |
+| Theme toggle | light/dark persists after reload |
+| Logout → refresh | **401**, `/student` redirected to login |
 
-| Symptom                                                | Cause                                                               | Fix                                                                                   |
-| ------------------------------------------------------ | ------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
-| `P1001` anywhere                                       | Postgres paused/unreachable                                         | Railway → Resume Postgres; re-run migrate                                             |
-| `404 Tenant not found` (API JSON)                      | cloud Host not in `tenant_domains`                                  | re-run seed with `PROD_TENANT_DOMAINS` set                                            |
-| Browser CORS errors, API fine via curl                 | web domain missing from `ALLOWED_ORIGINS`                           | set it on API service, redeploy                                                       |
-| API crashes on boot, "SECURITY ERROR" log              | default secrets + `NODE_ENV=production`                             | set real generated secrets                                                            |
-| Railway build fails on `tsup`/design-system            | root `pnpm build` pulls broken packages                             | our `railway.json` builds **api only** (`--filter api`) — do not switch to root build |
-| Railway build: `nest: not found` / `prisma: not found` | pnpm 9 skips devDeps when `NODE_ENV=production`                     | install with `--prod=false` — see `railway.json` / §2                                 |
-| Login `401 Invalid credentials` on live                | seed never ran on Railway DB                                        | run `pnpm seed:path2` against Railway URL                                             |
-| Logged out every ~15 min / refresh 401                 | cookies went cross-site (proxy bypassed / `API_PROXY_TARGET` unset) | §4 — keep the web-origin proxy, or same parent domain / `COOKIE_SAMESITE=none`        |
-| Cross-tenant data visible in prod                      | runtime still connects as superuser (FORCE RLS skips superusers)    | unset `MIGRATION_DATABASE_URL`, point `DATABASE_URL` at `app_user` (§2.5)             |
-| `password authentication failed for user "app_user"`   | role exists with no password (migrations create it without one)     | `ALTER ROLE app_user WITH PASSWORD '...'` in the Postgres Data tab (§2.5)             |
+## 7. Known deployment gaps
 
-## What NOT to send in chat, ever
+- RLS runtime activation (section 5).
+- Outbox dispatcher (events are written, not delivered).
+- No video webhook route.
+- No Bull processors.
+- Real provider sandbox transaction not yet recorded.
+- CI workflow is present but not the release evidence; use the local commands above.
 
-Secrets, passwords, connection strings, private keys. Generate locally,
-paste directly into Railway/Vercel dashboards. If a secret leaks in chat
-or git, rotate it immediately (new value → update dashboards → redeploy).
+## 8. Costs and operations
+
+- Vercel Hobby is sufficient for the demo; preview URLs may be protected by Vercel Authentication.
+- Railway Hobby is required for the API/Postgres/Redis services after the trial credit.
+- A custom domain is optional. If added, update `ALLOWED_ORIGINS`, `tenant_domains`, and the Vercel domain configuration together.
+- Never paste database passwords or provider keys into chat, source, logs, or issue trackers.

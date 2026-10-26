@@ -2,194 +2,133 @@
 
 # @lp/design-system
 
-### The visual foundation for the Multi-Tenant Learning Platform.
+**Shared tokens, theme primitives, and UI components for the SANAD learning platform.**
 
-**One learning universe. Many learning identities.**
+[![Next.js](https://img.shields.io/badge/consumer-Next.js%2015-111827?style=for-the-badge&logo=nextdotjs)](https://nextjs.org/)
+[![RTL](https://img.shields.io/badge/RTL-first-0f766e?style=for-the-badge)](#rtl)
+[![Tokens](https://img.shields.io/badge/tokens-CSS%20%2B%20TS-d4a373?style=for-the-badge)](./tokens.css)
 
-[![Repository](https://img.shields.io/badge/Repository-sanad--edtech-111827?style=for-the-badge&logo=github)](https://github.com/omarahameds2010-lab/sanad-edtech)
-[![Architecture](https://img.shields.io/badge/Architecture-Multi--Tenant-7c3aed?style=for-the-badge)](https://github.com/omarahameds2010-lab/sanad-edtech/blob/master/docs/ARCHITECTURE.md)
-[![RTL](https://img.shields.io/badge/RTL-First-0f766e?style=for-the-badge)](./)
-[![Motion](https://img.shields.io/badge/Motion-System-111827?style=for-the-badge)](./)
-[![Design Tokens](https://img.shields.io/badge/Design-Tokens-d4a373?style=for-the-badge)](./tokens.css)
-[![Accessibility](https://img.shields.io/badge/Accessibility-First-2563eb?style=for-the-badge)](./)
+[Repository](https://github.com/omarahameds2010-lab/sanad-edtech) · [Architecture](https://github.com/omarahameds2010-lab/sanad-edtech/blob/main/docs/ARCHITECTURE.md) · [Visual identity](https://github.com/omarahameds2010-lab/sanad-edtech/blob/main/docs/VISUAL_IDENTITY.md)
 
 </div>
 
 ---
 
-## ✦ What is `@lp/design-system`?
+## What this package is
 
-`@lp/design-system` is the shared visual foundation of the SANAD Multi-Tenant LMS.
+`@lp/design-system` is the shared visual foundation for the platform:
 
-It defines the visual language shared across the platform:
+- CSS custom properties in [`tokens.css`](./tokens.css)
+- typed token modules in `tokens/`
+- theme helpers in `theme/`
+- component sources in `components/`
+- RTL and reduced-motion conventions
 
-- Design tokens
-- Semantic theming
-- Typography
-- Spacing
-- Motion
-- RTL foundations
-- Accessibility behavior
-- Tenant-adaptive styling
+It is a workspace package (`private: true`), consumed by `apps/web`. It does not contain API clients, auth, database logic, payment logic, or workers.
 
-The package exists to solve a specific architectural problem:
+## Current use in the app
 
-> **How can one platform support many teachers, subjects, and learning identities without becoming a collection of disconnected products?**
+`apps/web/app/layout.tsx` imports:
 
-The answer is a controlled visual system:
-* The platform stays recognizable.
-* The learning identity changes.
+```ts
+import '@lp/design-system/tokens.css';
+import './globals.css';
+```
 
----
+The student-facing **Heritage Manuscript** theme is implemented in `apps/web/app/globals.css` under `html[data-theme="light"]`, because it coordinates page-level surfaces, curriculum classes (`lc-*`), command-center classes (`cc-*`, `sd-*`), and app-specific markup. The package supplies the shared base tokens; the app owns the shipped product theme.
 
-## ◈ Design Philosophy
+Current shipped theme behaviour:
 
-```text
-                         MASTER PLATFORM
-                                │
-                                ▼
-                     ┌─────────────────────┐
-                     │   Semantic Tokens   │
-                     └──────────┬──────────┘
-                                │
-                 ┌──────────────┼──────────────┐
-                 │              │              │
-                 ▼              ▼              ▼
-             Teacher A      Teacher B      Teacher C
-             Subject X      Subject Y      Subject Z
-                 │              │              │
-                 └──────────────┼──────────────┘
-                                │
-                                ▼
-                         Shared Components
-The design system is built around one central principle:
+- dark is the default
+- light mode is optional and persisted under `sanad:theme`
+- the theme is applied before paint by `apps/web/app/layout.tsx`
+- all light rules are scoped under `html[data-theme="light"]`
 
-Tenants adapt the system. They do not redefine the system.
+## Package exports
 
-◇ The 80 / 20 Identity Model
-The platform intentionally separates platform identity from learning identity.
+The root entry currently exports:
 
-Plaintext
-┌─────────────────────────────────────────────────────┐
-│                                                     │
-│         80% — MASTER PLATFORM DNA                   │
-│                                                     │
-│ Typography · Grid · Spacing · Components            │
-│ Motion · Interaction · Geometry · Accessibility     │
-│                                                     │
-├─────────────────────────────────────────────────────┤
-│                                                     │
-│         20% — TENANT / SUBJECT IDENTITY             │
-│                                                     │
-│ Accent · Motif · Subject language · Teacher brand   │
-│                                                     │
-└─────────────────────────────────────────────────────┘
-This creates a system where:
+- `Button`
+- `Card`
+- `Tabs`
+- `LangSwitch`
+- theme helpers
 
-A mathematics tenant can feel mathematical.
+Subpath exports are defined for `./tokens`, `./theme`, `./components`, `./tokens.css`, and `./theme.css`. Component source folders also include Avatar, Badge, DataDisplay, DataTable, Dialog, Drawer, EmptyState, FormField, icons, Input, Loading, Modal, Select, Skeleton, Stepper, Toast, Tooltip, and Wizard. Treat a component as public only when it is exported from the relevant entry point.
 
-An Arabic tenant can feel editorial.
+## Usage
 
-A physics tenant can feel scientific.
+```tsx
+import { Button, Card } from '@lp/design-system';
+import '@lp/design-system/tokens.css';
+```
 
-A teacher can have a recognizable learning space.
+Use semantic tokens rather than raw hex values:
 
-...while the entire product still feels like one platform.
-
-⟡ Identity Architecture
-The platform follows a three-layer identity model:
-
-Master Platform DNA: The shared language across the ecosystem (typography, layout, spacing, components, accessibility).
-
-Subject Identity: The educational character of the space (accent, motif, visual rhythm).
-
-Teacher Identity: Teacher branding, logo, imagery, and personalized workspace.
-
-◎ Token Architecture
-The token system is the foundation of the package:
-
-Raw / Adaptive Layer: Values that change per tenant (--tenant-accent, --tenant-motif-opacity).
-
-Semantic Layer: Values consumed by components (--color-action, --bg-surface, --text-primary).
-
-Component Layer: Styles dependent strictly on semantic tokens.
-
-◇ Tenant Theming
-Tenant customization is intentionally restricted to the adaptive layer.
-
-CSS
-:root[data-subject="physics"] {
-  --tenant-accent: #6ea8ff;
-  --tenant-motif-opacity: 0.2;
-}
-
-:root[data-subject="arabic"] {
-  --tenant-accent: #d4a373;
-  --tenant-motif-opacity: 0.15;
-}
-The component remains unchanged:
-
-CSS
-.teacher-card {
+```css
+.panel {
+  background: var(--bg-surface);
+  color: var(--text-primary);
   border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
 }
+```
 
-.teacher-card .cta {
-  color: var(--color-action);
-  transition: background-color var(--motion-fast) var(--ease-standard);
-}
-✦ Motion System & Budgets
-Motion = Feedback + Hierarchy + Continuity
+## RTL
 
-Level	Duration	Role
-Instant	80ms	Immediate state response
-Fast	140ms	Micro-interactions
-Standard	220ms	Common transitions
-Medium	320ms	Component/state transitions
-Slow	450ms	Larger transitions
-◌ Motion Budgets
-Product Area	Motion Budget
-Marketing / Landing	High
-Teacher Dashboard	Medium
-Course Builder	Medium
-Student Dashboard	Low–Medium
-Learning	Low
-Exam	Very Low
-Payment	Low
-Auth / Security	Very Low
-⇄ RTL First
 RTL is a first-class direction. Prefer logical CSS properties:
 
-margin-inline-start بدلاً من margin-left
+| Avoid | Prefer |
+| --- | --- |
+| `margin-left` / `margin-right` | `margin-inline-start` / `margin-inline-end` |
+| `padding-left` / `padding-right` | `padding-inline` |
+| `left` / `right` | `inset-inline-start` / `inset-inline-end` |
 
-padding-inline بدلاً من padding-left/right
+Components must not assume LTR.
 
-inset-inline-start بدلاً من left
+## Motion
 
-⌘ Component Contract
-Components consume tokens: Never hardcode colors.
+Motion is feedback and hierarchy, not decoration.
 
-Components do not know tenants: Avoid if (tenant === 'physics').
+| Level | Duration | Use |
+| --- | --- | --- |
+| Instant | 80ms | Immediate state response |
+| Fast | 140ms | Micro-interactions |
+| Standard | 220ms | Common transitions |
+| Medium | 320ms | Component/state transitions |
+| Slow | 450ms | Larger transitions |
 
-Components remain accessible: Support keyboard, focus states, and reduced-motion.
+Respect `prefers-reduced-motion: reduce`. Exam and payment surfaces should stay at the low end of the budget.
 
-Components support RTL: No direction assumptions in code.
+## Build and test
 
-🚫 Design-System Boundaries
-This package owns the visual foundation. It does not own business logic.
+```powershell
+pnpm --filter @lp/design-system build
+pnpm --filter @lp/design-system typecheck
+pnpm --filter @lp/design-system test
+```
 
-Never place here:
+The root `pnpm build` includes this package and currently completes **4/4** tasks.
 
-API clients / Axios
+## Boundaries
 
-Database logic / Prisma models
+Never place in this package:
 
-Authentication & Authorization
+- API clients or Prisma models
+- authentication or authorization
+- payment or entitlement logic
+- background workers
+- AI orchestration
 
-BullMQ workers
+The system stays consistent; tenant identity changes through tokens, not forks.
 
-AI orchestration / SANAD Integration
+## Current status
 
-The system stays the same. The learning identity changes.
-
-One platform. Many teachers. Many subjects. One design language.
+| Item | Status |
+| --- | --- |
+| Tokens imported by web | Yes |
+| Heritage Manuscript light mode | Implemented in `apps/web/app/globals.css` |
+| Dark default + pre-paint restore | Yes |
+| Root build | 4/4 |
+| Storybook | Not shipped |
+| Six subject DNA galleries | Not shipped — specification only |

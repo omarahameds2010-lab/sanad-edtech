@@ -1,346 +1,87 @@
-# حالة المشروع الميدانية — Sanad EdTech
-
-### تقرير من داخل الكود (مبني على قراءة مباشرة، لا على الذاكرة)
-
-> ⚠️ **تنبيه (16 أكتوبر 2026):** هذا التقرير موثّق بتاريخ 9 أكتوبر. راجع التدقيق الأحدث والأشمل — كسر البناء، عدم تطابق Feature Flags، RLS غير الموصولة، التقدم العالمي، إصلاحات لاحقة على evaluate-ai وlessons.controller — في `docs/AUDIT-2026-10-16.md`.
-
-- **تاريخ التقرير:** 9 أكتوبر 2026
-- **الفرع:** `master` — الريموت `github.com/omarahameds2010-lab/sanad-edtech`
-- **المنهجية:** كل رقم تحت موثّق بأمر فحص (glob/grep/read/test/build). أي رقم بلا دليل مكتوب جنبه "تقدير".
-- **القاعدة:** الحقائق أولًا — حتى لو ضد الانطباع السائد في `STATUS.md` أو `demo-scenario/`.
-
----
-
-## 1. الصورة في 60 ثانية
-
-| المكوّن                                        | الحالة الحقيقية                                                 | الدليل                                                  |
-| ---------------------------------------------- | --------------------------------------------------------------- | ------------------------------------------------------- |
-| صفحات الفرونت                                  | **32 صفحة** — صفر روابط ميتة (404)                              | glob عدّ 32 ملف `page.tsx`؛ فحص كل `href`/`router.push` |
-| حلقة الامتحان (طالب → امتحان → محاضرة → تصحيح) | **مكتملة كودًا، 13 commit مرفوعة**                              | `git log` + `git push` ناجح                             |
-| تستات API                                      | 14 ملف spec — آخر أخضر موثّق **91/91**                          | سجل تنفيذ jest                                          |
-| تستات Web                                      | ملفان — آخر أخضر موثّق **33/33** + build أخضر                   | سجل vitest و`next build`                                |
-| تشغيل حي ضد DB                                 | **لم يحدث ولا مرة** — مستحيل هنا (لا Postgres ولا Docker)       | فحص TCP للمنافذ + غياب Docker                           |
-| مجلد `ai/` (مسار Sanad AI)                     | **غير موجود إطلاقًا** — لا في الشجرة ولا في أي commit ظاهر      | بحث شامل `**/ai-evaluation*` = صفر                      |
-| حزم التصميم                                    | **2 فقط** (`design-system` + `motion`) — وليس 6 كما يقول STATUS | مجلد `packages/`                                        |
-| ملف `STATUS.md`                                | أرقامه قديمة (17 صفحة / 85 تست / 6 حزم) — الواقع تجاوزه         | مقارنة مباشرة أعلاه                                     |
-
----
-
-## 2. خريطة الريبو
-
-```
-learning-platform/               monorepo: pnpm 9 + Turborepo
-├── apps/api/                    NestJS 10 — المنطق كله هنا (12 موديول)
-├── apps/web/                    Next.js 15 + React 19 — 32 صفحة
-├── packages/
-│   ├── design-system/           ⚠️ إصلاحها متوقف مؤقتًا (تفاصيل §9)
-│   └── motion/                  ⚠️ نفس الوضع
-├── prisma → apps/api/prisma/    ‏42 موديل + RLS
-├── docs/                        ARCHITECTURE / SECURITY / VIDEO_PROTECTION /
-│                                VISUAL_IDENTITY / STATUS (قديم جزئيًا) / DEMO (جديد، للديمو)
-├── docker-compose.yml           Postgres 15 + Redis 7 (لا يعملان على هذا الجهاز)
-├── demo-scenario/README.txt     ⚠️ سيناريو "محاكى" — ادعاءات غير دقيقة (§10.4)
-└── ai-module-wip/               غير موجود (كان ركنًا مؤقتًا ثم حُذف مع مجلد ai)
-```
-
-**تصحيح مهم:** `STATUS.md` يذكر 6 حزم (`config, types, ui, validation`…). هذه الحزم **غير موجودة** على القرص. إما أنها خطة مستقبلية كُتبت بصيغة الحاضر، أو حُذفت. أي عمل يعتمد عليها يجب أن يتوقف حتى تُحسم.
-
----
-
-## 3. الباك-إند — 12 موديول (`apps/api/src/modules/`)
-
-`audit` · `auth` · `authorization` · `courses` · `entitlements` · `feature-flags` · `outbox` · `payments` · `plans` · `tenants` · `users` · `video-protection` · `video`
-
-### 3.1 جدول الـroutes (بعد إزالة بادئة `api/` المكررة — commit `b1156cd`)
-
-البادئة العامة `/api` (من `main.ts:52`). كل المسارات أدناه مسبوقة بها. كلها خلف `JwtAuthGuard` + `AuthorizationGuard` إلا المذكور.
-
-**الحلقة (مغطاة بتست عقد `route-paths.spec.ts`):**
-
-| النداء                                 | الطريقة والمسار                                           | الدور المسموح                                 |
-| -------------------------------------- | --------------------------------------------------------- | --------------------------------------------- |
-| دخول                                   | POST `/api/auth/login`                                    | عام (phone + password)                        |
-| عرض الامتحان (بلا إجابات)              | GET `/api/v1/exams/:id/view`                              | طالب مسجّل                                    |
-| بدء المحاولة (idempotent)              | POST `/api/v1/exams/:id/enter` + ترويسة `idempotency-key` | طالب + entitlement                            |
-| التايمر (expiresAt من السيرفر)         | GET `/api/v1/exams/:id/timer`                             | طالب                                          |
-| التسليم (idempotent)                   | POST `/api/v1/exams/:id/submit`                           | طالب (**أُضيفت صلاحيتها** — كانت ناقصة! §6.1) |
-| محاولاتي                               | GET `/api/v1/exams/:id/attempts/me`                       | طالب                                          |
-| الدرس التالي                           | GET `/api/v1/progression/lessons/:id/next`                | طالب                                          |
-| الدرس + فيديوهاته                      | GET `/api/v1/student/lessons/:id`                         | طالب مسجّل                                    |
-| طابور التصحيح                          | GET `/api/v1/exams/:id/attempts/grading`                  | مدرس (`grade`)                                |
-| التصحيح                                | POST `/api/v1/exams/attempts/:attemptId/grade`            | مدرس                                          |
-| الواجبات: عرض/بدء/تايمر/تسليم/تسليماتي | نفس الشكل تحت `/api/v1/assignments/:id/...`               | طالب (**`attempt` أُضيفت** — كانت ناقصة!)     |
-| تصحيح الواجبات                         | GET `.../submissions` + POST `.../submissions/:sid/grade` | مدرس                                          |
-| هيكل الكورس (عام)                      | GET `/api/v1/public/courses/:slug/structure`              | عام، بلا auth (**جديد**)                      |
-| هيكل الكورس (طالب)                     | GET `/api/v1/student/courses/:courseId/structure`         | طالب مسجّل (**جديد**)                         |
-| التسجيل في كورس                        | POST `/api/v1/enrollments/courses/:courseId/enroll`       | طالب (**يمنح entitlements الآن** §6.3)        |
-| ملف الطالب                             | GET `/api/users/:id` (الطالب يرى نفسه فقط)                | مدرس/طالب-نفسه (**جديد**)                     |
-
-**بقية الموديولز (موجودة، لم تُلمس هذه الجلسة):** payments (طلبات/نوايا/قسائم), video + video-protection (Bunny/HMAC), plans, tenants (حل النطاق من Host), outbox, audit, feature-flags, users (بروفايل ذاتي فقط سابقًا).
-
-### 3.2 حقائق التفويض (مقروءة من `policy-engine.ts` — ليست تخمينًا)
-
-- RBAC roles الخمسة معرفة صراحة؛ `SUPER_ADMIN` يتجاوز الكل.
-- **كان مكسورًا وتم إصلاحه:** الطالب لم يملك `submit` على exam ولا `attempt` على assignment → أي دخول/تسليم كان سيُرد بـ403. أُضيفت الصلاحيتان (commit `1d73f06`) + تست `policy-engine.spec.ts`.
-- الـentitlement يُشترط لـ: `attempt`/`submit` على exam وassignment، و`watch` على lesson/video. والـfeature flags (`exams`, `assignments`, `videoPlayback`) **مفعّلة افتراضيًا** — لا seed لها مطلوب.
-- الـentitlements تُمنح عند **الشراء فقط** (payment-orchestrator + voucher). لذلك أُضيف المنح عند **التسجيل المباشر** أيضًا (وإلا انكسرت الحلقة لأي طالب جديد).
-- `grantCourseEntitlement` كان يوزع على (course + lessons + exams) **بدون assignments** → أُضيفت الواجبات (كانت ستُرد 403).
-
-### 3.3 الداتابيز — 42 موديل
-
-Identity (7): Tenant, TenantDomain, TenantConfig, User, Device, Session + enums.
-Catalog (4): Course, Section, Lesson, Resource.
-LMS (7): Assignment, AssignmentSubmission, Exam, ExamQuestion, ExamAttempt, Enrollment, LessonProgress.
-Commerce (17): Order→Refund + Ledger + Voucher + Reconciliation + Settlement + IdempotencyKey + PaymentAuditLog.
-Video/Security (7): Video, PlaybackSession, CaptureEvent, SecurityEvent, Entitlement, Subscription, AuditLog, OutboxEvent.
-RLS: سياسات init + lms، دور `app_user` بلا BYPASSRLS (موثّق في STATUS — لم يُعَد فحصه هنا).
-
----
-
-## 4. الفرونت — 32 صفحة (`apps/web/app/`)
-
-### 4.1 الجرد الكامل (الحالة: حقيقي = بيانات API / ساكن = ثابت)
-
-| #     | المسار                                                                  | الحالة                                                  | يدخل من                               |
-| ----- | ----------------------------------------------------------------------- | ------------------------------------------------------- | ------------------------------------- |
-| 1     | `/`                                                                     | ساكن (landing)                                          | —                                     |
-| 2     | `/login`                                                                | **حقيقي** (جديد)                                        | كل الصفحات المحمية                    |
-| 3     | `/courses`                                                              | **حقيقي** (أُعيد بناؤه: بحث + قائمة)                    | landing                               |
-| 4     | `/courses/[slug]`                                                       | **حقيقي** (جديد: منهج + تسجيل)                          | القائمة                               |
-| 5     | `/teachers`, `/teachers/[slug]`                                         | ساكن (واجهة عرض)                                        | —                                     |
-| 6     | `/student`                                                              | **ساكن فارغ — hub ميت بلا روابط** ⚠️                    | login (إجباريًا!)                     |
-| 7     | `/student/courses`                                                      | **حقيقي**                                               | القائمة الجانبية                      |
-| 8     | `/student/courses/[id]`                                                 | **حقيقي** (جديد: أقفال + روابط)                         | كورساتي                               |
-| 9     | `/student/lessons/[id]`                                                 | **حقيقي** (أُعيد بناؤه: YouTube UNLISTED + دخول امتحان) | تفاصيل الكورس/الواجبات/نهاية الامتحان |
-| 10    | `/student/assignments`                                                  | **حقيقي**                                               | القائمة                               |
-| 11    | `/student/assignments/[id]`                                             | **حقيقي** (جديد: محرر + تايمر + تسليم تلقائي)           | القائمة                               |
-| 12    | `/student/exams`                                                        | **حقيقي**                                               | القائمة + زر الدرس القديم             |
-| 13    | `/student/exams/[id]`                                                   | **حقيقي** (جديد: تايمر + تنقل + تسليم)                  | القائمة/الدرس                         |
-| 14    | `/student/profile`                                                      | **حقيقي** (+ خروج)                                      | القائمة                               |
-| 15    | `/teacher`                                                              | ساكن بأرقام ثابتة (روابطه سليمة)                        | login يدوي                            |
-| 16–20 | `/teacher/courses`, `/new`, `/[id]`, `/builder`, `/preview`, `/publish` | ساكن + **`/new` حقيقي** (إنشاء فعلي)                    | القائمة/الداشبورد                     |
-| 21    | `/teacher/lessons/[id]`                                                 | ساكن (موجود مسبقًا)                                     | الـbuilder                            |
-| 22    | `/teacher/assignments`                                                  | **حقيقي** (أُعيد بناؤه)                                 | القائمة                               |
-| 23    | `/teacher/assignments/[id]`                                             | **حقيقي** (جديد: طابور + تصحيح)                         | القائمة                               |
-| 24    | `/teacher/exams`                                                        | **حقيقي** (أُعيد بناؤه)                                 | القائمة                               |
-| 25    | `/teacher/exams/[id]`                                                   | **حقيقي** (جديد: طابور + تصحيح)                         | القائمة                               |
-| 26    | `/teacher/students`                                                     | **⚠️ mock كامل بأسماء وهمية وبلا روابط**                | القائمة                               |
-| 27    | `/teacher/students/[id]`                                                | **حقيقي** (جديد: ملف + متوسط)                           | طابوري التصحيح فقط                    |
-| 28    | `/teacher/payments`                                                     | **حقيقي** (طلبات + إجمالي)                              | القائمة                               |
-| 29    | `/teacher/analytics`                                                    | **⚠️ mock برسوم وهمية**                                 | القائمة                               |
-| 30    | `/teacher/settings`                                                     | **حقيقي** (قراءة فقط — لا endpoint للتعديل)             | القائمة                               |
-
-(العد 32 يشمل تجزئة teacher/courses الستة.)
-
-### 4.2 خريطة الربط (مدققة سطرًا سطرًا — صفر 404)
-
-```
-landing → courses ⇄ [slug] → enroll → student/courses ⇄ courses/[id] → lessons/[id] → exams/[id] → done → lessons/[next] ✓
-                                              ↘ assignments ⇄ assignments/[id] → done → lessons[unlocked] ✓
-login → /student (إجباريًا — حتى للمدرس ⚠️) · profile → logout → login ✓
-teacher ⇄ courses/new → courses/[id] · exams ⇄ exams/[id] ⇄ students/[id] ⇄ assignments/[id] ⇄ assignments ✓
-```
-
-**الثغرات الثلاث الموثقة (ليست 404):**
-
-1. `/student` hub ميت — القادم من login يجد عناوين فارغة بلا أي رابط.
-2. `/teacher/students` معزولة — ملف الطالب لا يُفتح إلا من طابوري التصحيح.
-3. روابط احتياطية بIDs وهمية: `/student/lessons/l1` (fallback نهاية الامتحان — يعطي خطأ API أنيقًا لا كراش) و`/teacher/courses/c2` (صفحات الـbuilder الساكنة).
-
-### 4.3 بنية الـclient (`app/lib/`)
-
-- `api.ts`: كل endpoints أعلاه + `ApiError` + مفاتيح idempotency + فكّ `{data}` — **مغطى بـ33 تست**.
-- `auth.tsx`: التوكن **في ذاكرة React فقط** (لا localStorage — التزامًا بالقواعد). تنبيه صريح: نسخة ديمو، الإنتاج يحتاج BFF proxy.
-- `exam.ts` + `useCountdown.ts`: التايمر **مشتق من `expiresAt` السيرفر** — الساعة الأمامية للعرض فقط.
-- `NEXT_PUBLIC_API_URL` (default `http://localhost:3001`).
-
----
-
-## 5. الحلقة الكاملة (التجربة المقصودة للديمو)
-
-```
-طالب: login → /student/exams → intro → [POST enter + idempotency-key]
-     → أسئلة بلا إجابات (السيرفر يحذف correctAnswer) → إجابة/تنقل
-     → تسليم يدوي أو تلقائي عند الصفر → ENTER_EXAM يفتح الدرس التالي
-     → محاضرة YouTube UNLISTED → مدرس: طابور → درجة+ملاحظات → الطالب يرى نتيجته
-```
-
-- **التايمر:** `startedAt + timerMinutes` على السيرفر (افتراضي 70 امتحان / 300 واجب). إعادة التحميل لا تصفّره (يُعاد الجلب). انتهاء → `TIMED_OUT`/`LATE` بقواعد `allowLateSubmission`.
-- **التقدم:** `ENTER_ASSIGNMENT → فتح امتحان`، `ENTER_EXAM → فتح الدرس التالي` — idempotent بمفاتيح + قيود DB.
-- **Seed الديمو** (`pnpm seed:path2` + `docs/DEMO.md`): tenant + نطاق `localhost` (إجباري — حل المستأجر من Host) + مدرس `01000000001` + طالب `01000000002` + **٣ كورسات عربية إعدادية** (الأول يحمل المسار الكامل: وحدة/فيديو YouTube/امتحان نحوي ٣ أسئلة/واجب/درس يُفتح بدخول الاختبار) + تسجيل + **entitlements لكل الموارد** (بدونها 403).
-
----
-
-## 6. إصلاحات حرجة اكتُشفت وسُدّت (كانت ستُسقط الديمو)
-
-| #   | الخلل                                                                                         | الأثر                                  | الإصلاح                             |
-| --- | --------------------------------------------------------------------------------------------- | -------------------------------------- | ----------------------------------- |
-| 1   | `req.user.sub` دائمًا `undefined` (الـstrategy ترجع `id` فقط) وكل الـcontrollers تستخدم `sub` | كل calls الامتحانات تعمل بمستخدم مجهول | `jwt.strategy.ts` + تست             |
-| 2   | مسارات مزدوجة `/api/api/...` (بادئة عامة + بادئة controllers)                                 | عناوين قبيحة/مربكة في الديمو والتوثيق  | تجريد البادئة من 16 controller      |
-| 3   | RBAC بلا `submit/exam` و`attempt/assignment` للطالب                                           | 403 على التسليم والدخول                | سياسة + 4 تستات                     |
-| 4   | entitlements تُمنح عند الشراء فقط + بدون واجبات                                               | أي طالب مسجّل مباشرة يُرفض             | منح عند التسجيل + fan-out للواجبات  |
-| 5   | `getStudentLesson` بلا فيديوهات                                                               | صفحة الدرس عمياء                       | include مفلتر READY/PUBLISHED + تست |
-
----
-
-## 7. التستات — الجرد الصادق
-
-- **API: 14 ملف spec.** آخر أخضر كامل موثّق: **91/91**. يشمل: auth/strategy، policy (RBAC)، entitlements (fan-out)، courses/structure، users/file، enrollments (grant)، lessons (videos)، exams/assignments/progression/enrollments/sections/resources/progress (قديمة).
-- **Web: ملفان (33/33)** يغطيان كل دوال الـclient (URLs/methods/bodies/envelopes).
-- **عقد الطرق `route-paths.spec.ts`**: قفل كل مسارات الحلقة — مرّ (4/4) قبل كسر الشجرة، +3 routes جديدة بانتظار شجرة سليمة.
-- **E2E:** `golden-flow` + `rls-isolation` موجودة — تعمل في CI فقط (تحتاج DB حية). محليًا: مستحيل (لا Docker).
-- **⚠️ فخ الإعداد:** يوجد إعدادا jest معًا (`jest.config.js` + مفتاح `jest` في `package.json`) → التشغيل **يجب** أن يكون `jest --config jest.config.js` وإلا فشل "Multiple configurations". يجب حذف أحدهما.
-
----
-
-## 8. CI/CD والبنية
-
-- Jobs: typecheck (api+web builds فقط — **لا يفحص الحزم!**)، lint، test-unit، build، e2e، deploy-preview، release.
-- **Bugs موثقة بالقراءة:** (1) `e2e` و`release` تشترط `refs/heads/main` والفرع الافتراضي `master` → لا تعملان أبدًا؛ (2) مفاتيح `runs-on` مكررة في 3 jobs؛ (3) `pnpm --filter web test` كان بلا سكربت (أُضيف الآن).
-- المنافذ: API `:3000` افتراضيًا (يتعارض مع web — الديمو يستخدم `:3001`)، web `:3000`، Postgres `:5432`، Redis `:6379`.
-- التشغيل: `docker compose up -d` → migrate بالمستخدم الخارق → seed → API → web (التفاصيل `docs/DEMO.md`).
-
----
-
-## 9. مناطق الزملاء والملفات المتسخة (ممنوع اللمس دون تنسيق)
-
-- **تعديلات غير مثبتة الآن (نشطة):** `policy-engine.ts`، `assignments.controller/service`، `lessons.module.ts`، `idempotency.service.ts` (**يكسر 3 suites + الـbuild حاليًا**)، و7 ملفات design-system.
-- **مخبأ مركون:** `stash@{0}` = إصلاح design-system/motion (30 ملفًا) — احتياطي، لا يُمس.
-- **مخلفات مبعثرة (غير مؤذية للبناء):** عشرات `*-out.txt` و`build*.txt` و`STATUS-fixed.txt` و`service_backup.txt` و`*.bak` و`tsbuildinfo` و`.storybook` و`stories/` — تستحق تنظيفًا جماعيًا متفقًا عليه.
-- **`ai/` محذوف:** مجلد Path-4 أزاله أحد الزملاء من الشجرة تمامًا — أي خطة AI تبدأ من الصفر.
-- **`demo-scenario/README.txt` مضلل جزئيًا:** يدّعي HttpOnly cookies (الواقع: Bearer + ذاكرة)، و"85 تست / 18 صفحة" (قديم)، و"AI evaluation (mock)" (لا وجود له)، و"register (conceptual)" (لا endpoint). المرجع الصحيح للديمو هو `docs/DEMO.md`.
-
----
-
-## 10. المخاطر مرتبة (الأعلى أولًا)
-
-1. **لا إثبات حي لأي شيء** — كل ما سبق static/tests. أول `docker up` قد يكشف مفاجآت (RLS مع seed، سياسات، CORS).
-2. **تعارض التحرير المتزامن** — ثلاثة أطراف على `master` بلا فروع؛ كسر `idempotency` الآن مثال حي. **مقترح:** فروع قصيرة + PR.
-3. **الحزم (design-system/motion) مكسورة البناء** — الـweb لا يحتاجها اليوم (CSS فقط)، لكن أي استيراد مكونات منها سيُسقط البناء.
-4. **الدخول دائمًا → `/student`** حتى للمدرس — تجربة ديمو ناقصة.
-5. **الإعدادات قراءة فقط + analytics/mock + students/mock** — صفحات حقيقية الشكل فارغة الجوهر.
-6. **الأسرار في `apps/api/.env`** (ملف حقيقي على القرص، خارج git — صحيح، لكن قيم ديمو ضعيفة).
-
----
-
-## 11. الخطوات التالية المقترحة (صغيرة، بالترتيب)
-
-1. إحضار Postgres (Docker أو سحابي) + أول تشغيل حي من `docs/DEMO.md` وتسجيل الفروقات.
-2. إصلاح `idempotency.service.ts` الجاري + حذف أحد إعدادي jest + تنظيف `*.txt` المبعثرة (جلسة نظافة واحدة).
-3. توحيد الهبوط حسب الدور (`/login` → طالب/مدرس) + إحياء `/student` بروابط وبيانات حقيقية.
-4. ربط قائمة الطلاب والتحليلات (تحتاج endpoint قائمة + فحص باك-إند التحليلات).
-5. بدء Path-4 (AI) على `ExamAttempt.answers` الجاهزة — بعد تثبيت مفتاح Gemini وإعادة مجلد `ai/` بقرار جماعي.
-6. فروع + PR بدل الدفع المباشر على `master`.
-
----
-
-## 12. جرد الـroutes الكامل (كل controllers — من الكود لا الذاكرة)
-
-البادئة العامة `/api`. المصدر: `grep` لكل `@Controller` + `@Get/@Post/...` في `apps/api/src` + قراءة ملفات الحلقة.
-
-### health (`/api`)
-
-| الطريقة | المسار        | ملاحظة                                  |
-| ------- | ------------- | --------------------------------------- |
-| GET     | `/api/health` | يُتجاوز حل المستأجر (middleware سطر 35) |
-| GET     | `/api/ready`  | نفس الإعفاء                             |
-
-### auth (`/api/auth`)
-
-POST `login` (guard محلي phone/password) · POST `refresh` (body) · POST `logout` (يستخدم `req.user.sub` — كان مكسورًا قبل `3c6d728`).
-
-### tenants / users / plans / feature-flags / entitlements
-
-- `GET /api/tenants/current` — بيانات المستأجر من Host (صفحة الإعدادات).
-- `GET /api/users/me` (ذاتي) · `GET /api/users/:id` (**جديد**: ملف الطالب، الطالب-لنفسه فقط + RBAC).
-- plans (8): `GET "", current, :planId, :planId/limits, :planId/features` + `POST check-limit, subscribe` + `PUT subscription/cancel, subscription/plan`.
-- feature-flags (6): `GET "", :key, catalog/all` + `PUT :key` + `DELETE :key`. الافتراضيات ON لـ`videoPlayback/exams/assignments` (سطور 55–108).
-- entitlements (9): `GET "", check, stats, tenant` + `POST grant, grant-course, expire` + `PUT :id/revoke, :id`.
-
-### payments (`/api/payments`)
-
-`POST orders` · `GET orders, orders/:orderId` (قائمة الطلبات: `{orders,total,page,limit,totalPages}` **بدون غلاف data** — الوحيد المختلف!) · `POST intents` · `GET intents/:intentId` · `GET methods` · `GET :paymentId/status` · `POST :paymentId/cancel` · vouchers: `POST redeem, POST "", GET ""` + `PUT :voucherId/disable`. ملاحظة: القائمة مفلترة بـ`userId` دائمًا (سطر 118) — المدرس يرى طلباته هو، لا إيراد المنصة.
-
-### video (`/api/video`) و video-protection (`/api/video-protection`)
-
-- video (8): `POST lessons/:lessonId/videos` · `GET videos/:videoId/status` · `PUT videos/:videoId/sync` · `POST videos/:videoId/playback-token` · `GET videos/:videoId` · `GET lessons/:lessonId/videos` · `DELETE videos/:videoId` · `GET providers`.
-- video-protection (11): `POST playback/authorize, playback/:sid/heartbeat, playback/:sid/capture-event, playback/:sid/end, verify-token` · `GET playback/sessions/active, config, stats, admin/students/:sid/sessions` · `PUT config` · `POST admin/sessions/:sid/revoke`.
-- webhooks controller موجود (`payments/webhooks`) — مساراته **لم تُجرد بعد** (تحتاج قراءة).
-
-### courses (`/api/v1/...` — 8 classes في `courses.controller.ts`)
-
-- teacher/courses: `POST ""` (إنشاء — صفحة new) · `GET ""` (ترجع `{data, pagination}` لا `{data}` فقط!) · `GET :id` · `PATCH :id` · `DELETE :id` · `POST :id/publish, :id/unpublish, :id/archive`.
-- public/courses: `GET ""` (بحث `?search=`) · `GET :slug` · `GET :slug/preview` (**stub جزئي**: نوع ثابت VIDEO واسم مدرس فارغ — لا تبنِ عليه) · `GET :slug/structure` (**جديد حقيقي**).
-- student/courses: `GET :courseId/structure` (**جديد**: يشترط تسجيل ACTIVE).
-- sections/lessons (مدرس): CRUD كامل + publish/unpublish + reorder (سطور 231–408).
-- student/lessons: `GET :lessonId` (الدرس + فيديوهات READY/PUBLISHED فقط).
-- student/resources + student/enrollments (سطور 470–555): **مقروءة جزئيًا — تحقق قبل الاعتماد**.
-- progress (`v1/student`): حسب STATUS (progress بـGET/PATCH/complete) — **لم تُقرأ هنا، أعيد التحقق**.
-
-### exams / assignments / progression / enrollments
-
-كما في §3.1، + `POST lessons/:lessonId/exams|assignments` (إنشاء) + `POST lessons/:lessonId/unlock|reset` (تقدّم يدوي) + **`POST assignments/:id/evaluate-ai` (جديد من الزملاء — انظر §13)**.
-
-## 13. مسار الـAI — الواقع لا الطموح (Path-4 كما هو في الكود)
-
-1. **الـroute موجود** (شغل زملاء، غير مثبت): `POST /api/v1/assignments/:id/evaluate-ai` — body `{answer, question?}` — guard يتطلب action جديدًا `"evaluate"` أُضيف للـunion (سطر 50) **لكن لا role يملكه في المصفوفة** (حتى المدرس!) → عمليًا 403 للجميع عدا SUPER_ADMIN. يحتاج سطرًا واحدًا في المصفوفة + تست.
-2. **السيرفس موجود جزئيًا** (`assignments.service.ts:609`): وضع dev يُرجع **درجة عشوائية 70–100** (`Math.random`) + نص ثابت — أي ديمو عليه اليوم يعرض أرقامًا وهمية بلا تحليل. الإنتاج الحقيقي (Gemini) غير مربوط.
-3. **عيوب compile محتملة في نفس الملف**: دالتان بنفس الاسم (609 + 655 — الثانية غلاف يستدعي الأولى → خطأ تكرار التنفيذ)، واستدعاء `answer.hashCode()` (غير موجود في JS)، واستدعاء `idempotencyService.get/set` (الموجود `checkAndStore/markCompleted`). **البناء الكامل لم يُتحقق بعد استقرار الشجرة.**
-4. **الواجهة**: `SanadAiCard.tsx` مكون عرضي صرف (props فقط، بلا fetch) — مستخدم في **صفحة واحدة**: `teachers/[slug]` (واجهة عامة!) ببيانات ثابتة على الأرجح.
-5. **مجلد `ai/` محذوف** من الشجرة — لا كود Gemini/Anthropic في أي مكان (بحث شامل = صفر).
-6. **ما يحتاجه Path-4 فعليًا** (بالترتيب): (أ) منح `evaluate` للمدرس في المصفوفة + تست؛ (ب) إصلاح الدالتين المكررتين والـhashCode والـget/set؛ (ج) ربط Gemini بمفتاح + إزالة العشوائية؛ (د) تخزين النتيجة في `gradingData` لتظهر في طابور التصحيح؛ (هـ) زر "قيّم بالذكاء" في صفحة تصحيح الواجبات (الـUI جاهز مكانه).
-
-## 14. الشجرة المتسخة — الجرد الكامل (59 مدخلًا: 12 معدل + 47 غير متتبع)
-
-- **تعديلات زملاء جارية (12 M):** `policy-engine.ts` (منح evaluate) · `assignments.controller/service` (evaluate-ai) · `lessons.module.ts` · `idempotency.service.ts` (**يكسر 3 suites + البناء الآن**) · 7 ملفات design-system (إصلاح موازٍ لمركوني).
-- **سجلات مبعثرة (~20 ملف txt):** `build*.txt` و`*-out.txt` و`STATUS-fixed.txt` و`policy-engine-fixed.txt` و`service_backup.txt` و`*.bak` و`tsbuildinfo` — كلها مخرجات تجارب، تستحق `git clean` جماعيًا متفقًا عليه (بعضها قد يحوي أسرارًا — راجع قبل الحذف).
-- **WIP حقيقي غير مثبت:** `.storybook/` + `stories/` (web وdesign-system) · `components/header,hero` · `components/motion` · `components/icon` · `demo-scenario/` · `lessons.controller.ts` (غير مسجل في الموديول = ميت حاليًا) · `vitest.config.ts/shims` · `apps/api/jest.config.js` (أحد إعدادين متصارعين!).
-- **مركوني الخاص:** `stash@{0}` (إصلاح 30 ملفًا) — لا يُمس حتى يُطلب.
-- **تصحيح مزعوم:** STATUS بند #7 يدعي `node_modules` متتبعة داخل الحزم — **مُدحَض**: `git ls-files` = صفر في الحزمتين (موجودة على القرص فقط، متجاهَلة صح).
-
-## 15. فروقات التوثيق (أين تكذب الملفات القديمة)
-
-| الملف:السطر    | الادعاء                                                          | الواقع                                                                                            |
-| -------------- | ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
-| STATUS:9,11    | 62% / Overall                                                    | لا يمكن التحقق من رقم إجمالي — المنهجية غير معرفة                                                 |
-| STATUS:23–25   | 17+ صفحة، loop بلا واجهات                                        | **32 صفحة**؛ الحلقة لها واجهات كاملة مرفوعة                                                       |
-| STATUS:30      | 85 تست                                                           | **91 api + 33 web** (آخر أخضر موثق) — والرقم يتغير يوميًا                                         |
-| STATUS:29,94   | 6 حزم                                                            | **حزمتان** على القرص                                                                              |
-| STATUS:52      | "لا seed"                                                        | `prisma/seed-path2.ts` **موجود ومثبت** (مع entitlements)                                          |
-| STATUS:166     | "اربط صفحات الامتحانات"                                          | **تم** (4 صفحات + طابوران)                                                                        |
-| STATUS:231–254 | API على :3000 وweb على :3001                                     | **معكوس** `docs/DEMO.md` (api :3001) — المنفذان يتعارضان افتراضيًا (:3000 مزدحم). وحّدوا الاتفاق! |
-| demo-scenario  | HttpOnly cookies + تسجيل حسابات + "AI (mock)" + "85 تست/18 صفحة" | الواقع: Bearer + ذاكرة؛ لا endpoint تسجيل؛ لا AI؛ الأرقام قديمة                                   |
-| STATUS:99      | golden-flow 1/1 PASS                                             | **لم يُعَد تشغيله هنا** (يحتاج DB) — الثقة بتاريخها لا بإعادة                                     |
-
-## 16. سكربتات التشغيل والتحقق (المنسوخ يعمل — المُتحقق منه بعلامة ✅)
+# حالة المشروع — Sanad EdTech
+
+### تحديث ميداني — 25 أكتوبر 2026
+
+> هذا الملف كان تقريرًا قديمًا بتاريخ 9 أكتوبر. تم استبدال محتواه بحالة حالية مختصرة. المرجع الكامل والقاطع هو [`CURRENT-STATE.md`](CURRENT-STATE.md)، والتقرير التاريخي الأصلي محفوظ في [`AUDIT-2026-10-16.md`](AUDIT-2026-10-16.md).
+
+## 1. الإصدار الحالي
+
+| البند | القيمة |
+| --- | --- |
+| الفرع | `main` |
+| آخر كوميت إنتاجي | `4951e49` — إعادة تصميم منهج الطالب ومساحة الدرس |
+| الويب | <https://sanad-edtech.vercel.app> |
+| الـAPI | <https://sanad-edtech-production.up.railway.app> |
+| فحص الصحة | `/api/health` → **200**، قاعدة البيانات **up** |
+| المستأجر التجريبي | `sanad-demo` |
+| الهجرات | 7/7 مطبقة |
+| نماذج قاعدة البيانات | 43 |
+| سياسات RLS | 138 سياسة على 43 جدولًا |
+| تفعيل RLS وقت التشغيل | **غير مفعّل بعد** — الاتصال الحالي بمستخدم المالك/السوبر |
+
+## 2. ما يعمل فعليًا
+
+- تسجيل الدخول بكوكيز HttpOnly، وتدوير refresh token، واستعادة الجلسة بعد إعادة التحميل.
+- لوحة المعلم، تأليف الكورسات والأقسام والدروس والموارد والواجبات والامتحانات، ومساحة النشر.
+- منهج الطالب: أقسام ودروس ومهام، تقدم حقيقي من الـAPI، وروابط مباشرة لكل مهمة.
+- مساحة الدرس: فيديو، ملخص امتحان، ملخص واجب، وحالة متطلب الفيديو المغلق.
+- مؤقتات من جهة السيرفر: الواجب 300 دقيقة، الامتحان 70 دقيقة؛ إعادة التحميل لا تعيد ضبط المؤقت.
+- التقدم لكل طالب: `ENTER_ASSIGNMENT` يفتح الامتحان المرتبط، و`ENTER_EXAM` يفتح الدرس التالي؛ التسجيل idempotent.
+- طابور تصحيح المعلم.
+- مركز قيادة الطالب `/student`، وكل أرقامه من استجابات السيرفر.
+- الوضع الداكن افتراضيًا، ووضع “المخطوطة الأكاديمية” الفاتح اختياري، ويُحفظ في `sanad:theme` قبل أول رسم.
+- المدفوعات: Paymob وFawry والقسائم، وتوقيع webhooks، وidempotency، ودفتر قيود، واستحقاقات، واستردادات.
+- الفيديو: مزود Bunny Stream موجود، ومسار YouTube غير المدرج مستخدم في العرض التجريبي، مع رموز تشغيل وعلامة مائية على مستوى الخدمة.
+
+## 3. الأدلة
+
+| الفحص | النتيجة |
+| --- | --- |
+| اختبارات الـAPI | **311/311**، 31 مجموعة |
+| اختبارات الويب | **137/137**، 8 ملفات |
+| بناء المشروع | **4/4** مهام |
+| الصحة الحية | **200** وقاعدة البيانات متاحة |
+| اختبار المتصفح | الكورس، روابط المهام، الدرس، الامتحان، الواجب، الفيديو المغلق، وتبديل الثيم — على سطح المكتب والموبايل |
+
+الأرقام القديمة (86، 179، 229، 276، 307، 393) تخص لقطات تاريخية وليست العدد الحالي.
+
+## 4. الفجوات الحقيقية
+
+| الأولوية | الفجوة | معنى الإغلاق |
+| --- | --- | --- |
+| P1 | تفعيل RLS على Railway | تشغيل الـAPI بمستخدم `app_user`، وإزالة `MIGRATION_DATABASE_URL` من بيئة التشغيل، وقلب أولوية الاتصال في `prisma.service.ts`، ثم نجاح اختبار العزل 5/5 |
+| P1 | موزّع الـOutbox | أحداث تُسلَّم فعليًا مع إعادة محاولة ومراقبة، لا مجرد صفوف مكتوبة |
+| P1 | Webhook الفيديو | مسار HTTP يتحقق من التوقيع ويحدّث حالة الفيديو |
+| P2 | Sandbox حقيقي للمدفوعات | عملية دفع واحدة واسترداد واحد مسجلان من مزود حقيقي |
+| P2 | فرض قفل الدرس | الـAPI لا يعيد محتوى الدرس المغلق للطالب |
+| P2 | أدلة المراجعة على مستوى الكلمة | حفظ `evidence` و`knowledge_gaps` بدل الجسر التجميعي |
+| P2 | حدود المعدل، 2FA، إدارة الأسرار، المراقبة | تنفيذ واختبار فعلي |
+| P3 | أنواع تقدم متقدمة | `COMPLETE_*`، `PASS_EXAM`، `SCORE_THRESHOLD`، `TIME_ELAPSED`، والفتح اليدوي |
+| P3 | عامل التسوية | تشغيل تسوية حقيقية على بيانات المزود |
+
+## 5. ما لا يجوز ادعاؤه
+
+- RLS ليست حماية مفعّلة على الإنتاج ما دام الاتصال بمستخدم المالك.
+- الـOutbox لا يوزّع أحداثًا.
+- لا يوجد مسار webhook للفيديو.
+- Instapay وVodafone Cash وe&money ليست وسائل دفع حية.
+- VdoCipher مجرد هيكل غير مكتمل.
+- قصة SANAD RAG وQdrant/BM25 وbenchmark 38.8ms و393 إنجازًا غير موجودة في هذا المستودع وغير موثقة.
+- CI ليس دليل الإصدار الحالي؛ الدليل هو تشغيل الاختبارات والبناء المحلي أعلاه.
+
+## 6. خطوات التحقق السريعة
 
 ```powershell
-pnpm install                                  # pnpm 9.15 حصرًا
-pnpm --filter api exec jest --config jest.config.js   # ✅ التستات (الإعداد المزدوج يكسر الافتراضي!)
-pnpm --filter web test                        # ✅ 33 تست (vitest.unit.config)
-pnpm --filter web run build                   # ✅ يشمل typecheck (يستثني stories/tests)
-pnpm --filter api run build                   # ✅ إذا تجاهلت ملفات الآخرين المكسورة
-pnpm build                                    # ❌ أحمر حاليًا (الحزم + ملفات WIP)
-npx prisma migrate deploy                     # يحتاج DB + مستخدم خارق
-pnpm --filter api exec ts-node ... seed:path2 # يحتاج DB (تحقق typecheck فقط ✅)
+pnpm --filter web test
+pnpm --filter api exec jest --config jest.config.js --runInBand
+pnpm build
+Invoke-RestMethod https://sanad-edtech.vercel.app/api/health
 ```
 
-## 17. مصفوفة الثقة (الخلاصة الصادقة لكل منطقة)
+## 7. المراجع
 
-| المنطقة                           | كود موجود           | تست وحدة        | عقد/بناء                       | تشغيل حي      |
-| --------------------------------- | ------------------- | --------------- | ------------------------------ | ------------- |
-| auth/RBAC/entitlements/flags      | ✅                  | ✅ (4+1)        | ✅ build                       | ❌            |
-| exam/assignment loop (خدمات)      | ✅                  | ✅ (قديم+جديد)  | ✅                             | ❌            |
-| exam/assignment (واجهات)          | ✅ 6 صفحات          | ✅ client فقط   | ✅ next build                  | ❌            |
-| grading (واجهتان)                 | ✅                  | ✅ client فقط   | ✅                             | ❌            |
-| structure/enroll/student-file     | ✅                  | ✅ خدمات        | ⏳ routes جديدة بلا تشغيل أخضر | ❌            |
-| evaluate-ai                       | ⚠️ نصف مكتمل        | ❌              | ❌ متوقع أحمر                  | ❌            |
-| payments/video/publishers         | ✅ (زملاء)          | ❓ لم تُفحص هنا | ❓                             | ❌            |
-| design-system/motion              | ⚠️ إصلاحان متوازيان | ❌              | ❌ أحمر                        | —             |
-| analytics/students-list/dashboard | ⚠️ mock/ساكن        | —               | ✅ يبني                        | ❌ بلا بيانات |
-
-**القاعدة المقترحة للفريق:** لا كلمة "يعمل/تم" بلا مخرج ملصق؛ والـlive-DB هو بوابة الانتقال من "مكتوب" إلى "مُتحقق".
-
-## ملحق: سجل الجلسة (13 commit مرفوعة)
-
-`3c6d728` sub · `b1156cd` routes · `e0ac9f3` client/auth/login · `1ae10b9` exam runner · `ce1a1f7` lesson+YouTube · `c277033` exam grading · `c5e92d2` contract+seed+DEMO · `e52a497` + `cf2c712` الصفحات الست · `1d73f06` أساسات API · `c79c852`/`1eb4a5d`/`4230fe8`/`a6baf6e`/`0bac878` الصفحات الخمس.
+- الحالة القاطعة: [`CURRENT-STATE.md`](CURRENT-STATE.md)
+- المعمارية الحالية: [`ARCHITECTURE.md`](ARCHITECTURE.md)
+- النشر: [`DEPLOY.md`](DEPLOY.md)
+- الأمان: [`SECURITY.md`](SECURITY.md)
+- التدقيق التاريخي: [`AUDIT-2026-10-16.md`](AUDIT-2026-10-16.md)

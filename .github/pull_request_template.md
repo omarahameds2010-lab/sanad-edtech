@@ -1,28 +1,44 @@
 ## What + Why
 
-<!-- 2-3 sentences. Link issue: Closes #123 -->
+<!-- 2-3 sentences. Link the issue: Closes #123 -->
 
-## How verified (REQUIRED)
+## How verified (required)
 
-<!-- Never claim success without proof. Paste outputs. -->
+Never claim success without proof. Paste the actual output tails.
 
+```text
+pnpm --filter web test          → Tests: 137 passed (137)
+pnpm --filter api exec jest --config jest.config.js --runInBand
+                                → Tests: 311 passed (311)
+pnpm build                      → Tasks: 4 successful, 4 total
 ```
-pnpm build → (paste tail: Tasks X successful)
-pnpm test → ( Suites: X passed )
-Manual → (steps + screenshots, if UI)
+
+For UI changes, include the route, viewport widths, and theme(s) checked.
+
+For a live change, include:
+
+```powershell
+Invoke-RestMethod https://sanad-edtech.vercel.app/api/health
 ```
 
-## Security checklist (check or explain N/A)
+## Security checklist
 
-- [ ] Guarded by `AuthorizationGuard` + `@RequirePermission` (or `@Public()` with reason)
-- [ ] Fetch by `(tenantId, id)` — no bare-ID tenant lookups
-- [ ] New table? → `tenantId` + RLS migration + FORCE (see `docs/SECURITY.md` §5.3)
-- [ ] Webhook touched? → HMAC verified BEFORE state change (raw body, constant-time)
-- [ ] Money/time/unlock decided server-side (no client trust)
-- [ ] Sensitive action emits audit row (see `docs/SECURITY.md` §9.1 catalog)
-- [ ] No secrets in diff (`git diff --cached -- .env*` empty; no tokens/keys/PAN)
-- [ ] No PII in logs (IDs only — see `docs/SECURITY.md` §9.2)
+- [ ] Guarded by `AuthorizationGuard` + `@RequirePermission` (or `@Public()` with a reason)
+- [ ] Fetches by `(tenantId, id)` — no bare-ID tenant lookups
+- [ ] New table? `tenantId` + migration + RLS policies/grants + FORCE
+- [ ] Webhook touched? Signature verified before any state change, raw body retained
+- [ ] Money/time/unlock decided server-side; no client trust
+- [ ] Sensitive action emits an audit/security row
+- [ ] No secrets in the diff (`git diff --cached -- .env*` is empty; no tokens/keys/PAN)
+- [ ] No PII in logs (IDs only)
+- [ ] If RLS-related: remember runtime enforcement is still pending, so tenant filters are mandatory
 
-## Risk + Rollback
+## Risk + rollback
 
-<!-- What breaks if this is wrong? How to revert in one commit? -->
+What breaks if this is wrong? How do we revert in one commit?
+
+## Docs
+
+- [ ] `docs/CURRENT-STATE.md` updated if runtime/test/deployment facts changed
+- [ ] `AGENTS.md` updated if architecture rules changed
+- [ ] No historical document silently rewritten without a dated banner

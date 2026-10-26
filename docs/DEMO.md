@@ -1,117 +1,159 @@
-# Demo Runbook — مساحة الأستاذ صالح حسين (جوكر اللغة العربية) + Exam Loop
+# Demo Runbook — Sanad EdTech
 
-## What this proves (3-minute pitch)
+> **Verified 25 October 2026.** This runbook uses only shipped flows. Do not improvise claims about RLS enforcement, RAG benchmarks, or live payment providers.
+> Current state: [`CURRENT-STATE.md`](CURRENT-STATE.md).
 
-0. المساحة العامة للمعلم (`/teachers/saleh-hussein`) — «The Teacher Space»: هيرو غامق `ink-950` بأورورا زمردي خفيفة + حبيبات ورق (`grain` 2%)، أفاتار وشرائح زجاجية، وكروت «غلاف كتاب» 16:9 لكورساته الثلاثة (الأول 60% والثاني/الثالث 40%) بأرقام حقيقية من السيرفر (مدة/دروس/اختبارات/سعر) — ثم «ثالوث الثقة» بفواصل تحريرية وأيقونات SVG، ولحظة تباين ختامية غامقة بدل الصندوق البيج — بظهور متدرج وزر مغناطيسي. ومن اللاندنج: كبسولة لغة زجاجية (AR/EN بزحلقة ناعمة)، صفحة «منصات المعلمين» (`/teachers`) بكارت غلاف للمدرس، وكتالوج `/courses` بكروت الغلاف نفسها وحالة «مسجل» مع شريط تقدم حقيقي.
-   0.5 المدرس ينشر من `/teacher/publish`: يختار الصف → مساحة الكورس → يضيف درسًا (فيديو/امتحان/واجب) وينشره — والطالب يجد الامتحان في «الاختبارات» والواجب في «الواجبات» فورًا.
-   0.6 **مركز قيادة الطالب** (`/student`): بينتو سينمائي داكن — إحصائيات حقيقية من السيرفر (كورساتي/دروس مفتوحة/تسليماتي)، حلقة تقدّم SVG بـ%، «أكمل من حيث توقفت» (آخر فتح مسجَّل على السيرفر مع سبب الفتح)، أجندة بحالات حقيقية («بانتظار التصحيح»...)، إشارة نشاط آخر ٧ أيام مع تلميحات زجاجية، جوازات الكورسات بنِسَب فتح، ورف إنجازات يُفتح فقط من بيانات حقيقية. دوك زجاجي بفواصل ومؤشر متحرك + كبسولة ⌘K للوحة الأوامر + **وضع تركيز** يخفت كل حاجة عدا الهيرو وبطاقة «أكمل التعلم».
-1. طالب يدخل امتحانًا بتايمر سيرفر (70 دقيقة)، يحل MCQ وصح/خطأ ومقاليًا، يتنقل بين الأسئلة، ويسلّم (يدويًا أو تلقائيًا عند انتهاء الوقت).
-2. دخول الاختبار يفتح الدرس التالي تلقائيًا (ENTER_EXAM progression).
-3. الدرس يعرض فيديو YouTube UNLISTED حقيقيًا.
-4. المدرس يرى طابور المحاولات ويصحح بالدرجة والملاحظات، والطالب يرى نتيجته.
+## 1. What the demo proves
 
-## Prerequisites
+In three minutes:
 
-- Docker with Postgres 15 + Redis 7 (see `docker-compose.yml`), **or** any Postgres 15 reachable via `DATABASE_URL`.
-- Node 20 + pnpm 9.
-- A YouTube UNLISTED video id for the lesson player (`DEMO_YOUTUBE_ID`).
+1. A teacher owns a branded space with real courses.
+2. A student sees a real curriculum, not a card mock.
+3. The student enters an assignment, then an exam, and progression unlocks the next lesson.
+4. The teacher grades the work.
+5. The UI works in Arabic RTL, dark and light, on desktop and mobile.
 
-## 1) Start infrastructure
+That is the honest core. Payments and AI can be shown as code paths, but not as a live provider transaction unless one has actually been run.
+
+## 2. Live demo
+
+| Surface | URL |
+| --- | --- |
+| Web | <https://sanad-edtech.vercel.app> |
+| Health | <https://sanad-edtech.vercel.app/api/health> |
+
+| Role | Phone | Password |
+| --- | --- | --- |
+| Teacher | `01000000001` | `Joker-Arabic#2026` |
+| Student | `01000000002` | `Student123!` |
+
+The production tenant is `sanad-demo` with three published Arabic prep courses.
+
+### Pre-flight
+
+```powershell
+Invoke-RestMethod https://sanad-edtech.vercel.app/api/health
+```
+
+Expected: `status: ok`, `database: up`. If health is down, stop; do not demo around a broken API.
+
+## 3. Three-minute flow
+
+### 0:00 — Teacher space
+
+1. Open `/login`, sign in as the teacher.
+2. Show `/teacher` and `/teacher/courses`: three published courses.
+3. Open a course builder or the publish workspace and point out sections, lessons, assignment, and exam — all authored in the UI.
+
+Do not claim the platform auto-generates content. The teacher authored it.
+
+### 0:40 — Student curriculum
+
+1. Log out (or use a private window) and sign in as the student.
+2. Open `/student/courses` → the Arabic course.
+3. Show the curriculum board:
+   - sections and lessons;
+   - task chips for video, assignment, exam;
+   - progress and available/locked counts from the API;
+   - direct links into each task.
+
+Point out that the counts are not hardcoded: they come from the curriculum response.
+
+### 1:20 — Lesson and prerequisite
+
+1. Open a video lesson. Show the player and the lesson rail.
+2. Open the lesson whose video is gated by the assignment. Show the locked-video state.
+3. Explain the active rule: `ENTER_ASSIGNMENT` unlocks the linked exam; `ENTER_EXAM` unlocks the next lesson.
+
+Do not claim score-based unlocking or server-enforced lock confidentiality. Only entry-based progression is active.
+
+### 1:50 — Assignment + exam
+
+1. Open the assignment. Show the 300-minute server timer and the brief.
+2. Enter the assignment, submit (or show an already-submitted attempt).
+3. Open the exam. Show the 70-minute timer, question types, and no correct answers in the student view.
+4. Submit the exam.
+
+### 2:30 — Grading
+
+1. Sign back in as the teacher.
+2. Open the grading queue for the exam or the assignment submission.
+3. Show score + feedback.
+4. Return to the student result screen and show the teacher's feedback.
+
+### 2:50 — Theme and responsive check
+
+1. Toggle the student dock's Moon/Sun control.
+2. Reload: the theme persists (`sanad:theme`), and the session restores from the refresh cookie.
+3. Resize to mobile width; show the curriculum and lesson layout.
+
+## 4. Optional: payments
+
+Show the payment state machine in code or docs:
+
+```text
+Order → PaymentIntent → Provider → Payment → LedgerEntry → Entitlement
+```
+
+What is true:
+
+- Paymob/Fawry/voucher integrations and signed webhooks exist;
+- idempotency and refund settlement are implemented;
+- local webhook/refund smokes passed.
+
+What is not proven:
+
+- a real Paymob/Fawry sandbox charge in this release;
+- Instapay/Vodafone Cash/e&money as live methods.
+
+Say “implemented and locally proven” — not “live with every provider.”
+
+## 5. Optional: AI evaluation
+
+The client calls `/api/v1/assignments/:id/evaluate-ai`; the API has a SANAD client configured through `SANAD_BASE_URL` / `SANAD_API_KEY`.
+
+That is all this repo proves. Do not present:
+
+- Qdrant/BM25/RRF;
+- `38.8ms`;
+- `Recall@5 = 0.75`;
+- “393 achievements”;
+- auto-grading as a replacement for teacher review.
+
+If the external SANAD service is not configured, say so and skip the AI segment.
+
+## 6. Local demo
 
 ```powershell
 docker compose up -d
-```
-
-## 2) Migrate + seed (superuser bypasses RLS for seeding only)
-
-```powershell
+Copy-Item apps/api/.env.example apps/api/.env
 cd apps/api
-$env:MIGRATION_DATABASE_URL="postgresql://postgres:postgres@localhost:5432/learning_platform?schema=public"
-$env:DATABASE_URL=$env:MIGRATION_DATABASE_URL
-npx prisma migrate deploy
-$env:DEMO_YOUTUBE_ID="PASTE_UNLISTED_ID_HERE"
+pnpm exec prisma generate
+pnpm exec prisma migrate deploy
+$env:DEMO_YOUTUBE_ID="<unlisted-id>"
 pnpm seed:path2
+pnpm run dev
 ```
 
-The seed prints credentials and ids. Demo accounts:
-
-| Role    | Phone       | Password          |
-| ------- | ----------- | ----------------- |
-| Teacher | 01000000001 | Joker-Arabic#2026 |
-| Student | 01000000002 | Student123!       |
-
-It also registers the `localhost` tenant domain (required: tenant resolution is Host-based).
-
-## 3) Run the apps (two terminals)
+In a second terminal:
 
 ```powershell
-# Terminal 1 — API on :3002 (canonical lock: API :3002, Web :3001)
-cd apps/api
-pnpm run dev
-
-# Terminal 2 — Web on :3001 (expects NEXT_PUBLIC_API_URL=http://localhost:3002)
 cd apps/web
-$env:NEXT_PUBLIC_API_URL="http://localhost:3002"
 pnpm dev
 ```
 
-## 4) Pitch flow (student)
+Open `http://localhost:3001/login`.
 
-1. Open `http://localhost:3001/login` → login as student.
-2. Go to `/student/exams` → open "اختبار: المهارات النحوية".
-3. Intro shows question count, server timer, attempts used → "بدء الاختبار".
-4. Answer Q1 (MCQ, option `b`), Q2 (True/False), Q3 (essay — this is where Sanad AI grading plugs in later).
-5. Use السابق/التالي + palette; watch the server-anchored countdown.
-6. "إنهاء الاختبار وتسليم الإجابات" → result screen → "الدرس التالي" (unlocked by ENTER_EXAM).
+The seed registers the localhost tenant domain; tenant resolution is Host-based, so use `localhost:3001`, not a random IP.
 
-## 5) Lecture (YouTube UNLISTED)
+## 7. Known limitations to mention if asked
 
-- The next lesson page embeds `https://www.youtube-nocookie.com/embed/<DEMO_YOUTUBE_ID>`.
-- If the lesson shows locked, the exam-enter step did not run — check the API log for `CONTENT_UNLOCKED`.
+- RLS policies exist but production still connects with the owner/superuser URL; RLS is not enforcing yet.
+- Outbox events are written but not dispatched.
+- No video webhook endpoint.
+- Locked lessons can still return content in student API views.
+- Word-level review highlights are not persisted.
+- Advanced progression types are future work.
+- CI is not the release evidence for this commit; local runs are.
 
-## 6) Teacher grading
-
-1. Login as teacher → `/teacher/exams` → open the exam → grading queue.
-2. Open the student attempt, review answers, set score 0–100 + feedback → "حفظ الدرجة".
-3. Back as student: result screen shows الدرجة + ناجح/راسب (passing 60%).
-
-## 7) Teacher authoring (UI, no DB console needed)
-
-مسار النشر كامل من قائمة «النشر» عند المدرس:
-
-1. **مساحة النشر** (`/teacher/publish`): ثلاثة كروت للصفوف (الأول/الثاني/الثالث الإعدادي) بعدادات حقيقية لكل صف (كورسات/دروس/منشور/امتحانات/واجبات).
-2. **صفحة الصف** (`/teacher/publish/<prep-1|prep-2|prep-3>`): كورسات الصف + مناهجها، وأزرار «فتح الامتحان» و«تصحيح الواجب» على الدروس. زر «+ كورس جديد للصف» يفتح الإنشاء والصف مُعبَّأ مسبقًا.
-3. **مساحة الكورس** (`/teacher/courses/<id>`): نشر/إلغاء نشر الكورس، «+ إضافة وحدة»، و«+ إضافة درس» (النوع: فيديو/امتحان/واجب)، مع نشر/إلغاء نشر/حذف لكل درس (الحذف يشمل الامتحان/الواجب المرتبط تلقائيًا).
-4. **محرر الدرس** (`/teacher/lessons/<id>`): بيانات الدرس + محرر حسب النوع —
-   - **فيديو**: الصق معرّف يوتيوب UNLISTED → «ربط فيديو يوتيوب» (`POST /api/video/youtube`).
-   - **امتحان**: إعدادات + أسئلة (MCQ/صح-خطأ/مقالي) → «حفظ ونشر الاختبار» (`POST /api/v1/exams/lessons/:lessonId/exams` → `.../questions` → `.../publish`).
-   - **واجب**: إعدادات → «حفظ ونشر الواجب» (`POST /api/v1/assignments/lessons/:lessonId/assignments` → `.../publish`).
-5. بعد النشر: الطالب يجد الامتحان في `/student/exams` والواجب في `/student/assignments` ومحتوى الدرس في صفحة الدرس.
-6. **امتحان بعد كل محاضرة**: اضبط صف الدرس التالي `unlockType=ENTER_EXAM, unlockTargetId=<examId>, lockStatus=LOCKED` (تحديث Prisma/API واحد) — دخول الامتحان يفتحه تلقائيًا.
-7. **الطلاب + التليفونات**: `/teacher/students` يعرض كل طالب مسجّل في كورساتك بأرقام تليفونه.
-8. **الصفحة العامة للكورس** (`/courses/<slug>` من `/courses`): تصميم «Editor's Stage» — خلفية ورقية `paper-50` مع حرف «ع» شبح مقطوع في الكورنر، شبكة 7:5 (المحتوى يمين، الكارت شمال)، كارت تسجيل زجاجي sticky بحواف gleam وزر magnet، المنهج على شكل دفتر (أيقونة نوع + عنوان + قفل + توست للدرس المقفول)، وكل الأرقام (عدد الدروس/مدة المحتوى/السعر) من السيرفر. للزائر: «سجل الدخول للتسجيل» — للطالب المسجل: «أنت مسجل بالفعل ✓».
-
-## Verification already done in CI/local
-
-- `pnpm --filter api run build` + full jest suite (86+ tests incl. `route-paths.spec.ts` locking every URL below).
-- `pnpm --filter web test` (72 tests: api 40 + dashboard 26 + exam 6) + `next build`.
-- Locked HTTP contract (global prefix `/api`):
-
-| Call                     | Method + Path                                     |
-| ------------------------ | ------------------------------------------------- |
-| login                    | POST /api/auth/login                              |
-| exam view (no answers)   | GET /api/v1/exams/:id/view                        |
-| enter (idempotent)       | POST /api/v1/exams/:id/enter + `idempotency-key`  |
-| timer (server expiresAt) | GET /api/v1/exams/:id/timer                       |
-| submit (idempotent)      | POST /api/v1/exams/:id/submit + `idempotency-key` |
-| my attempts              | GET /api/v1/exams/:id/attempts/me                 |
-| next lesson              | GET /api/v1/progression/lessons/:id/next          |
-| lesson + videos          | GET /api/v1/student/lessons/:id                   |
-| grading queue            | GET /api/v1/exams/:id/attempts/grading            |
-| grade                    | POST /api/v1/exams/attempts/:attemptId/grade      |
-
-## Next (explicitly out of Path-2 scope)
-
-- Sanad AI essay auto-grading (Path 4) consumes `ExamAttempt.answers` graded here.
-- Bunny/VdoCipher upload pipeline (Path 3); YouTube is the demo source.
-- BFF session proxy to replace the in-memory web token (demo-grade auth noted in code).
+Honesty is part of the demo. The shipped loop is strong enough without invented numbers.
