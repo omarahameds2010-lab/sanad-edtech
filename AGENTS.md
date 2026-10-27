@@ -37,16 +37,18 @@
 
 - Branch `feat/security-quick-wins` adds a global per-IP `@nestjs/throttler` guard: 120/min per route, login 10/min, register 5/min, refresh 30/min; health/readiness and payment webhooks opt out.
 - It also redacts `assignment`/`exam`/`videos` from locked student lesson payloads and returns `403 LESSON_LOCKED` from student assignment/exam view/enter endpoints unless a per-student grant exists.
+- Authoring reads now require `update`: `GET /api/v1/exams/:examId`, the generic assignment read, teacher lesson routes, and legacy lesson routes. Student lists return navigation metadata only; pre-start exam views withhold the question paper but expose `questionCount`.
 - Throttler storage is in-memory per API instance; forwarded-header client IPs are best-effort, not an authorization boundary.
-- Local evidence: API **324/324** (33 suites), web **137/137**, build **4/4**, login-limit smoke `401`×10 → `429` with `Retry-After`. Production remains `4951e49` until this branch is merged and deployed.
+- Local evidence: API **344/344** (34 suites), web **137/137**, build **4/4**, login-limit smoke `401`×10 → `429` with `Retry-After`. Production remains `4951e49` until this branch is merged and deployed.
 
 ### Pending assignment-retakes branch — 2026-10-27 (not deployed)
 
-- Branch `feat/assignment-retakes` is stacked on `feat/security-quick-wins`.
+- Branch `feat/assignment-retakes` merges `feat/security-quick-wins` (merge commit `a26d946`) and carries the retake lifecycle.
 - Migration #8 (`20261027000001_assignment_retakes`) adds `attemptNumber`, `startedAt`, nullable `submittedAt`, the `IN_PROGRESS` submission status, and replaces the one-row unique key with `(assignmentId, studentId, attemptNumber)`. Existing rows are backfilled as submitted attempt #1 with `startedAt = submittedAt`.
 - Active work is an `IN_PROGRESS` row with `submittedAt = null`; submitting sets the final timestamp. The student view/timer and teacher queue use the active marker, and teacher/student history excludes in-progress rows from grading.
-- The API enforces `maxAttempts`, starts attempt N+1 after a completed attempt, and converts a concurrent duplicate insert into `409`. The web runner labels the next start as a new attempt; the teacher queue displays the attempt number.
-- Local evidence: API **331/331** (33 suites), web **138/138**, build **4/4**, fresh local PostgreSQL migration chain **8/8**, a legacy-shaped database backfilled as attempt #1 (`startedAt = submittedAt`), `prisma migrate diff` no drift, retake HTTP smoke (attempt 1 → submit → attempt 2 → max-attempt 400 → teacher queue excludes active), concurrent-start smoke **201/409** with one active row, and browser QA (submit attempt 1 → reload shows «محاولة جديدة» → attempt 2 starts with a fresh timer). Production still has **7** migrations and no retakes until this branch is merged and deployed.
+- The API enforces `maxAttempts`, starts attempt N+1 after a completed attempt, checks an active attempt before the max-attempt count (`409`, not `400`), derives the next number from the highest stored attempt (gap-tolerant), and converts a concurrent duplicate insert into `409`. The web runner labels the next start as a new attempt; the teacher queue displays the attempt number.
+- Student overview fixes: completion uses `submissions.some((s) => s.submittedAt !== null)`, an active attempt outranks an older grade in status/CTA, result review scans every attempt, and `LESSON_LOCKED` renders a prerequisite lock card instead of a failure state.
+- Local evidence: API **353/353** (34 suites), web **145/145** (9 files), API/web `tsc --noEmit` clean, build **4/4**, fresh local PostgreSQL migration chain **8/8**, a legacy-shaped database backfilled as attempt #1 (`startedAt = submittedAt`), `prisma migrate diff` no drift, retake HTTP smoke (attempt 1 → submit → attempt 2 → max-attempt 400 → teacher queue excludes active), concurrent-start smoke **201/409** with one active row, read-only production preflight (1 total / 1 submitted / 0 null content), and browser QA: active attempt #2 with a prior grade showed «قيد الحل», «متابعة الحل», secondary «مراجعة المحاولة السابقة», and 100% completion; a locked assignment showed «مقفل» and «سلّم الواجب السابق أولًا» in dark and light themes with no horizontal overflow. Production still has **7** migrations and no retakes until this branch is merged and deployed; migration #8 and a Railway backup remain pending.
 
 ## ⚠️ Verified Reality (audit trail — current release is above)
 

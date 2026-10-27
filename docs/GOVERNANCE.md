@@ -58,7 +58,7 @@ pnpm --filter api exec jest --config jest.config.js --runInBand
 pnpm build
 ```
 
-Current expected results on `main`: **137/137 web**, **311/311 API**, **4/4 build**. On the pending `feat/security-quick-wins` branch, the API count is **324/324** (33 suites). On the stacked `feat/assignment-retakes` branch, the expected results are **138/138 web**, **331/331 API**, and **4/4 build**, with migration #8 verified as **8/8** on a fresh local PostgreSQL.
+Current expected results on `main`: **137/137 web**, **311/311 API**, **4/4 build**. On the pending `feat/security-quick-wins` branch, the API count is **344/344** (34 suites). On the `feat/assignment-retakes` branch (with hardening merged), the expected results are **145/145 web**, **353/353 API**, and **4/4 build**, with migration #8 verified as **8/8** on a fresh local PostgreSQL and a read-only production preflight before any Railway migration.
 
 Older versions of this document claimed the design-system build had 24 pre-existing errors and the web suite had 8 port-drift failures. Those conditions are no longer true at `4951e49`; do not use them to justify skipping gates.
 

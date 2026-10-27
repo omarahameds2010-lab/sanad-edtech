@@ -36,13 +36,14 @@
 >
 > - Global per-IP rate limiting: 120 requests/minute per route; login 10/min, register 5/min, refresh 30/min; health/readiness and payment webhooks exempt.
 > - Locked lesson payloads are metadata-only; student assignment/exam view and enter endpoints return `403 LESSON_LOCKED` without a per-student grant.
+> - Authoring reads require `update`: generic exam/assignment reads, teacher lesson routes, and legacy lesson routes. Student lists expose navigation metadata only, and pre-start exam views withhold the question paper.
 > - Throttler storage is in-memory per API instance; the client key comes from forwarded headers and is best-effort, not an authorization boundary.
 >
 > **Additional controls on `feat/assignment-retakes` (not deployed)**
 >
-> - Attempts are unique on `(assignmentId, studentId, attemptNumber)`; the API enforces `maxAttempts` server-side and returns `409` for a concurrent duplicate start.
-> - An active attempt is `IN_PROGRESS` with `submittedAt = null`; teacher grading queues and teacher student-file history exclude it, while the student can resume it.
-> - Migration #8 backfills existing rows as submitted attempt #1 and keeps their original timestamps.
+> - Attempts are unique on `(assignmentId, studentId, attemptNumber)`; the API enforces `maxAttempts` server-side and returns `409` for a concurrent duplicate start. An active attempt is checked before the max-attempt count, so the final open attempt returns `409`, not `400`.
+> - An active attempt is `IN_PROGRESS` with `submittedAt = null`; teacher grading queues and teacher student-file history exclude it, while the student can resume it. The next number is derived from the highest stored attempt, tolerating history gaps.
+> - Migration #8 backfills existing rows as submitted attempt #1 and keeps their original timestamps. The read-only production preflight passed; the migration and a backup remain pending.
 >
 > **Critical caveat**
 >
@@ -1482,7 +1483,7 @@ DELIVERABLE: findings with SEVERITY + REPRO (requestIds) + retest window. Fix SL
 | v0.1 | 2026-10-04 | Original 430-line spec (architecture + policies, pre-verification) |
 | v1.0 | 2026-10-08 | Full rewrite, 4000+ lines: 10 parts + appendices; EVERY control cited to code (file:line) or marked 🧪/📋; posture dashboard from live grep (Argon2, rotation, 22 actions, redeem-closed, RLS 178+26, HMAC ×5 surfaces, boot validator); 6 runbooks; STRIDE ×6 domains; Egypt PDPL/PCI/minors; pentest scope |
 | v2.0 | 2026-10-25 | Current-state banner; RLS counts corrected to 138 policies / 43 tables with runtime activation pending; Bunny webhook marked helper-only; outbox/Bull/video-route gaps called out; token TTL confirmed 5 minutes; local test/build evidence recorded |
-| v2.1 | 2026-10-27 | Pending retakes branch documented: active-attempt status, attempt uniqueness, server-side `maxAttempts`, grading-queue exclusion, migration #8 backfill; production remains on the one-row model |
+| v2.1 | 2026-10-27 | Pending retakes branch documented: active-attempt status, attempt uniqueness, server-side `maxAttempts`, active-before-max `409`, gap-tolerant numbering, grading-queue exclusion, migration #8 backfill/preflight; authoring-read bypass fixes added to the hardening branch; production remains on the one-row model |
 
 ---
 

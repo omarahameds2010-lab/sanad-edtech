@@ -39,7 +39,7 @@ Browser
    pnpm build
    ```
 
-   Current expected evidence on `main`: **137/137 web**, **311/311 API**, **4/4 build**. The pending `feat/security-quick-wins` branch is **324/324 API**; the stacked `feat/assignment-retakes` branch is **331/331 API**, **138/138 web**, **4/4 build**, plus the local retake and concurrent-start smokes.
+   Current expected evidence on `main`: **137/137 web**, **311/311 API**, **4/4 build**. The pending `feat/security-quick-wins` branch is **344/344 API**; the `feat/assignment-retakes` branch (with hardening merged) is **353/353 API**, **145/145 web**, **4/4 build**, plus the local retake, concurrent-start, lock-card, and migration-preflight checks.
 
 3. Do not commit `.env`, logs, or generated scratch files.
 
@@ -164,6 +164,15 @@ Production has **7** migrations. The stacked retakes branch adds an eighth:
 ```
 
 Migration #8 is additive: existing submissions are backfilled as submitted attempt #1 with `startedAt = submittedAt`, then `submittedAt` becomes nullable and the unique key becomes `(assignmentId, studentId, attemptNumber)`. Apply it only after the branch is approved, and take a database backup first.
+
+Run the read-only preflight before the migration:
+
+```sql
+SELECT COUNT(*) FROM assignment_submissions
+WHERE status = 'SUBMITTED' AND content IS NULL;
+```
+
+The production preflight on 27 October 2026 returned **1 total submission, 1 submitted, 0 with null content, 0 empty content**. No migration was applied by that check; a Railway backup is still required.
 
 Apply with the migration/owner URL. Prisma's datasource reads `DATABASE_URL`, so set it to the owner URL for the migration command:
 

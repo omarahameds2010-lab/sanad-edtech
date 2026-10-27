@@ -35,9 +35,9 @@ These are **demo accounts**. Never reuse demo credentials for a real tenant.
 
 Production is `main`; the verified app release is `4951e49`. Documentation-only commits after it do not change runtime code. The last verified production run: **311/311 API tests, 137/137 web tests, 4/4 build tasks**, and both health endpoints returning `200` with the database up. Full evidence: [`docs/CURRENT-STATE.md`](docs/CURRENT-STATE.md).
 
-A pending hardening branch, `feat/security-quick-wins`, adds per-IP/auth rate limiting and server-side lock enforcement. Its local evidence is **324/324 API tests (33 suites), 137/137 web tests, 4/4 build tasks**, plus a live local login-limit smoke. It is **not deployed** yet; production remains `4951e49`.
+A pending hardening branch, `feat/security-quick-wins`, adds per-IP/auth rate limiting, server-side lock enforcement, and authoring-read bypass fixes. Its local evidence is **344/344 API tests (34 suites), 137/137 web tests, 4/4 build tasks**, plus a live local login-limit smoke. It is **not deployed** yet; production remains `4951e49`.
 
-The stacked `feat/assignment-retakes` branch adds a real attempt model (migration #8), server-side `maxAttempts`, and retake-aware student/teacher UI. Its local evidence is **331/331 API tests (33 suites), 138/138 web tests, 4/4 build tasks**, an **8/8** fresh migration chain, and retake plus concurrent-start HTTP smokes. It is **not deployed**.
+The `feat/assignment-retakes` branch (hardening merged) adds a real attempt model (migration #8), server-side `maxAttempts`, active-before-max ordering, and retake-aware student/teacher UI. Its local evidence is **353/353 API tests (34 suites), 145/145 web tests, 4/4 build tasks**, an **8/8** fresh migration chain, retake plus concurrent-start HTTP smokes, and browser QA for active retakes and locked assignments. Migration #8 has **not** been applied to Railway; the read-only preflight passed and a backup is still required.
 
 ---
 
@@ -441,9 +441,9 @@ Current verified counts:
 | Suite | Result |
 | --- | --- |
 | API on `main` (`4951e49`) | **311/311**, 31 suites |
-| API on `feat/security-quick-wins` | **324/324**, 33 suites |
-| API on `feat/assignment-retakes` | **331/331**, 33 suites |
-| Web | **138/138**, 8 files |
+| API on `feat/security-quick-wins` | **344/344**, 34 suites |
+| API on `feat/assignment-retakes` | **353/353**, 34 suites |
+| Web | **145/145**, 9 files |
 | Build | **4/4** tasks |
 | Live health | **200**, database up |
 

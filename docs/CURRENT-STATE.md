@@ -10,8 +10,8 @@
 | --- | --- |
 | Production branch | `main` |
 | Verified app commit | `4951e49` — `feat(web): redesign student curriculum and lesson workspace` (later docs-only commits do not change runtime code) |
-| Pending hardening branch | `feat/security-quick-wins` — rate limiting + lock enforcement; local only, **not deployed** |
-| Pending assignment-retakes branch | `feat/assignment-retakes` — stacked on the hardening branch; local only, **not deployed** |
+| Pending hardening branch | `feat/security-quick-wins` — rate limiting, lock enforcement, and authoring-read bypass fixes; local only, **not deployed** |
+| Pending assignment-retakes branch | `feat/assignment-retakes` — merge of the hardening branch plus the attempt lifecycle; local only, **not deployed** |
 | Web | <https://sanad-edtech.vercel.app> |
 | API (direct) | <https://sanad-edtech-production.up.railway.app> |
 | API through the web domain | <https://sanad-edtech.vercel.app/api/health> (Vercel rewrite to Railway) |
@@ -36,9 +36,9 @@ These are seeded demo accounts, not production customer accounts.
 | Check | Result |
 | --- | --- |
 | API unit suite on `main` (`4951e49`) | **311 / 311 passed**, 31 suites (`pnpm --filter api exec jest --config jest.config.js --runInBand`) |
-| API unit suite on `feat/security-quick-wins` | **324 / 324 passed**, 33 suites (13 new security tests) |
-| API unit suite on `feat/assignment-retakes` | **331 / 331 passed**, 33 suites (7 new retake/active-attempt tests) |
-| Web unit suite | **138 / 138 passed**, 8 files (`pnpm --filter web test`) |
+| API unit suite on `feat/security-quick-wins` | **344 / 344 passed**, 34 suites |
+| API unit suite on `feat/assignment-retakes` | **353 / 353 passed**, 34 suites |
+| Web unit suite | **145 / 145 passed**, 9 files (`pnpm --filter web test`) |
 | TypeScript | `pnpm --filter web exec tsc --noEmit` and the API typecheck pass |
 | Monorepo build | `pnpm build` → **4/4 tasks successful** |
 | Live health | Web `/api/health` and direct Railway `/api/health` both return **200**, database up |
@@ -47,10 +47,12 @@ These are seeded demo accounts, not production customer accounts.
 | Legacy backfill | A legacy-shaped database with one existing submission migrated cleanly to attempt #1, preserving `submittedAt` and setting `startedAt = submittedAt` |
 | Retake HTTP smoke | Attempt 1 → submit → attempt 2 starts → third start returns **400** at `maxAttempts=2`; teacher queue excludes the in-progress attempt |
 | Concurrent-start smoke | Two simultaneous `enter` requests → **201 + 409**, exactly one `IN_PROGRESS` row |
-| Retake browser QA | Student submitted attempt 1; reload showed «محاولة جديدة» and attempt 2 started with a fresh 300-minute timer |
+| Retake browser QA | Student submitted attempt 1; reload showed «محاولة جديدة» and attempt 2 started with a fresh 300-minute timer. A second QA pass with a graded attempt #1 plus an active attempt #2 showed «قيد الحل», primary «متابعة الحل», secondary «مراجعة المحاولة السابقة», and completion **100% (1/1)**. |
+| Locked-assignment QA | With the lesson grant removed, the assignment list rendered «مقفل», the prerequisite «سلّم الواجب السابق أولًا», and a lesson link instead of a generic failure. Verified in dark and light themes with no document-level horizontal overflow. |
+| Migration preflight | Read-only production check before migration #8: **1 total** submission, **1 submitted**, **0** with null content, **0** empty content. Migration and backup remain pending. |
 | Curriculum/lesson QA | Course page, curriculum task links, video lesson, exam brief, assignment brief, locked-video prerequisite, and theme toggle verified in a browser at desktop and mobile widths |
 
-The production API suite is **311/311**; the hardening branch is **324/324**, and the stacked retakes branch is **331/331**. Older documents that mention 86, 179, 229, 276, 307, or 393 tests are historical snapshots, not the current count.
+The production API suite is **311/311**; the hardening branch is **344/344**, and the retakes branch (with the hardening branch merged) is **353/353**. Web is **145/145** on the retakes branch. Older documents that mention 86, 179, 229, 276, 307, or 393 tests are historical snapshots, not the current count.
 
 ## Stack and repository facts
 
@@ -58,7 +60,7 @@ The production API suite is **311/311**; the hardening branch is **324/324**, an
 | --- | --- |
 | Web | Next.js `^15.0.0`, React `^19.0.0`, App Router, TypeScript |
 | API | NestJS 10 modular monolith, 13 domain modules |
-| Database | PostgreSQL + Prisma `5.22.0`; **43 models**, 35 enums, 7 production migrations (8 on the retakes branch) |
+| Database | PostgreSQL + Prisma `5.22.0`; **43 models**, 35 enums, 7 production migrations; migration #8 is committed on the retakes branch and **not applied to Railway** |
 | Auth | JWT access token in an HttpOnly cookie + rotating opaque refresh token; refresh-on-mount in the SPA |
 | Cache/jobs | Redis and Bull dependencies are installed; **no Bull processors or outbox relay are wired** |
 | Storage | R2/S3 signing helpers exist; not part of the verified demo flow |
@@ -96,6 +98,9 @@ The repository does **not** have a root `tsconfig.base.json` or a root `.env.exa
 - Forwarded-IP extraction (`X-Forwarded-For` first, then `X-Real-IP`, then the socket address). This is a best-effort rate-limit key, not an authorization boundary; a direct caller can spoof the header.
 - Locked-lesson payload redaction: `GET /api/v1/student/lessons/:lessonId` returns title/description/access metadata but `assignment: null`, `exam: null`, and `videos: []` while locked.
 - Assessment lock enforcement: student assignment/exam view and enter endpoints return **403 `LESSON_LOCKED`** when the lesson is locked and the student has no per-student unlock grant.
+- Authoring-read bypass fixes: `GET /api/v1/exams/:examId`, the generic `GET /api/v1/assignments/:assignmentId`, teacher lesson routes, and legacy lesson routes now require the `update` action, not student `read`.
+- Pre-start exam protection: the student exam view withholds the question paper until an attempt is active; `questionCount` remains available for the intro screen.
+- Student assignment/exam lists return navigation metadata only. Descriptions, instructions, questions, attempts, and grading fields stay behind the locked `/view` routes.
 
 Production `4951e49` does not include any of these changes yet.
 
@@ -106,11 +111,13 @@ Production `4951e49` does not include any of these changes yet.
 - Migration #8 `20261027000001_assignment_retakes`: `attemptNumber`, `startedAt`, nullable `submittedAt`, the `IN_PROGRESS` submission status, and a unique `(assignmentId, studentId, attemptNumber)` key replacing the one-row unique key.
 - Safe backfill of existing rows as submitted attempt #1; `startedAt` is backfilled from the old `submittedAt`. No existing row is deleted or rewritten.
 - Active-attempt semantics: `IN_PROGRESS` + `submittedAt = null` while the student writes; submit sets the final timestamp. Timers derive from `startedAt`, not `submittedAt`.
-- Server-side `maxAttempts` enforcement, attempt N+1 after a completed attempt, and a `409` for concurrent duplicate starts.
+- Server-side `maxAttempts` enforcement, attempt N+1 after a completed attempt, and a `409` for concurrent duplicate starts. An active attempt is checked before the max-attempt count, so an open final attempt returns `409`, not a misleading `400`.
+- The next attempt number is `max(count, highest stored attemptNumber) + 1`, tolerating gaps in legacy history.
 - Teacher grading queue and teacher student-file history exclude in-progress attempts. Student history includes them with `submittedAt: null`.
 - Assignment list/runner and dashboard types handle nullable timestamps; the teacher queue shows the attempt number.
+- Student overview fixes: completion counts any submission with a non-null `submittedAt`; an active `IN_PROGRESS` attempt outranks an older grade; result review scans all attempts; and a `LESSON_LOCKED` response renders the prerequisite lock card instead of a failure state.
 
-Production `4951e49` still has one submission row per student/assignment and does **not** enforce retakes.
+Production `4951e49` still has one submission row per student/assignment and does **not** enforce retakes. Migration #8 has **not** been applied to Railway; the read-only preflight passed and a backup is still required before deployment.
 
 ## Known limits and absent features
 

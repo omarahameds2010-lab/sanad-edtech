@@ -7,8 +7,8 @@
 | Item | Value |
 | --- | --- |
 | Production branch / verified app commit | `main` / `4951e49` |
-| Pending hardening branch | `feat/security-quick-wins` — rate limiting + lock enforcement; local only, not deployed |
-| Pending retakes branch | `feat/assignment-retakes` — stacked on the hardening branch; local only, not deployed |
+| Pending hardening branch | `feat/security-quick-wins` — rate limiting, lock enforcement, and authoring-read fixes; local only, not deployed |
+| Pending retakes branch | `feat/assignment-retakes` — hardening branch merged plus the attempt lifecycle; local only, not deployed |
 | Web | <https://sanad-edtech.vercel.app> |
 | API | <https://sanad-edtech-production.up.railway.app> |
 | Health | `/api/health` → **200**, database **up** |
@@ -24,15 +24,17 @@
 | Check | Result | Command |
 | --- | --- | --- |
 | API tests on `main` | **311/311**, 31 suites | `pnpm --filter api exec jest --config jest.config.js --runInBand` |
-| API tests on hardening branch | **324/324**, 33 suites | Same command on `feat/security-quick-wins` |
-| API tests on retakes branch | **331/331**, 33 suites | Same command on `feat/assignment-retakes` |
-| Web tests | **138/138**, 8 files | `pnpm --filter web test` |
+| API tests on hardening branch | **344/344**, 34 suites | Same command on `feat/security-quick-wins` |
+| API tests on retakes branch | **353/353**, 34 suites | Same command on `feat/assignment-retakes` |
+| Web tests | **145/145**, 9 files | `pnpm --filter web test` |
 | Monorepo build | **4/4** successful | `pnpm build` |
 | Fresh migration chain | **8/8** on local PostgreSQL 15; no schema drift | Docker + `prisma migrate deploy`; `prisma migrate diff` |
 | Legacy backfill | Existing submission preserved as attempt #1 with `startedAt = submittedAt` | Legacy-shaped local DB + migration #8 |
 | Retake HTTP smoke | Attempt 1 → submit → attempt 2 → max-attempt `400`; teacher queue excludes active | Local API + PostgreSQL |
 | Concurrent-start smoke | Two simultaneous starts → **201 + 409**, one active row | Local API + PostgreSQL |
-| Retake browser QA | Attempt 1 submit → reload shows «محاولة جديدة» → attempt 2 starts | Local web + API |
+| Retake browser QA | Attempt 1 submit → reload shows «محاولة جديدة» → attempt 2 starts; active attempt #2 with prior grade shows «قيد الحل», «متابعة الحل», and 100% completion | Local web + API |
+| Locked-assignment QA | Lock card shows «مقفل» and the prerequisite «سلّم الواجب السابق أولًا» instead of a failure state | Local web + API, dark and light themes |
+| Migration preflight | **1** submission, **1** submitted, **0** null/empty content | Read-only production query before #8 |
 | Live health | **200** / database up | `Invoke-RestMethod https://sanad-edtech.vercel.app/api/health` |
 | Login-limit smoke (branch) | `401` ×10 → `429` ×2 with `Retry-After` | Local API, one forwarded IP |
 | Student redesign | Course, task links, video, exam brief, assignment brief, locked state, theme toggle verified in browser | Manual QA, 24–25 Oct 2026 |
@@ -59,7 +61,9 @@ Older counts (86, 179, 229, 276, 307, 393) belong to historical snapshots. Do no
 
 - global per-IP rate limiting (120/min per route; login 10/min, register 5/min, refresh 30/min), with health/readiness and payment webhooks exempt;
 - in-memory throttler storage and forwarded-IP keying;
-- metadata-only responses for locked lessons and `403 LESSON_LOCKED` from locked assignment/exam view and enter endpoints.
+- metadata-only responses for locked lessons and `403 LESSON_LOCKED` from locked assignment/exam view and enter endpoints;
+- `update`-only authoring reads for the generic exam/assignment routes and teacher/legacy lesson routes, closing student read bypasses;
+- no exam question paper before an attempt is active; student lists expose navigation metadata only.
 
 ## Pending assignment-retakes branch (not deployed)
 
@@ -67,11 +71,13 @@ Older counts (86, 179, 229, 276, 307, 393) belong to historical snapshots. Do no
 
 - migration #8 with `attemptNumber`, `startedAt`, nullable `submittedAt`, and the `IN_PROGRESS` status;
 - one row per attempt, unique on `(assignmentId, studentId, attemptNumber)`;
-- server-side `maxAttempts` enforcement and `409` for concurrent duplicate starts;
+- server-side `maxAttempts` enforcement and `409` for concurrent duplicate starts; an open attempt is checked before the max-attempt count;
+- next attempt numbers derived from the highest stored attempt number, tolerating history gaps;
 - grading/history filters that keep in-progress attempts out of teacher queues while preserving student resume;
-- retake-aware student runner, assignment list, result review, and teacher attempt column.
+- retake-aware student runner, assignment list, result review, and teacher attempt column;
+- active-attempt-first status/CTA, submission-based completion stats, all-attempt grade lookup, and a prerequisite lock card for `LESSON_LOCKED`.
 
-Production `4951e49` still has the old one-row model and does not enforce retakes.
+Production `4951e49` still has the old one-row model and does not enforce retakes. Migration #8 is **not applied** to Railway; the read-only preflight passed and a backup is still required.
 
 ## Still open
 
@@ -112,7 +118,7 @@ Production `4951e49` still has the old one-row model and does not enforce retake
 | 2026-10-20 | Vercel web go-live; session restore; all production URLs health-verified |
 | 2026-10-24 | Academic Light Mode + student redesign QA |
 | 2026-10-25 | Heritage Manuscript curriculum/lesson workspace redesign; docs aligned to verified state |
-| 2026-10-26 | Pending hardening branch: per-IP/auth rate limiting + server-side lock enforcement; 324/324 API tests |
-| 2026-10-27 | Pending retakes branch: attempt model + migration #8, 331/331 API and 138/138 web tests, 8/8 migration chain |
+| 2026-10-26 | Pending hardening branch: per-IP/auth rate limiting, server-side lock enforcement, authoring-read bypass fixes; 344/344 API tests |
+| 2026-10-27 | Pending retakes branch: attempt model + migration #8, active-attempt ordering, lock/retake UI; 353/353 API and 145/145 web tests, 8/8 migration chain |
 
 Historical audit: [`AUDIT-2026-10-16.md`](AUDIT-2026-10-16.md). It is preserved as a dated snapshot, not rewritten.
