@@ -28,7 +28,6 @@ type Phase =
   | "needs-login"
   | "intro"
   | "writing"
-  | "submitted"
   | "submitting"
   | "done"
   | "closed"
@@ -102,42 +101,10 @@ export default function StudentAssignmentRunnerPage({
         if (cancelled) return;
         setView(v);
         if (v.activeSubmission) {
-          const active = v.activeSubmission;
-          const hasAnswer =
-            Boolean(active.content?.trim()) ||
-            (Array.isArray(active.attachments) &&
-              active.attachments.length > 0);
-          setContent(active.content ?? "");
-
-          // The API uses SUBMITTED for two different states: an attempt the
-          // student only entered (content still empty) and an answer that was
-          // actually submitted. Content/attachments are the runtime signal.
-          if (hasAnswer) {
-            let mine: AssignmentSubmissionSummary[] = [];
-            try {
-              mine = await api.getMySubmissions(token, assignmentId);
-            } catch {
-              // Fall back to the active attempt so the answer still renders.
-            }
-            if (cancelled) return;
-            setSubmissions(
-              mine.length > 0
-                ? mine
-                : [
-                    {
-                      id: active.id,
-                      status: active.status,
-                      score: null,
-                      submittedAt: active.submittedAt,
-                      content: active.content,
-                      attachments: active.attachments,
-                    },
-                  ],
-            );
-            setPhase("submitted");
-            return;
-          }
-
+          // An active attempt is always in progress: `submittedAt` is null
+          // until the student hands it in, even when a previous attempt was
+          // submitted on time.
+          setContent(v.activeSubmission.content ?? "");
           const timer = await api.getAssignmentTimer(token, assignmentId);
           if (cancelled) return;
           setExpiresAt(timer.expiresAt);
@@ -410,23 +377,17 @@ export default function StudentAssignmentRunnerPage({
     );
   }
 
-  if (phase === "submitted" && view) {
-    return renderResultPage(
-      "بانتظار التصحيح",
-      "تم استلام الواجب",
-      "تم استلام إجابتك بنجاح. الدرجة الرسمية هتظهر بعد اعتماد المعلم.",
-      submissions[0] ?? null,
-      "success",
-    );
-  }
-
   if (phase === "intro" && view) {
     return (
       <div className="sc-canvas">
         <div className="lp-container" style={{ maxWidth: 880 }}>
           <article className="sc-panel">
             <div className="sc-body">
-              <p className="sc-eyebrow">واجب جاهز للبدء</p>
+              <p className="sc-eyebrow">
+                {view.studentAttemptCount > 0
+                  ? "محاولة جديدة"
+                  : "واجب جاهز للبدء"}
+              </p>
               <h1 className="sc-title">{view.title}</h1>
               {view.description && (
                 <p
@@ -477,7 +438,10 @@ export default function StudentAssignmentRunnerPage({
                   className="sc-btn sc-btn-primary"
                   onClick={() => void startAttempt()}
                 >
-                  ابدأ الواجب <span aria-hidden>←</span>
+                  {view.studentAttemptCount > 0
+                    ? "ابدأ محاولة جديدة"
+                    : "ابدأ الواجب"}{" "}
+                  <span aria-hidden>←</span>
                 </button>
                 <Link
                   href="/student/assignments"

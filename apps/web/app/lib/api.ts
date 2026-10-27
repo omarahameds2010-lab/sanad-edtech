@@ -657,7 +657,10 @@ export interface StudentAssignmentView {
   activeSubmission: {
     id: string;
     status: string;
-    submittedAt: string;
+    attemptNumber: number;
+    startedAt: string;
+    /** Null until the student actually hands the attempt in. */
+    submittedAt: string | null;
     content?: string | null;
     attachments?: unknown[] | null;
   } | null;
@@ -666,6 +669,7 @@ export interface StudentAssignmentView {
 export interface StartAssignmentResult {
   attemptId: string;
   assignmentId: string;
+  attemptNumber: number;
   startedAt: string;
   expiresAt: string;
   timeRemainingSeconds: number;
@@ -695,9 +699,12 @@ export interface SubmitAssignmentResult {
 export interface AssignmentSubmissionSummary {
   id: string;
   status: string;
+  attemptNumber?: number;
+  startedAt?: string;
   score: number | null;
   feedback?: string | null;
-  submittedAt: string;
+  /** Null while the attempt is in progress. */
+  submittedAt: string | null;
   content?: string | null;
   attachments?: unknown[] | null;
   gradedAt?: string | null;
@@ -718,6 +725,7 @@ export interface GradingSubmission {
   studentId: string;
   content: string | null;
   status: string;
+  attemptNumber: number;
   score: number | null;
   feedback: string | null;
   submittedAt: string;
@@ -800,6 +808,7 @@ export interface StudentFile {
   submissions: Array<{
     id: string;
     status: string;
+    attemptNumber: number;
     score: number | null;
     submittedAt: string;
     assignment: { id: string; title: string };

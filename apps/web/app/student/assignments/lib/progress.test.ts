@@ -26,6 +26,18 @@ describe("hasSubmittedWork", () => {
     ).toBe(false);
   });
 
+  it("rejects an in-progress attempt even when it carries draft content", () => {
+    expect(
+      hasSubmittedWork(
+        attempt({
+          status: "IN_PROGRESS",
+          submittedAt: null,
+          content: "مسودة",
+        }),
+      ),
+    ).toBe(false);
+  });
+
   it("accepts text, attachments, graded and late attempts", () => {
     expect(hasSubmittedWork(attempt({ content: "نص" }))).toBe(true);
     expect(

@@ -2,7 +2,7 @@ export interface AttemptLike {
   id: string;
   status: string;
   score?: number | null;
-  submittedAt: string;
+  submittedAt: string | null;
   gradedAt?: string | null;
   content?: string | null;
   attachments?: unknown[] | null;
@@ -45,8 +45,9 @@ export function localDayKey(date: Date): string {
   )}`;
 }
 
-/** True only when the attempt contains an actual answer. */
+/** True only when the attempt was handed in with actual work. */
 export function hasSubmittedWork(attempt: AttemptLike): boolean {
+  if (!attempt.submittedAt) return false;
   if (typeof attempt.content === "string" && attempt.content.trim()) {
     return true;
   }
@@ -67,8 +68,13 @@ export function buildGrowthSummary(
   today: Date = new Date(),
   days = 14,
 ): GrowthSummary {
-  const completed = attempts.filter(hasSubmittedWork);
-  const keys = new Set(completed.map((attempt) => localDayKey(new Date(attempt.submittedAt))));
+  const completed = attempts.filter(
+    (attempt): attempt is AttemptLike & { submittedAt: string } =>
+      hasSubmittedWork(attempt),
+  );
+  const keys = new Set(
+    completed.map((attempt) => localDayKey(new Date(attempt.submittedAt))),
+  );
   const todayStart = new Date(
     today.getFullYear(),
     today.getMonth(),
@@ -125,13 +131,19 @@ export function buildScoreBlueprint(attempts: AttemptLike[]): ScoreBlueprint | n
       (attempt) =>
         attempt.status === "GRADED" &&
         typeof attempt.score === "number" &&
-        Number.isFinite(attempt.score),
+        Number.isFinite(attempt.score) &&
+        Boolean(attempt.gradedAt ?? attempt.submittedAt),
     )
-    .map((attempt) => ({
-      id: attempt.id,
-      score: Math.max(0, Math.min(100, Math.round(attempt.score as number))),
-      at: attempt.gradedAt ?? attempt.submittedAt,
-    }))
+    .map((attempt) => {
+      const at = attempt.gradedAt ?? attempt.submittedAt;
+      if (!at) return null;
+      return {
+        id: attempt.id,
+        score: Math.max(0, Math.min(100, Math.round(attempt.score as number))),
+        at,
+      };
+    })
+    .filter((point): point is ScorePoint => point !== null)
     .sort((a, b) => new Date(a.at).getTime() - new Date(b.at).getTime());
 
   if (points.length === 0) return null;

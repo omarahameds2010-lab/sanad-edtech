@@ -299,9 +299,19 @@ export class AssignmentSubmissionResponseDto {
   attachments?: AttachmentDto[];
 
   @ApiProperty({
-    enum: ["SUBMITTED", "GRADED", "LATE", "REJECTED", "RETURNED"],
+    enum: [
+      "IN_PROGRESS",
+      "SUBMITTED",
+      "GRADED",
+      "LATE",
+      "REJECTED",
+      "RETURNED",
+    ],
   })
   status: string;
+
+  @ApiProperty()
+  attemptNumber: number;
 
   @ApiPropertyOptional()
   score?: number;
@@ -316,7 +326,10 @@ export class AssignmentSubmissionResponseDto {
   feedback?: string;
 
   @ApiProperty()
-  submittedAt: Date;
+  startedAt: Date;
+
+  @ApiPropertyOptional()
+  submittedAt?: Date;
 
   @ApiPropertyOptional()
   isLate?: boolean;
@@ -331,6 +344,9 @@ export class StartAssignmentResponseDto {
 
   @ApiProperty()
   assignmentId: string;
+
+  @ApiProperty()
+  attemptNumber: number;
 
   @ApiProperty()
   startedAt: Date;

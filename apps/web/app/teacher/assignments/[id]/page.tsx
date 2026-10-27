@@ -276,6 +276,7 @@ export default function TeacherAssignmentGradingPage({
                   }}
                 >
                   <th style={{ padding: "var(--space-md)" }}>الطالب</th>
+                  <th style={{ padding: "var(--space-md)" }}>المحاولة</th>
                   <th style={{ padding: "var(--space-md)" }}>الحالة</th>
                   <th style={{ padding: "var(--space-md)" }}>الدرجة</th>
                   <th style={{ padding: "var(--space-md)" }}>التسليم</th>
@@ -302,6 +303,16 @@ export default function TeacherAssignmentGradingPage({
                       >
                         {sub.student.phone}
                       </div>
+                    </td>
+                    <td
+                      style={{
+                        padding: "var(--space-md)",
+                        fontSize: 12,
+                        fontWeight: 600,
+                      }}
+                      dir="ltr"
+                    >
+                      #{sub.attemptNumber}
                     </td>
                     <td style={{ padding: "var(--space-md)" }}>
                       <span

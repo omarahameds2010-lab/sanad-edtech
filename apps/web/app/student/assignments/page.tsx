@@ -304,15 +304,6 @@ function lessonEmbedUrl(lesson: StudentLesson): string | null {
     : null;
 }
 
-function hasSubmittedAnswer(view: StudentAssignmentView): boolean {
-  const attempt = view.activeSubmission;
-  if (!attempt) return false;
-  if (typeof attempt.content === "string" && attempt.content.trim()) {
-    return true;
-  }
-  return Array.isArray(attempt.attachments) && attempt.attachments.length > 0;
-}
-
 function deriveState(
   item: AssignmentListItem,
   view: StudentAssignmentView | null,
@@ -322,10 +313,6 @@ function deriveState(
   if (viewFailed || !view) return "unknown";
 
   if (view.activeSubmission) {
-    // The API keeps a submitted answer in SUBMITTED until a teacher grades
-    // it, and uses the same status for an attempt the student only entered.
-    // Content/attachments are the only runtime signal that separates them.
-    if (hasSubmittedAnswer(view)) return "submitted";
     return view.isExpired ? "expired" : "active";
   }
 
@@ -442,6 +429,8 @@ export default function StudentAssignmentsPage() {
                 : [];
             const viewFailed = viewResult.status === "rejected";
             const state = deriveState(item, studentView, viewFailed);
+            const latestSubmitted =
+              submissions.find((s) => s.submittedAt !== null) ?? null;
 
             return {
               item,
@@ -449,7 +438,7 @@ export default function StudentAssignmentsPage() {
               viewFailed,
               state,
               attempted: state === "submitted",
-              latest: submissions[0] ?? null,
+              latest: latestSubmitted,
               submissions,
             };
           }),

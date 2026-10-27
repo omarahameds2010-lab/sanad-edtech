@@ -394,25 +394,27 @@ enum AssignmentStatus {
 // ============================================
 
 model AssignmentSubmission {
-  id           String           @id @default(uuid())
-  tenantId     String
-  assignmentId String
-  studentId    String
-  content      String? // text submission
-  attachments  Json? // file URLs, metadata
-  status       SubmissionStatus @default(SUBMITTED)
-  score        Int? // percentage 0-100
-  gradedBy     String? // teacher ID
-  gradedAt     DateTime?
-  feedback     String?
-  submittedAt  DateTime         @default(now())
+  id            String           @id @default(uuid())
+  tenantId      String
+  assignmentId  String
+  studentId     String
+  content       String? // text submission
+  attachments   Json? // file URLs, metadata
+  status        SubmissionStatus @default(SUBMITTED)
+  attemptNumber Int              @default(1)
+  score         Int? // percentage 0-100
+  gradedBy      String? // teacher ID
+  gradedAt      DateTime?
+  feedback      String?
+  startedAt     DateTime         @default(now()) // timer start
+  submittedAt   DateTime? // null while the attempt is in progress
 
   tenant     Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   assignment Assignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
   student    User       @relation("AssignmentStudent", fields: [studentId], references: [id], onDelete: Cascade)
   grader     User?      @relation("AssignmentGrader", fields: [gradedBy], references: [id], onDelete: SetNull)
 
-  @@unique([assignmentId, studentId])
+  @@unique([assignmentId, studentId, attemptNumber])
   @@index([tenantId])
   @@index([assignmentId])
   @@index([studentId])
@@ -421,6 +423,7 @@ model AssignmentSubmission {
 }
 
 enum SubmissionStatus {
+  IN_PROGRESS
   SUBMITTED
   GRADED
   LATE

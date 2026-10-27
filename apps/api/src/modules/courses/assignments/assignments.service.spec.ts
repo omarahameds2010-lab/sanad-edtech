@@ -247,7 +247,10 @@ describe("AssignmentsService", () => {
       prisma.enrollment.findFirst.mockResolvedValue({ id: "e1" });
       prisma.assignmentSubmission.count.mockResolvedValue(0);
       prisma.assignmentSubmission.findFirst.mockResolvedValue(null);
-      prisma.assignmentSubmission.create.mockResolvedValue({ id: "s1" });
+      prisma.assignmentSubmission.create.mockResolvedValue({
+        id: "s1",
+        attemptNumber: 1,
+      });
 
       const before = Date.now();
       const result = await service.startAssignmentAttempt(
@@ -264,6 +267,15 @@ describe("AssignmentsService", () => {
         1000,
       );
       expect(result.timeRemainingSeconds).toBe(300 * 60);
+      expect(result.attemptNumber).toBe(1);
+      expect(prisma.assignmentSubmission.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          status: "IN_PROGRESS",
+          attemptNumber: 1,
+          startedAt: expect.any(Date),
+          submittedAt: null,
+        }),
+      });
 
       expect(progressionService.handleEnterAssignment).toHaveBeenCalledWith(
         tenantId,
@@ -289,6 +301,65 @@ describe("AssignmentsService", () => {
       expect(result.startedAt.getTime()).toBeGreaterThanOrEqual(before);
       expect(result.startedAt.getTime()).toBeLessThanOrEqual(after);
     });
+
+    it("starts attempt #2 after a completed attempt when retakes remain", async () => {
+      prisma.assignment.findFirst.mockResolvedValue({
+        id: "a1",
+        status: "PUBLISHED",
+        lessonId: "l1",
+        timerMinutes: 300,
+        maxAttempts: 3,
+      });
+      prisma.lesson.findUnique.mockResolvedValue({
+        id: "l1",
+        section: { courseId: "c1" },
+      });
+      prisma.enrollment.findFirst.mockResolvedValue({ id: "e1" });
+      prisma.assignmentSubmission.count.mockResolvedValue(1);
+      prisma.assignmentSubmission.findFirst.mockResolvedValue(null);
+      prisma.assignmentSubmission.create.mockResolvedValue({
+        id: "s2",
+        attemptNumber: 2,
+      });
+
+      const result = await service.startAssignmentAttempt(
+        tenantId,
+        userId,
+        "a1",
+        "key2",
+      );
+
+      expect(result.attemptNumber).toBe(2);
+      expect(prisma.assignmentSubmission.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          status: "IN_PROGRESS",
+          attemptNumber: 2,
+          submittedAt: null,
+        }),
+      });
+    });
+
+    it("turns a concurrent duplicate insert into a conflict", async () => {
+      prisma.assignment.findFirst.mockResolvedValue({
+        id: "a1",
+        status: "PUBLISHED",
+        lessonId: "l1",
+        timerMinutes: 300,
+        maxAttempts: 3,
+      });
+      prisma.lesson.findUnique.mockResolvedValue({
+        id: "l1",
+        section: { courseId: "c1" },
+      });
+      prisma.enrollment.findFirst.mockResolvedValue({ id: "e1" });
+      prisma.assignmentSubmission.count.mockResolvedValue(0);
+      prisma.assignmentSubmission.findFirst.mockResolvedValue(null);
+      prisma.assignmentSubmission.create.mockRejectedValue({ code: "P2002" });
+
+      await expect(
+        service.startAssignmentAttempt(tenantId, userId, "a1", "key1"),
+      ).rejects.toThrow(ConflictException);
+    });
   });
 
   describe("submitAssignment", () => {
@@ -305,7 +376,9 @@ describe("AssignmentsService", () => {
       const oldDate = new Date(Date.now() - 400 * 60 * 1000);
       prisma.assignmentSubmission.findFirst.mockResolvedValue({
         id: "s1",
-        submittedAt: oldDate,
+        status: "IN_PROGRESS",
+        startedAt: oldDate,
+        submittedAt: null,
         assignment: { timerMinutes: 300, allowLateSubmission: false },
       });
       prisma.assignmentSubmission.update.mockResolvedValue({
@@ -330,7 +403,9 @@ describe("AssignmentsService", () => {
       const oldDate = new Date(Date.now() - 400 * 60 * 1000);
       prisma.assignmentSubmission.findFirst.mockResolvedValue({
         id: "s1",
-        submittedAt: oldDate,
+        status: "IN_PROGRESS",
+        startedAt: oldDate,
+        submittedAt: null,
         assignment: { timerMinutes: 300, allowLateSubmission: true },
       });
       prisma.assignmentSubmission.update.mockResolvedValue({
@@ -354,7 +429,9 @@ describe("AssignmentsService", () => {
     it("marks SUBMITTED when within timer", async () => {
       prisma.assignmentSubmission.findFirst.mockResolvedValue({
         id: "s1",
-        submittedAt: new Date(),
+        status: "IN_PROGRESS",
+        startedAt: new Date(),
+        submittedAt: null,
         assignment: { timerMinutes: 300, allowLateSubmission: true },
       });
       prisma.assignmentSubmission.update.mockResolvedValue({
@@ -395,6 +472,17 @@ describe("AssignmentsService", () => {
       await expect(
         service.gradeSubmission(tenantId, "s1", "t1", { score: 150 }),
       ).rejects.toThrow(BadRequestException);
+    });
+
+    it("refuses to grade an attempt that is still in progress", async () => {
+      prisma.assignmentSubmission.findFirst.mockResolvedValue({
+        id: "s1",
+        status: "IN_PROGRESS",
+      });
+      await expect(
+        service.gradeSubmission(tenantId, "s1", "t1", { score: 80 }),
+      ).rejects.toThrow(ConflictException);
+      expect(prisma.assignmentSubmission.update).not.toHaveBeenCalled();
     });
 
     it("grades successfully", async () => {
@@ -561,7 +649,7 @@ describe("AssignmentsService", () => {
 
       expect(prisma.assignmentSubmission.findMany).toHaveBeenCalledWith({
         where: { tenantId, assignmentId: "a1", studentId: userId },
-        orderBy: { submittedAt: "desc" },
+        orderBy: { attemptNumber: "desc" },
       });
       expect(result).not.toHaveProperty("submissions");
       expect(result.studentAttemptCount).toBe(0);
@@ -594,15 +682,17 @@ describe("AssignmentsService", () => {
     });
 
     it("computes remaining time from the student's own active submission", async () => {
-      const submittedAt = new Date();
-      submittedAt.setMinutes(submittedAt.getMinutes() - 10);
+      const startedAt = new Date();
+      startedAt.setMinutes(startedAt.getMinutes() - 10);
       prisma.assignmentSubmission.findMany.mockResolvedValue([
         {
           id: "s1",
           studentId: userId,
-          status: "SUBMITTED",
-          submittedAt,
-          content: "my answer",
+          status: "IN_PROGRESS",
+          attemptNumber: 1,
+          startedAt,
+          submittedAt: null,
+          content: null,
           attachments: null,
         },
       ]);
@@ -614,9 +704,110 @@ describe("AssignmentsService", () => {
       );
 
       expect(result.activeSubmission).toEqual(
-        expect.objectContaining({ id: "s1", content: "my answer" }),
+        expect.objectContaining({
+          id: "s1",
+          status: "IN_PROGRESS",
+          attemptNumber: 1,
+          submittedAt: null,
+        }),
       );
+      expect(result.canAttempt).toBe(false);
       expect(result.timeRemainingSeconds).toBeGreaterThan(280 * 60);
+    });
+
+    it("allows a retake after a completed attempt when attempts remain", async () => {
+      prisma.assignment.findFirst.mockResolvedValue({
+        ...assignmentRow,
+        maxAttempts: 2,
+      });
+      prisma.assignmentSubmission.findMany.mockResolvedValue([
+        {
+          id: "s1",
+          studentId: userId,
+          status: "SUBMITTED",
+          attemptNumber: 1,
+          startedAt: new Date(),
+          submittedAt: new Date(),
+          content: "first answer",
+          attachments: null,
+        },
+      ]);
+
+      const result = await service.getStudentAssignmentView(
+        tenantId,
+        userId,
+        "a1",
+      );
+
+      expect(result.studentAttemptCount).toBe(1);
+      expect(result.activeSubmission).toBeNull();
+      expect(result.canAttempt).toBe(true);
+      expect(result.timeRemainingSeconds).toBeUndefined();
+    });
+
+    it("blocks a new attempt after the configured maximum", async () => {
+      prisma.assignment.findFirst.mockResolvedValue({
+        ...assignmentRow,
+        maxAttempts: 1,
+      });
+      prisma.assignmentSubmission.findMany.mockResolvedValue([
+        {
+          id: "s1",
+          studentId: userId,
+          status: "GRADED",
+          attemptNumber: 1,
+          startedAt: new Date(),
+          submittedAt: new Date(),
+          content: "first answer",
+          attachments: null,
+        },
+      ]);
+
+      const result = await service.getStudentAssignmentView(
+        tenantId,
+        userId,
+        "a1",
+      );
+
+      expect(result.canAttempt).toBe(false);
+      expect(result.activeSubmission).toBeNull();
+    });
+  });
+
+  describe("getAssignmentTimer", () => {
+    it("uses the attempt's startedAt, not its final submission time", async () => {
+      const startedAt = new Date();
+      startedAt.setMinutes(startedAt.getMinutes() - 5);
+      prisma.assignmentSubmission.findFirst.mockResolvedValue({
+        id: "s1",
+        status: "IN_PROGRESS",
+        startedAt,
+        submittedAt: null,
+        assignment: { timerMinutes: 300 },
+      });
+
+      const result = await service.getAssignmentTimer(
+        tenantId,
+        userId,
+        "a1",
+      );
+
+      expect(result.timeRemainingSeconds).toBeGreaterThan(290 * 60);
+      expect(result.isExpired).toBe(false);
+    });
+  });
+
+  describe("getSubmissionsForGrading", () => {
+    it("excludes in-progress attempts from the teacher queue", async () => {
+      prisma.assignmentSubmission.findMany.mockResolvedValue([]);
+
+      await service.getSubmissionsForGrading(tenantId, "a1", {});
+
+      expect(prisma.assignmentSubmission.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({ submittedAt: { not: null } }),
+        }),
+      );
     });
   });
 });

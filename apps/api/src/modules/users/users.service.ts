@@ -92,7 +92,13 @@ export class UsersService {
         take: 20,
       }),
       this.prisma.assignmentSubmission.findMany({
-        where: { tenantId, studentId },
+        where: {
+          tenantId,
+          studentId,
+          // Teacher-facing history only contains handed-in attempts; an
+          // in-progress attempt has no submittedAt and no work to review.
+          submittedAt: { not: null },
+        },
         include: { assignment: { select: { id: true, title: true } } },
         orderBy: { submittedAt: "desc" },
         take: 20,

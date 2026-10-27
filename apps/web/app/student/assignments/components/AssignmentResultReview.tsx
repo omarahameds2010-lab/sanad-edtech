@@ -115,7 +115,8 @@ function BookmarkIcon() {
   );
 }
 
-function formatMoment(value: string): string {
+function formatMoment(value: string | null): string {
+  if (!value) return "—";
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "—";
   return date.toLocaleString("ar-EG", {
@@ -182,7 +183,7 @@ export default function AssignmentResultReview({
   const saved = isPortfolioSaved(latest.id, portfolio);
 
   function saveLegacy() {
-    if (!graded) return;
+    if (!graded || !latest.submittedAt) return;
     try {
       const next = savePortfolioEntry({
         submissionId: latest.id,
@@ -246,11 +247,13 @@ export default function AssignmentResultReview({
           <h2>{assignmentTitle}</h2>
         </div>
         <span className="ar-review-date">
-          {new Date(latest.submittedAt).toLocaleDateString("ar-EG", {
-            day: "numeric",
-            month: "short",
-            year: "numeric",
-          })}
+          {latest.submittedAt
+            ? new Date(latest.submittedAt).toLocaleDateString("ar-EG", {
+                day: "numeric",
+                month: "short",
+                year: "numeric",
+              })
+            : "—"}
         </span>
       </header>
 
@@ -290,7 +293,9 @@ export default function AssignmentResultReview({
           <div className="ar-answer-meta">
             <div>
               <span>وقت التسليم</span>
-              <strong>{formatMoment(latest.submittedAt)}</strong>
+              <strong>
+                {formatMoment(latest.submittedAt ?? latest.gradedAt ?? null)}
+              </strong>
             </div>
             <div>
               <span>نوع الإجابة</span>

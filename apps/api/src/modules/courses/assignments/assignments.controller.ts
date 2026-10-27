@@ -140,6 +140,7 @@ export class AssignmentsController {
     const attempt = {
       attemptId: result.attemptId,
       assignmentId: result.assignmentId,
+      attemptNumber: result.attemptNumber ?? 1,
       startedAt: result.startedAt,
       expiresAt: result.expiresAt,
       timeRemainingSeconds: result.timeRemainingSeconds,

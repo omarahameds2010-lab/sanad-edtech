@@ -152,7 +152,9 @@ export class AssignmentsService {
       const activeAttempts = await this.prisma.assignmentSubmission.count({
         where: {
           assignmentId,
-          status: { in: [SubmissionStatus.SUBMITTED] },
+          // Active means the attempt has not been submitted yet. SUBMITTED
+          // is a final state once the student actually hands the work in.
+          submittedAt: null,
         },
       });
       if (activeAttempts > 0) {
@@ -226,6 +228,9 @@ export class AssignmentsService {
     if (!submission) {
       throw new NotFoundException("Submission not found");
     }
+    if (submission.status === SubmissionStatus.IN_PROGRESS) {
+      throw new ConflictException("Attempt has not been submitted yet");
+    }
     if (submission.status === SubmissionStatus.GRADED) {
       throw new ConflictException("Submission already graded");
     }
@@ -291,27 +296,25 @@ export class AssignmentsService {
     // score and feedback leaked into the response via `...assignment`.
     const submissions = await this.prisma.assignmentSubmission.findMany({
       where: { tenantId, assignmentId, studentId: userId },
-      orderBy: { submittedAt: "desc" },
+      orderBy: { attemptNumber: "desc" },
     });
     const attemptCount = submissions.length;
 
-    // Check if can attempt
-    const canAttempt = await this.canStudentAttempt(
+    // The active attempt is the row without a submission timestamp. It is
+    // intentionally separate from SUBMITTED: a submitted on-time answer must
+    // not block the next allowed retake.
+    const activeSubmission = submissions.find((s) => s.submittedAt === null);
+    const canAttempt = this.canStudentAttempt(
       assignment,
       attemptCount,
-      submissions,
-    );
-
-    // Get active attempt (in progress)
-    const activeSubmission = submissions.find(
-      (s) => s.status === SubmissionStatus.SUBMITTED,
+      activeSubmission,
     );
 
     let timeRemainingSeconds: number | undefined;
     let isExpired = false;
 
     if (activeSubmission) {
-      const expiresAt = new Date(activeSubmission.submittedAt);
+      const expiresAt = new Date(activeSubmission.startedAt);
       expiresAt.setMinutes(expiresAt.getMinutes() + assignment.timerMinutes);
       const now = new Date();
       timeRemainingSeconds = Math.max(
@@ -331,6 +334,8 @@ export class AssignmentsService {
         ? {
             id: activeSubmission.id,
             status: activeSubmission.status,
+            attemptNumber: activeSubmission.attemptNumber,
+            startedAt: activeSubmission.startedAt,
             submittedAt: activeSubmission.submittedAt,
             content: activeSubmission.content,
             attachments: activeSubmission.attachments,
@@ -339,27 +344,12 @@ export class AssignmentsService {
     };
   }
 
-  private async canStudentAttempt(
+  private canStudentAttempt(
     assignment: any,
     attemptCount: number,
-    submissions: any[],
-  ): Promise<boolean> {
-    if (attemptCount >= assignment.maxAttempts) {
-      return false;
-    }
-
-    // Check if there's an active (not graded/expired) attempt
-    const hasActiveAttempt = submissions.some(
-      (s) =>
-        s.status === SubmissionStatus.SUBMITTED ||
-        s.status === SubmissionStatus.LATE,
-    );
-
-    if (hasActiveAttempt) {
-      return false;
-    }
-
-    return true;
+    activeSubmission: unknown,
+  ): boolean {
+    return attemptCount < assignment.maxAttempts && !activeSubmission;
   }
 
   async startAssignmentAttempt(
@@ -424,7 +414,7 @@ export class AssignmentsService {
       where: {
         assignmentId,
         studentId: userId,
-        status: { in: [SubmissionStatus.SUBMITTED, SubmissionStatus.LATE] },
+        submittedAt: null,
       },
     });
 
@@ -432,20 +422,36 @@ export class AssignmentsService {
       throw new ConflictException("You already have an active attempt");
     }
 
-    // Create submission with server-authoritative timer
+    // Create submission with server-authoritative timer. `submittedAt` stays
+    // null until the student actually hands the work in; `startedAt` is the
+    // timer origin for this specific attempt.
     const startedAt = new Date();
     const expiresAt = new Date(startedAt);
     expiresAt.setMinutes(expiresAt.getMinutes() + assignment.timerMinutes);
+    const attemptNumber = attemptCount + 1;
 
-    const submission = await this.prisma.assignmentSubmission.create({
-      data: {
-        tenantId,
-        assignmentId,
-        studentId: userId,
-        status: SubmissionStatus.SUBMITTED,
-        submittedAt: startedAt, // This serves as startedAt for timer
-      },
-    });
+    let submission;
+    try {
+      submission = await this.prisma.assignmentSubmission.create({
+        data: {
+          tenantId,
+          assignmentId,
+          studentId: userId,
+          status: SubmissionStatus.IN_PROGRESS,
+          attemptNumber,
+          startedAt,
+          submittedAt: null,
+        },
+      });
+    } catch (error) {
+      // The unique (assignmentId, studentId, attemptNumber) index closes the
+      // concurrent-start race: two requests can both read count=0, but only
+      // one insert can win.
+      if ((error as { code?: string } | null)?.code === "P2002") {
+        throw new ConflictException("You already have an active attempt");
+      }
+      throw error;
+    }
 
     // Trigger progression ONCE: ENTER_ASSIGNMENT → unlock the linked exam
     // lesson for THIS student (audit 2026-10-16 §6.1 — this used to be a
@@ -463,6 +469,7 @@ export class AssignmentsService {
     const response = {
       attemptId: submission.id,
       assignmentId,
+      attemptNumber: submission.attemptNumber ?? attemptNumber,
       startedAt,
       expiresAt,
       timeRemainingSeconds: assignment.timerMinutes * 60,
@@ -504,7 +511,7 @@ export class AssignmentsService {
       where: {
         assignmentId,
         studentId: userId,
-        status: { in: [SubmissionStatus.SUBMITTED, SubmissionStatus.LATE] },
+        submittedAt: null,
       },
       include: { assignment: true },
     });
@@ -515,7 +522,7 @@ export class AssignmentsService {
 
     const assignment = submission.assignment;
     const now = new Date();
-    const expiresAt = new Date(submission.submittedAt);
+    const expiresAt = new Date(submission.startedAt);
     expiresAt.setMinutes(expiresAt.getMinutes() + assignment.timerMinutes);
 
     // Check if expired
@@ -569,7 +576,7 @@ export class AssignmentsService {
       where: {
         assignmentId,
         studentId: userId,
-        status: { in: [SubmissionStatus.SUBMITTED, SubmissionStatus.LATE] },
+        submittedAt: null,
       },
       include: { assignment: true },
     });
@@ -580,7 +587,7 @@ export class AssignmentsService {
 
     const assignment = submission.assignment;
     const now = new Date();
-    const expiresAt = new Date(submission.submittedAt);
+    const expiresAt = new Date(submission.startedAt);
     expiresAt.setMinutes(expiresAt.getMinutes() + assignment.timerMinutes);
     const timeRemainingSeconds = Math.max(
       0,
@@ -603,14 +610,14 @@ export class AssignmentsService {
   ) {
     const submissions = await this.prisma.assignmentSubmission.findMany({
       where: { assignmentId, studentId: userId, tenantId },
-      orderBy: { submittedAt: "desc" },
+      orderBy: [{ attemptNumber: "desc" }, { startedAt: "desc" }],
       include: {
         assignment: { select: { timerMinutes: true, passingScore: true } },
       },
     });
 
     return submissions.map((s) => {
-      const expiresAt = new Date(s.submittedAt);
+      const expiresAt = new Date(s.startedAt);
       expiresAt.setMinutes(
         expiresAt.getMinutes() +
           (s.assignment?.timerMinutes ?? this.DEFAULT_TIMER_MINUTES),
@@ -768,6 +775,9 @@ export class AssignmentsService {
     const where: Prisma.AssignmentSubmissionWhereInput = {
       assignmentId,
       tenantId,
+      // In-progress attempts have no submittedAt and must never enter the
+      // teacher's grading queue.
+      submittedAt: { not: null },
     };
     if (filters.status) where.status = filters.status;
 
@@ -793,7 +803,7 @@ export class AssignmentsService {
 
     return {
       submissions: submissions.map((s) => {
-        const expiresAt = new Date(s.submittedAt);
+        const expiresAt = new Date(s.startedAt);
         expiresAt.setMinutes(
           expiresAt.getMinutes() +
             (s.assignment?.timerMinutes ?? this.DEFAULT_TIMER_MINUTES),
