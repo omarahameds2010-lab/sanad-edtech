@@ -40,6 +40,14 @@
 - Throttler storage is in-memory per API instance; forwarded-header client IPs are best-effort, not an authorization boundary.
 - Local evidence: API **324/324** (33 suites), web **137/137**, build **4/4**, login-limit smoke `401`×10 → `429` with `Retry-After`. Production remains `4951e49` until this branch is merged and deployed.
 
+### Pending assignment-retakes branch — 2026-10-27 (not deployed)
+
+- Branch `feat/assignment-retakes` is stacked on `feat/security-quick-wins`.
+- Migration #8 (`20261027000001_assignment_retakes`) adds `attemptNumber`, `startedAt`, nullable `submittedAt`, the `IN_PROGRESS` submission status, and replaces the one-row unique key with `(assignmentId, studentId, attemptNumber)`. Existing rows are backfilled as submitted attempt #1 with `startedAt = submittedAt`.
+- Active work is an `IN_PROGRESS` row with `submittedAt = null`; submitting sets the final timestamp. The student view/timer and teacher queue use the active marker, and teacher/student history excludes in-progress rows from grading.
+- The API enforces `maxAttempts`, starts attempt N+1 after a completed attempt, and converts a concurrent duplicate insert into `409`. The web runner labels the next start as a new attempt; the teacher queue displays the attempt number.
+- Local evidence: API **331/331** (33 suites), web **138/138**, build **4/4**, fresh local PostgreSQL migration chain **8/8**, a legacy-shaped database backfilled as attempt #1 (`startedAt = submittedAt`), `prisma migrate diff` no drift, retake HTTP smoke (attempt 1 → submit → attempt 2 → max-attempt 400 → teacher queue excludes active), concurrent-start smoke **201/409** with one active row, and browser QA (submit attempt 1 → reload shows «محاولة جديدة» → attempt 2 starts with a fresh timer). Production still has **7** migrations and no retakes until this branch is merged and deployed.
+
 ## ⚠️ Verified Reality (audit trail — current release is above)
 
 > Full report: `docs/AUDIT-2026-10-16.md`. The dated entries below are kept as an audit trail. Use the **Current verified release — 2026-10-25** block above for today's runtime.
@@ -77,6 +85,7 @@
 
 - **Progression unlock types beyond ENTER_*** (COMPLETE_*/PASS_EXAM/SCORE_THRESHOLD/TIME_ELAPSED, per-student MANUAL) are still future extension points. Production `4951e49` still returns some locked-lesson content in student views; `feat/security-quick-wins` closes the lesson-payload and assessment-entry paths but is not deployed yet (audit §6.2).
 - **Rate limiting** is absent on production `4951e49`; the pending branch adds in-memory per-instance limits only. Distributed/shared storage and hostile-proxy tuning remain open.
+- **Assignment retakes** are implemented on the pending `feat/assignment-retakes` branch but are not deployed; production `4951e49` still has one submission row per student/assignment and no working `maxAttempts`.
 - **Word-level answer↔review highlighting is not persisted yet.** `AssignmentSubmission` stores only `content`, `score`, and `feedback`; the result review links the student answer and teacher review with an honest aggregate bridge. Real per-word evidence spans require a migration-first change to persist and expose the evaluator's `criteria[].evidence` / `knowledge_gaps`; never simulate highlights.
 - **Transactional outbox has no dispatcher** — events are written and never sent.
 - **No Bull processors** — Redis/Bull dependencies exist, but no `@Processor`/worker is registered. Reconciliation has models but no live worker.
@@ -87,7 +96,7 @@
 
 **Rules that follow:**
 
-1. P1 isolation core has landed and is verified locally. Remaining P1 = **activate on Railway**: rotate the DB password by hand → apply all 7 migrations (`migrate resolve --applied` only for pre-baseline histories) → point the runtime `DATABASE_URL` at `app_user` → remove/avoid `MIGRATION_DATABASE_URL` in runtime → flip the preference in `prisma.service.ts` → re-run RLS e2e 5/5.
+1. P1 isolation core has landed and is verified locally. Remaining P1 = **activate on Railway**: rotate the DB password by hand → apply all migrations (7 on production; 8 once `feat/assignment-retakes` is merged; `migrate resolve --applied` only for pre-baseline histories) → point the runtime `DATABASE_URL` at `app_user` → remove/avoid `MIGRATION_DATABASE_URL` in runtime → flip the preference in `prisma.service.ts` → re-run RLS e2e 5/5.
 2. Claims about RLS / flags / outbox / webhooks / progression / funnel & idempotency must cite working code — not intent.
 3. Secrets live only in `.env` (gitignored). Never paste credentials into source, logs, or chat.
 
@@ -184,12 +193,13 @@ pnpm --filter api exec jest --config jest.config.js --runInBand
 ### Assignment timer and submission
 
 - Default timer: **300 minutes (5 hours)**; configurable per assignment, maximum 10,080 minutes.
-- Starting an assignment creates an `AssignmentSubmission` row; its server-set `submittedAt` is the timer start.
-- `expiresAt` is derived as `submittedAt + timerMinutes`; it is not a stored column.
-- The frontend displays only derived remaining time. Refresh/resume returns the same row.
-- Statuses are `SUBMITTED`, `LATE`, `REJECTED`, `GRADED`, `RETURNED`.
-- `allowLateSubmission` is enforced on submit; teacher grading writes score + feedback.
-- **Current limitation:** `@@unique([assignmentId, studentId])` gives one submission row per student/assignment, so `maxAttempts` does not yet provide working retakes.
+- Starting an assignment creates an `AssignmentSubmission` row with status `IN_PROGRESS`, a server-set `startedAt`, and `submittedAt = null`.
+- `expiresAt` is derived as `startedAt + timerMinutes`; it is not a stored column.
+- The frontend displays only derived remaining time. Refresh/resume returns the same active row.
+- Submitting sets `submittedAt` and moves the status to `SUBMITTED` (on time), `LATE` (allowed late), or `REJECTED` (late disallowed); teacher grading writes score + feedback and `GRADED`/`RETURNED`.
+- Each attempt is unique by `(assignmentId, studentId, attemptNumber)`; `maxAttempts` is enforced server-side. A student may have one active attempt at a time; a concurrent duplicate start returns `409`.
+- In-progress attempts never enter the teacher grading queue, and the student history includes them with `submittedAt: null`.
+- **Production `4951e49` still uses the old one-row model** (`@@unique([assignmentId, studentId])`, `submittedAt` as timer start). Retakes are implemented on the pending `feat/assignment-retakes` branch, not deployed.
 
 ### Exam timer and attempt
 
@@ -257,7 +267,7 @@ learning-platform/
 │   ├── api/                     ← NestJS 10 API
 │   │   ├── prisma/
 │   │   │   ├── schema.prisma
-│   │   │   └── migrations/      ← 7 migrations
+│   │   │   └── migrations/      ← 7 on production; 8 on the retakes branch
 │   │   └── src/modules/         ← 13 domain modules
 │   └── web/                     ← Next.js 15 App Router
 │       └── app/                 ← 35 pages, student/teacher/public
@@ -273,7 +283,7 @@ learning-platform/
 | File                                                                 | Purpose                                                                                                                                                                        |
 | -------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `apps/api/prisma/schema.prisma`                                      | All Prisma models + enums                                                                                                                                                      |
-| `apps/api/prisma/migrations/`                                        | 7 migrations: baseline `0_init` (42 tables) + `lms_rls` + `auth_cookie_sessions` + `rls_hardening` + `tenant_resolution_fn` + `webhook_raw_payload` + `student_lesson_unlocks` |
+| `apps/api/prisma/migrations/`                                        | 7 production migrations: baseline `0_init` (42 tables) + `lms_rls` + `auth_cookie_sessions` + `rls_hardening` + `tenant_resolution_fn` + `webhook_raw_payload` + `student_lesson_unlocks`; the retakes branch adds `assignment_retakes` as #8 |
 | `apps/api/src/common/prisma/tenant-context.ts`                       | AsyncLocalStorage tenant scope + `applyTenantContext()` for interactive transactions                                                                                           |
 | `apps/api/src/modules/tenants/prisma.service.ts`                     | Prisma `$extends` proxy — injects `app.tenant_id` per operation inside a request scope                                                                                         |
 | `apps/api/src/modules/tenants/tenant-resolver.middleware.ts`         | Resolves Host → tenant (SECURITY DEFINER fn) and runs the request in the tenant scope                                                                                          |

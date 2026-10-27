@@ -1,6 +1,6 @@
-# Current State — 26 October 2026
+# Current State — 27 October 2026
 
-> **This is the canonical snapshot for the repository.** If another document disagrees with this file, this file wins. Production was checked against the live deployment on 25 October 2026; the pending hardening branch was checked locally on 26 October 2026.
+> **This is the canonical snapshot for the repository.** If another document disagrees with this file, this file wins. Production was checked against the live deployment on 25 October 2026; the pending hardening and assignment-retakes branches were checked locally on 26–27 October 2026.
 >
 > Historical reports keep their original date and evidence. They are not silently rewritten; they carry a banner pointing here.
 
@@ -11,12 +11,13 @@
 | Production branch | `main` |
 | Verified app commit | `4951e49` — `feat(web): redesign student curriculum and lesson workspace` (later docs-only commits do not change runtime code) |
 | Pending hardening branch | `feat/security-quick-wins` — rate limiting + lock enforcement; local only, **not deployed** |
+| Pending assignment-retakes branch | `feat/assignment-retakes` — stacked on the hardening branch; local only, **not deployed** |
 | Web | <https://sanad-edtech.vercel.app> |
 | API (direct) | <https://sanad-edtech-production.up.railway.app> |
 | API through the web domain | <https://sanad-edtech.vercel.app/api/health> (Vercel rewrite to Railway) |
 | Health check | `/api/health` → **200** `{"status":"ok","database":"up"}` |
 | Login page | `/login` → **200** |
-| Database | Managed PostgreSQL on Railway, 7/7 Prisma migrations applied |
+| Database | Managed PostgreSQL on Railway, 7/7 Prisma migrations applied in production; the retakes branch has migration #8 for local verification |
 | Demo tenant | `sanad-demo` |
 
 The production demo seed contains **3 published Arabic prep courses**, one exam and one assignment. The student curriculum screen shows the real task counts from the API; do not hardcode the demo's current numbers into marketing copy.
@@ -36,14 +37,20 @@ These are seeded demo accounts, not production customer accounts.
 | --- | --- |
 | API unit suite on `main` (`4951e49`) | **311 / 311 passed**, 31 suites (`pnpm --filter api exec jest --config jest.config.js --runInBand`) |
 | API unit suite on `feat/security-quick-wins` | **324 / 324 passed**, 33 suites (13 new security tests) |
-| Web unit suite | **137 / 137 passed**, 8 files (`pnpm --filter web test`) |
+| API unit suite on `feat/assignment-retakes` | **331 / 331 passed**, 33 suites (7 new retake/active-attempt tests) |
+| Web unit suite | **138 / 138 passed**, 8 files (`pnpm --filter web test`) |
 | TypeScript | `pnpm --filter web exec tsc --noEmit` and the API typecheck pass |
 | Monorepo build | `pnpm build` → **4/4 tasks successful** |
 | Live health | Web `/api/health` and direct Railway `/api/health` both return **200**, database up |
 | Login-limit smoke (branch) | 10 attempts from one forwarded IP returned `401`; attempts 11–12 returned `429` with `Retry-After: 40` |
+| Fresh migration chain | Local PostgreSQL 15 via Docker: **8/8** migrations applied; `prisma migrate diff` reports **no difference** |
+| Legacy backfill | A legacy-shaped database with one existing submission migrated cleanly to attempt #1, preserving `submittedAt` and setting `startedAt = submittedAt` |
+| Retake HTTP smoke | Attempt 1 → submit → attempt 2 starts → third start returns **400** at `maxAttempts=2`; teacher queue excludes the in-progress attempt |
+| Concurrent-start smoke | Two simultaneous `enter` requests → **201 + 409**, exactly one `IN_PROGRESS` row |
+| Retake browser QA | Student submitted attempt 1; reload showed «محاولة جديدة» and attempt 2 started with a fresh 300-minute timer |
 | Curriculum/lesson QA | Course page, curriculum task links, video lesson, exam brief, assignment brief, locked-video prerequisite, and theme toggle verified in a browser at desktop and mobile widths |
 
-The production API suite is **311/311**; the hardening branch is **324/324**. Older documents that mention 86, 179, 229, 276, 307, or 393 tests are historical snapshots, not the current count.
+The production API suite is **311/311**; the hardening branch is **324/324**, and the stacked retakes branch is **331/331**. Older documents that mention 86, 179, 229, 276, 307, or 393 tests are historical snapshots, not the current count.
 
 ## Stack and repository facts
 
@@ -51,7 +58,7 @@ The production API suite is **311/311**; the hardening branch is **324/324**. Ol
 | --- | --- |
 | Web | Next.js `^15.0.0`, React `^19.0.0`, App Router, TypeScript |
 | API | NestJS 10 modular monolith, 13 domain modules |
-| Database | PostgreSQL + Prisma `5.22.0`; **43 models**, 35 enums, 7 migrations |
+| Database | PostgreSQL + Prisma `5.22.0`; **43 models**, 35 enums, 7 production migrations (8 on the retakes branch) |
 | Auth | JWT access token in an HttpOnly cookie + rotating opaque refresh token; refresh-on-mount in the SPA |
 | Cache/jobs | Redis and Bull dependencies are installed; **no Bull processors or outbox relay are wired** |
 | Storage | R2/S3 signing helpers exist; not part of the verified demo flow |
@@ -92,6 +99,19 @@ The repository does **not** have a root `tsconfig.base.json` or a root `.env.exa
 
 Production `4951e49` does not include any of these changes yet.
 
+## Pending assignment-retakes branch — not in production
+
+`feat/assignment-retakes` is stacked on `feat/security-quick-wins` and is local-only until both branches are merged and deployed. It adds:
+
+- Migration #8 `20261027000001_assignment_retakes`: `attemptNumber`, `startedAt`, nullable `submittedAt`, the `IN_PROGRESS` submission status, and a unique `(assignmentId, studentId, attemptNumber)` key replacing the one-row unique key.
+- Safe backfill of existing rows as submitted attempt #1; `startedAt` is backfilled from the old `submittedAt`. No existing row is deleted or rewritten.
+- Active-attempt semantics: `IN_PROGRESS` + `submittedAt = null` while the student writes; submit sets the final timestamp. Timers derive from `startedAt`, not `submittedAt`.
+- Server-side `maxAttempts` enforcement, attempt N+1 after a completed attempt, and a `409` for concurrent duplicate starts.
+- Teacher grading queue and teacher student-file history exclude in-progress attempts. Student history includes them with `submittedAt: null`.
+- Assignment list/runner and dashboard types handle nullable timestamps; the teacher queue shows the attempt number.
+
+Production `4951e49` still has one submission row per student/assignment and does **not** enforce retakes.
+
 ## Known limits and absent features
 
 Do not describe any of the following as shipped:
@@ -107,7 +127,7 @@ Do not describe any of the following as shipped:
 | Rate limiting | Production `4951e49` has no application-level rate limiting. The pending branch adds in-memory per-IP limits; distributed/shared storage and hostile-proxy tuning remain open. |
 | Word-level review highlighting | `AssignmentSubmission` stores `content`, `score`, and `feedback`; per-word evidence spans are not persisted. The result screen uses an aggregate bridge, not fabricated highlights. |
 | Content versioning | Courses, lessons, and exams do not have a separate version/snapshot table. Publishing updates the current row; old attempts are not guaranteed to point at an immutable content version. |
-| Assignment retakes | `Assignment.maxAttempts` exists, but `@@unique([assignmentId, studentId])` permits one submission row per student/assignment. Retakes are not implemented. |
+| Assignment retakes | Production `4951e49` still uses `@@unique([assignmentId, studentId])`, so `Assignment.maxAttempts` does not enable retakes. The pending `feat/assignment-retakes` branch implements the attempt model and migration #8, but it is not deployed. |
 | Exam auto-submit | The student client submits when the timer reaches zero; the API records a late submit as `TIMED_OUT`. There is no server-side scheduled auto-submit worker. |
 | Reconciliation | `ReconciliationRun`, `ReconciliationItem`, and settlement models exist, but there is no live reconciliation worker or route. |
 | Provider sandbox proof | Paymob/Fawry code and local webhook smokes are present; a real provider sandbox run remains pending. |

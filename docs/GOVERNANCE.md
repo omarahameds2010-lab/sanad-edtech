@@ -58,7 +58,7 @@ pnpm --filter api exec jest --config jest.config.js --runInBand
 pnpm build
 ```
 
-Current expected results on `main`: **137/137 web**, **311/311 API**, **4/4 build**. On the pending `feat/security-quick-wins` branch, the API count is **324/324** (33 suites).
+Current expected results on `main`: **137/137 web**, **311/311 API**, **4/4 build**. On the pending `feat/security-quick-wins` branch, the API count is **324/324** (33 suites). On the stacked `feat/assignment-retakes` branch, the expected results are **138/138 web**, **331/331 API**, and **4/4 build**, with migration #8 verified as **8/8** on a fresh local PostgreSQL.
 
 Older versions of this document claimed the design-system build had 24 pre-existing errors and the web suite had 8 port-drift failures. Those conditions are no longer true at `4951e49`; do not use them to justify skipping gates.
 
@@ -67,7 +67,7 @@ Older versions of this document claimed the design-system build had 24 pre-exist
 - Commit source, tests, migrations, and documentation.
 - Never commit `.env`, credentials, tokens, database URLs, or provider keys.
 - Never commit generated proof logs, scratch `.txt` files, or screenshot dumps. The root `.gitignore` blocks common log/scratch patterns; `git status` is still the final check.
-- A schema change needs a migration, RLS policies/grants, and a tenant-scoped query review.
+- A schema change needs a migration, RLS policies/grants, and a tenant-scoped query review. The retakes migration is additive but includes a backfill; verify it on a fresh and a legacy-shaped database before applying it to production.
 - A webhook change needs signature verification, raw-body handling, replay handling, and a test.
 
 ## 5. Ignored files and cleanup

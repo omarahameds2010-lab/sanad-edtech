@@ -1,6 +1,6 @@
 # Architecture — Learning Platform
 
-> **Current runtime architecture, verified 25 October 2026; pending security branch checked 26 October 2026.** This replaces the older aspirational architecture notes. For exact release/test facts see [`CURRENT-STATE.md`](CURRENT-STATE.md). For deployment steps see [`DEPLOY.md`](DEPLOY.md).
+> **Current runtime architecture, verified 25 October 2026; pending security branch checked 26 October 2026; pending retakes branch checked 27 October 2026.** This replaces the older aspirational architecture notes. For exact release/test facts see [`CURRENT-STATE.md`](CURRENT-STATE.md). For deployment steps see [`DEPLOY.md`](DEPLOY.md).
 
 ## 1. System shape
 
@@ -99,7 +99,7 @@ Interactive `$transaction` callbacks are not automatically wrapped; those sites 
 
 The database side is installed:
 
-- 7 migrations;
+- 7 production migrations (8 on the pending retakes branch);
 - 43 application tables;
 - 138 policies;
 - `FORCE ROW LEVEL SECURITY` on application tables;
@@ -153,7 +153,7 @@ Money columns are stored in minor units and serialized as strings. The global JS
 
 Assignment and exam timers are server-owned, but the two models differ:
 
-- **Assignment:** starting creates an `AssignmentSubmission`; its server-set `submittedAt` is the timer start. `expiresAt` is derived (`submittedAt + timerMinutes`) and is not stored in a column. The unique `(assignmentId, studentId)` constraint currently allows one submission row, so the `maxAttempts` field does not yet enable retakes.
+- **Assignment (pending retakes branch):** starting creates an `AssignmentSubmission` with status `IN_PROGRESS`, `startedAt = now`, and `submittedAt = null`. `expiresAt` is derived (`startedAt + timerMinutes`) and is not stored in a column. Each attempt is unique on `(assignmentId, studentId, attemptNumber)`; `maxAttempts` is enforced server-side and concurrent duplicate starts return `409`. Submitting sets `submittedAt`; in-progress rows are excluded from teacher grading. Production `4951e49` still uses the old one-row model where `submittedAt` is the timer start and `maxAttempts` does not enable retakes.
 - **Exam:** `ExamAttempt.startedAt` is the timer start. `expiresAt` is derived (`startedAt + timerMinutes`) and is not stored in a column.
 - The UI only displays remaining time; refresh does not extend it.
 - Expiration is computed server-side. The exam client auto-submits at zero; the API records a late submit as `TIMED_OUT`. No background auto-submit worker is registered.
@@ -240,7 +240,7 @@ No mock data is allowed in these surfaces. Every count and state comes from the 
 | --- | --- | --- |
 | Web | Vercel | `main` production branch; `/api/*` rewrite to Railway |
 | API | Railway | root `Dockerfile`; `railway.json` `DOCKERFILE` builder; `nixpacks.toml` fallback |
-| DB | Railway PostgreSQL | 7 migrations applied; runtime currently owner/superuser |
+| DB | Railway PostgreSQL | 7 migrations applied in production (8 on the retakes branch); runtime currently owner/superuser |
 | Redis | Railway | dependency present; no jobs registered |
 
 Vercel fail-safes:
@@ -255,9 +255,10 @@ Vercel fail-safes:
 3. Video webhook route.
 4. Background job processors.
 5. Deploy the pending lock-enforcement and rate-limit branch to production.
-6. Persisted word-level review evidence.
-7. Provider sandbox verification.
-8. Reconciliation worker.
-9. CI workflow verification (local evidence is authoritative for `4951e49`).
+6. Deploy the stacked retakes branch and apply migration #8 to production.
+7. Persisted word-level review evidence.
+8. Provider sandbox verification.
+9. Reconciliation worker.
+10. CI workflow verification (local evidence is authoritative for `4951e49`).
 
 These are tracked with acceptance criteria in [`STATUS.md`](STATUS.md) and [`CURRENT-STATE.md`](CURRENT-STATE.md).

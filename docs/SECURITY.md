@@ -20,7 +20,7 @@
 
 ### *Protected by architecture, not by promises. Every claim below cites code.*
 
-> **Current security posture — production verified 25 October 2026; pending hardening branch checked 26 October 2026.** Read [`CURRENT-STATE.md`](CURRENT-STATE.md) for the canonical state. This document is a threat model and control catalogue; the dated dashboard below is a historical snapshot.
+> **Current security posture — production verified 25 October 2026; pending hardening branch checked 26 October 2026, retakes branch checked 27 October 2026.** Read [`CURRENT-STATE.md`](CURRENT-STATE.md) for the canonical state. This document is a threat model and control catalogue; the dated dashboard below is a historical snapshot.
 >
 > **Active controls on `main` (`4951e49`)**
 >
@@ -38,17 +38,23 @@
 > - Locked lesson payloads are metadata-only; student assignment/exam view and enter endpoints return `403 LESSON_LOCKED` without a per-student grant.
 > - Throttler storage is in-memory per API instance; the client key comes from forwarded headers and is best-effort, not an authorization boundary.
 >
+> **Additional controls on `feat/assignment-retakes` (not deployed)**
+>
+> - Attempts are unique on `(assignmentId, studentId, attemptNumber)`; the API enforces `maxAttempts` server-side and returns `409` for a concurrent duplicate start.
+> - An active attempt is `IN_PROGRESS` with `submittedAt = null`; teacher grading queues and teacher student-file history exclude it, while the student can resume it.
+> - Migration #8 backfills existing rows as submitted attempt #1 and keeps their original timestamps.
+>
 > **Critical caveat**
 >
 > - **RLS is not enforcing production traffic yet.** The runtime selects `MIGRATION_DATABASE_URL` first and connects with owner/superuser credentials. Until the runtime URL is `app_user` and the preference is flipped, application `tenantId` filters are the active isolation control.
 > - There is no video webhook route; the video webhook design below is not exposed.
 > - There is no outbox dispatcher.
 > - Published course/lesson/exam content has **no immutable version/snapshot layer yet**; the “publish = immutable snapshot” language below is a target control, not a current guarantee.
-> - Assignment attempts are `AssignmentSubmission` rows, not a separate `IN_PROGRESS` attempt table. The unique `(assignmentId, studentId)` constraint blocks retakes regardless of `maxAttempts`.
+> - Production `4951e49` still uses `@@unique([assignmentId, studentId])`, so `maxAttempts` does not enable retakes. The pending `feat/assignment-retakes` branch adds `IN_PROGRESS`, `attemptNumber`, `startedAt`, nullable `submittedAt`, and the attempt key, but it is not deployed.
 > - Exam auto-submit is client-driven; the API marks a late submit `TIMED_OUT`, but no scheduled worker submits abandoned attempts.
 > - 2FA, KMS/Vault, SIEM/Sentry/Prometheus, and WAF are not implemented. Application-level rate limiting exists only on the pending branch and uses in-memory storage, not a shared cluster store.
 > - Production `4951e49` still treats lesson locks as advisory in some student API views; the pending branch closes the lesson-payload and assessment-entry paths.
-> - Do not treat the older “178 + 26 policies” or `20240101000000_init_rls.sql` references as current; the migration chain is now 7 migrations with 138 policies on 43 tables.
+> - Do not treat the older “178 + 26 policies” or `20240101000000_init_rls.sql` references as current; production has 7 migrations with 138 policies on 43 tables, and the retakes branch has migration #8.
 
 [![RLS](https://img.shields.io/badge/RLS-policies_ready%2C_runtime_pending-4169E1?style=for-the-badge&logo=postgresql&logoColor=white)](#-5-tenancy--isolation-rls-the-last-wall)
 [![Argon2id](https://img.shields.io/badge/Hashing-Argon2id-2D3748?style=for-the-badge)](#-31-password-security-argon2id-real)
@@ -1476,6 +1482,7 @@ DELIVERABLE: findings with SEVERITY + REPRO (requestIds) + retest window. Fix SL
 | v0.1 | 2026-10-04 | Original 430-line spec (architecture + policies, pre-verification) |
 | v1.0 | 2026-10-08 | Full rewrite, 4000+ lines: 10 parts + appendices; EVERY control cited to code (file:line) or marked 🧪/📋; posture dashboard from live grep (Argon2, rotation, 22 actions, redeem-closed, RLS 178+26, HMAC ×5 surfaces, boot validator); 6 runbooks; STRIDE ×6 domains; Egypt PDPL/PCI/minors; pentest scope |
 | v2.0 | 2026-10-25 | Current-state banner; RLS counts corrected to 138 policies / 43 tables with runtime activation pending; Bunny webhook marked helper-only; outbox/Bull/video-route gaps called out; token TTL confirmed 5 minutes; local test/build evidence recorded |
+| v2.1 | 2026-10-27 | Pending retakes branch documented: active-attempt status, attempt uniqueness, server-side `maxAttempts`, grading-queue exclusion, migration #8 backfill; production remains on the one-row model |
 
 ---
 

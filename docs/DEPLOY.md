@@ -1,7 +1,7 @@
 # Deployment Runbook — Vercel + Railway
 
 > **Current production:** web on Vercel, API and PostgreSQL on Railway.
-> **Verified 25 October 2026:** production branch `main`, verified app commit `4951e49` (later docs-only commits do not change runtime code), `/api/health` **200** with database **up**.
+> **Verified 25 October 2026:** production branch `main`, verified app commit `4951e49` (later docs-only commits do not change runtime code), `/api/health` **200** with database **up**. Pending retakes branch was verified locally on 27 October 2026 and is **not deployed**.
 > Canonical state: [`CURRENT-STATE.md`](CURRENT-STATE.md).
 
 ## 0. Topology
@@ -39,7 +39,7 @@ Browser
    pnpm build
    ```
 
-   Current expected evidence on `main`: **137/137 web**, **311/311 API**, **4/4 build**. The pending `feat/security-quick-wins` branch adds 13 API tests: **324/324 API**, same web/build counts.
+   Current expected evidence on `main`: **137/137 web**, **311/311 API**, **4/4 build**. The pending `feat/security-quick-wins` branch is **324/324 API**; the stacked `feat/assignment-retakes` branch is **331/331 API**, **138/138 web**, **4/4 build**, plus the local retake and concurrent-start smokes.
 
 3. Do not commit `.env`, logs, or generated scratch files.
 
@@ -150,7 +150,7 @@ Then log in through the browser as the teacher and load `/teacher/courses`; conf
 
 ## 4. Database migrations
 
-The repository has **7** migrations:
+Production has **7** migrations. The stacked retakes branch adds an eighth:
 
 ```text
 0_init
@@ -160,7 +160,10 @@ The repository has **7** migrations:
 20261016000001_tenant_resolution_fn
 20261017000000_webhook_raw_payload
 20261017000001_student_lesson_unlocks
+20261027000001_assignment_retakes   # retakes branch only
 ```
+
+Migration #8 is additive: existing submissions are backfilled as submitted attempt #1 with `startedAt = submittedAt`, then `submittedAt` becomes nullable and the unique key becomes `(assignmentId, studentId, attemptNumber)`. Apply it only after the branch is approved, and take a database backup first.
 
 Apply with the migration/owner URL. Prisma's datasource reads `DATABASE_URL`, so set it to the owner URL for the migration command:
 

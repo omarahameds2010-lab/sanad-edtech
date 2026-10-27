@@ -37,6 +37,8 @@ Production is `main`; the verified app release is `4951e49`. Documentation-only 
 
 A pending hardening branch, `feat/security-quick-wins`, adds per-IP/auth rate limiting and server-side lock enforcement. Its local evidence is **324/324 API tests (33 suites), 137/137 web tests, 4/4 build tasks**, plus a live local login-limit smoke. It is **not deployed** yet; production remains `4951e49`.
 
+The stacked `feat/assignment-retakes` branch adds a real attempt model (migration #8), server-side `maxAttempts`, and retake-aware student/teacher UI. Its local evidence is **331/331 API tests (33 suites), 138/138 web tests, 4/4 build tasks**, an **8/8** fresh migration chain, and retake plus concurrent-start HTTP smokes. It is **not deployed**.
+
 ---
 
 ## What this is
@@ -83,6 +85,7 @@ It is not a marketplace and not a collection of unrelated demo pages. The shippe
 | Reconciliation | Models exist; no live reconciliation worker or route. |
 | Advanced progression | Only `ENTER_ASSIGNMENT` and `ENTER_EXAM` are active. Other unlock types are extension points. |
 | Rate limiting + lock enforcement | Implemented on `feat/security-quick-wins`, not deployed: global per-IP limits, stricter login/register/refresh limits, metadata-only locked lessons, and 403 responses from locked assessment endpoints. The throttler uses in-memory storage per API instance. |
+| Assignment retakes | Implemented on the stacked `feat/assignment-retakes` branch, not deployed: `IN_PROGRESS`, per-attempt rows, server-side `maxAttempts`, and migration #8. Production still has one submission row per student/assignment. |
 | Word-level review evidence | Submissions store `content`, `score`, and `feedback`; per-word evidence spans are not persisted. |
 | Provider sandbox proof | Paymob/Fawry integration code and local webhook smokes exist; a real provider sandbox run is still pending. |
 
@@ -157,7 +160,7 @@ RLS is not a production control until the API connects as `app_user`. Today `app
 To activate:
 
 1. Rotate the Railway database password by hand.
-2. Apply the 7 migrations as the migration owner.
+2. Apply all migrations as the migration owner (7 in production; 8 once the retakes branch is merged).
 3. Set the runtime `DATABASE_URL` to the `app_user` connection string.
 4. Remove `MIGRATION_DATABASE_URL` from the runtime environment.
 5. Flip the preference in `prisma.service.ts` to `DATABASE_URL` first.
@@ -176,12 +179,14 @@ Until then, **every query must still carry `tenantId`**. Application filters are
 ### Assignment timer
 
 - Default duration: **300 minutes** (configurable per assignment, maximum 10,080).
-- Start: the API creates the student's `AssignmentSubmission` row and uses its server-set `submittedAt` as the timer start.
-- Expiry: derived as `submittedAt + timerMinutes`; it is not stored as a separate column.
+- Start (pending retakes branch): the API creates an `IN_PROGRESS` `AssignmentSubmission` with a server-set `startedAt` and `submittedAt = null`.
+- Expiry: derived as `startedAt + timerMinutes`; it is not stored as a separate column.
 - The frontend displays the derived remaining time only; it never owns it.
-- Refresh or browser restart does not reset the timer; re-entering resumes the same row.
-- Statuses: `SUBMITTED` on time, `LATE` when late submission is allowed, `REJECTED` when it is not, then `GRADED`/`RETURNED` after review.
-- Current limitation: `@@unique([assignmentId, studentId])` gives one submission row per student/assignment, so `maxAttempts` does not yet provide a working retake flow.
+- Refresh or browser restart does not reset the timer; re-entering resumes the same active row.
+- Submitting sets `submittedAt` and the final status: `SUBMITTED` on time, `LATE` when allowed, or `REJECTED` when not; grading writes `GRADED`/`RETURNED`.
+- Each attempt is unique on `(assignmentId, studentId, attemptNumber)`, and `maxAttempts` is enforced server-side. A concurrent duplicate start returns `409`.
+- In-progress attempts are excluded from teacher grading; the student history includes them with `submittedAt: null`.
+- Production `4951e49` still uses the old one-row model, where `submittedAt` is the timer start and `maxAttempts` does not enable retakes.
 
 ### Exam timer
 
@@ -437,7 +442,8 @@ Current verified counts:
 | --- | --- |
 | API on `main` (`4951e49`) | **311/311**, 31 suites |
 | API on `feat/security-quick-wins` | **324/324**, 33 suites |
-| Web | **137/137**, 8 files |
+| API on `feat/assignment-retakes` | **331/331**, 33 suites |
+| Web | **138/138**, 8 files |
 | Build | **4/4** tasks |
 | Live health | **200**, database up |
 
@@ -508,11 +514,13 @@ Implemented:
 - Audit rows for sensitive actions.
 - No secrets in git; `.env` is ignored.
 - On the pending hardening branch: per-IP rate limiting (login 10/min, register 5/min, refresh 30/min, 120/min per route otherwise), metadata-only locked lessons, and 403 responses from locked assessment endpoints.
+- On the pending retakes branch: per-attempt uniqueness, server-side `maxAttempts`, `409` on concurrent duplicate starts, and active-attempt exclusion from grading.
 
 Not complete:
 
 - RLS runtime activation (see above).
 - Distributed rate limiting (the pending branch uses in-memory storage per API instance).
+- Assignment retakes in production (the attempt model is on the pending branch).
 - TOTP 2FA.
 - KMS/Vault-backed secret management.
 - SIEM/Prometheus/Sentry wiring.
