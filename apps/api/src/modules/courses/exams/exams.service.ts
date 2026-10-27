@@ -132,19 +132,38 @@ export class ExamsService {
       cursor?: string;
       limit?: number;
     },
+    options?: { studentSafe?: boolean },
   ) {
     const where: Prisma.ExamWhereInput = { tenantId };
     if (filters.lessonId) where.lessonId = filters.lessonId;
     if (filters.status) where.status = filters.status;
 
     const limit = filters.limit ?? 20;
-    const exams = await this.prisma.exam.findMany({
-      where,
-      orderBy: { createdAt: "desc" },
-      take: limit + 1,
-      cursor: filters.cursor ? { id: filters.cursor } : undefined,
-      include: { lesson: { select: { id: true, title: true } } },
-    });
+    const exams: any[] = options?.studentSafe
+      ? await this.prisma.exam.findMany({
+          where,
+          orderBy: { createdAt: "desc" },
+          take: limit + 1,
+          cursor: filters.cursor ? { id: filters.cursor } : undefined,
+          // Student index: navigation metadata only. Description,
+          // instructions, questions and attempts stay behind `/view`, which
+          // enforces enrollment + the per-student lesson grant.
+          select: {
+            id: true,
+            title: true,
+            status: true,
+            lessonId: true,
+            timerMinutes: true,
+            lesson: { select: { id: true, title: true } },
+          },
+        })
+      : await this.prisma.exam.findMany({
+          where,
+          orderBy: { createdAt: "desc" },
+          take: limit + 1,
+          cursor: filters.cursor ? { id: filters.cursor } : undefined,
+          include: { lesson: { select: { id: true, title: true } } },
+        });
 
     let nextCursor: string | null = null;
     if (exams.length > limit) {
@@ -378,6 +397,11 @@ export class ExamsService {
 
     return {
       ...exam,
+      // The intro/closed screen needs a count, not the paper. Returning the
+      // questions before `enter` let a student read the whole exam while the
+      // timer was stopped. Only an active attempt may receive the paper.
+      questions: activeAttempt ? exam.questions : [],
+      questionCount: exam.questions.length,
       studentAttemptCount: attemptCount,
       canAttempt,
       timeRemainingSeconds,

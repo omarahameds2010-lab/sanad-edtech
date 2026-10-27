@@ -91,18 +91,31 @@ export class ExamsController {
   @Get()
   @RequirePermission({ action: "read", resourceType: "exam" })
   async list(@Request() req, @Query() query: any) {
-    const result = await this.examsService.listExams(req.tenantId, {
-      lessonId: query.lessonId,
-      status: query.status,
-      cursor: query.cursor,
-      limit: query.limit ? Number(query.limit) : undefined,
-    });
+    const result = await this.examsService.listExams(
+      req.tenantId,
+      {
+        lessonId: query.lessonId,
+        status: query.status,
+        cursor: query.cursor,
+        limit: query.limit ? Number(query.limit) : undefined,
+      },
+      {
+        // Students and teachers share the index endpoint. Students receive
+        // only navigation metadata; the full brief lives behind `/view`.
+        studentSafe:
+          req.user.role === "STUDENT" || req.user.role === "PARENT",
+      },
+    );
     return { data: result };
   }
 
   @Get(":examId")
+  // Teacher/admin authoring read. `questions=true` and `attempts=true` expose
+  // answer keys and every student's attempt, so this route must never be
+  // reachable with the student `exam:read` grant. Students use `/view`,
+  // `/timer`, and `/attempts/me`, which are scoped to the caller.
   @RequirePermission({
-    action: "read",
+    action: "update",
     resourceType: "exam",
     resourceIdParam: "examId",
   })

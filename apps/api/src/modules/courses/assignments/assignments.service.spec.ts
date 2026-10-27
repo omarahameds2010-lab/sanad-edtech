@@ -810,4 +810,36 @@ describe("AssignmentsService", () => {
       );
     });
   });
+
+  describe("listAssignments", () => {
+    it("returns navigation metadata only for students", async () => {
+      prisma.assignment.findMany.mockResolvedValue([]);
+
+      await service.listAssignments(tenantId, {}, { studentSafe: true });
+
+      const query = prisma.assignment.findMany.mock.calls[0][0];
+      expect(query.select).toMatchObject({
+        id: true,
+        title: true,
+        status: true,
+        lessonId: true,
+        timerMinutes: true,
+      });
+      expect(query.select).not.toHaveProperty("description");
+      expect(query.select).not.toHaveProperty("instructions");
+      expect(query).not.toHaveProperty("include");
+    });
+
+    it("keeps the full authoring shape for teachers", async () => {
+      prisma.assignment.findMany.mockResolvedValue([]);
+
+      await service.listAssignments(tenantId, {});
+
+      const query = prisma.assignment.findMany.mock.calls[0][0];
+      expect(query.include).toEqual({
+        lesson: { select: { id: true, title: true } },
+      });
+      expect(query).not.toHaveProperty("select");
+    });
+  });
 });

@@ -61,8 +61,10 @@ export class LessonsController {
   }
 
   @Get("sections/:sectionId/lessons")
+  // Legacy duplicate of the teacher lesson surface. It exposes linked
+  // assignment/exam rows, so it is authoring-only (not `lesson:read`).
   @RequirePermission({
-    action: "read",
+    action: "update",
     resourceType: "lesson",
     resourceIdParam: "sectionId",
   })
@@ -75,8 +77,10 @@ export class LessonsController {
   }
 
   @Get(":lessonId")
+  // Authoring-only for the same reason as the teacher lesson route. Students
+  // must use the student controller, which enforces the progression grant.
   @RequirePermission({
-    action: "read",
+    action: "update",
     resourceType: "lesson",
     resourceIdParam: "lessonId",
   })

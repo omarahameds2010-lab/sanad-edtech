@@ -58,6 +58,7 @@ function examView(over: Partial<StudentExamView> = {}): StudentExamView {
     status: "PUBLISHED",
     lessonId: "l1",
     questions: [],
+    questionCount: 0,
     studentAttemptCount: 0,
     canAttempt: true,
     activeAttempt: null,

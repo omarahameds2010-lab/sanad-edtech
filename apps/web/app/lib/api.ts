@@ -269,6 +269,8 @@ export interface StudentExamView {
   status: string;
   lessonId: string;
   questions: ExamQuestionView[];
+  /** Count is always available; `questions` is empty until an attempt starts. */
+  questionCount: number;
   studentAttemptCount: number;
   canAttempt: boolean;
   timeRemainingSeconds?: number;

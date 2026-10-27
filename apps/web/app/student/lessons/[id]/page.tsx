@@ -493,7 +493,9 @@ export default function StudentLessonPage({
                     title={data.exam?.title ?? data.lesson.title}
                     description={examDescription}
                     timerMinutes={examTimer}
-                    questionCount={examView?.questions.length ?? null}
+                    questionCount={
+                      examView?.questionCount ?? examView?.questions.length ?? null
+                    }
                     maxAttempts={examView?.maxAttempts ?? null}
                     status={baseStatus}
                     href={examHref}

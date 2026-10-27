@@ -309,7 +309,9 @@ export default function StudentExamRunnerPage({
               <div className="sc-spec-grid">
                 <div className="sc-spec">
                   <span className="sc-spec-label">عدد الأسئلة</span>
-                  <span className="sc-spec-value">{view.questions.length}</span>
+                  <span className="sc-spec-value">
+                    {view.questionCount ?? view.questions.length}
+                  </span>
                 </div>
                 <div className="sc-spec">
                   <span className="sc-spec-label">المدة (بتوقيت السيرفر)</span>

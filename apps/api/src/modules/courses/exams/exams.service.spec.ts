@@ -510,5 +510,71 @@ describe("ExamsService", () => {
       );
       expect(result.timeRemainingSeconds).toBeGreaterThan(64 * 60);
     });
+
+    it("withholds the question paper before an attempt starts", async () => {
+      prisma.exam.findFirst.mockResolvedValue({
+        ...examRow,
+        questions: [
+          { id: "q1", type: "MCQ", text: "Secret?", correctAnswer: "A" },
+        ],
+      });
+      prisma.examAttempt.findMany.mockResolvedValue([]);
+
+      const result = await service.getStudentExamView(tenantId, userId, "e1");
+
+      expect(result.questionCount).toBe(1);
+      expect(result.questions).toEqual([]);
+    });
+
+    it("returns the question paper only while an attempt is active", async () => {
+      prisma.exam.findFirst.mockResolvedValue({
+        ...examRow,
+        questions: [
+          { id: "q1", type: "MCQ", text: "Q?", correctAnswer: "A" },
+        ],
+      });
+      prisma.examAttempt.findMany.mockResolvedValue([
+        { id: "at1", studentId: userId, status: "IN_PROGRESS" },
+      ]);
+
+      const result = await service.getStudentExamView(tenantId, userId, "e1");
+
+      expect(result.questionCount).toBe(1);
+      expect(result.questions).toEqual([
+        expect.objectContaining({ id: "q1", correctAnswer: undefined }),
+      ]);
+    });
+  });
+
+  describe("listExams", () => {
+    it("returns navigation metadata only for students", async () => {
+      prisma.exam.findMany.mockResolvedValue([]);
+
+      await service.listExams(tenantId, {}, { studentSafe: true });
+
+      const query = prisma.exam.findMany.mock.calls[0][0];
+      expect(query.select).toMatchObject({
+        id: true,
+        title: true,
+        status: true,
+        lessonId: true,
+        timerMinutes: true,
+      });
+      expect(query.select).not.toHaveProperty("description");
+      expect(query.select).not.toHaveProperty("instructions");
+      expect(query).not.toHaveProperty("include");
+    });
+
+    it("keeps the full authoring shape for teachers", async () => {
+      prisma.exam.findMany.mockResolvedValue([]);
+
+      await service.listExams(tenantId, {});
+
+      const query = prisma.exam.findMany.mock.calls[0][0];
+      expect(query.include).toEqual({
+        lesson: { select: { id: true, title: true } },
+      });
+      expect(query).not.toHaveProperty("select");
+    });
   });
 });
