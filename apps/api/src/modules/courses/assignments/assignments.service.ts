@@ -121,19 +121,38 @@ export class AssignmentsService {
       cursor?: string;
       limit?: number;
     },
+    options?: { studentSafe?: boolean },
   ) {
     const where: Prisma.AssignmentWhereInput = { tenantId };
     if (filters.lessonId) where.lessonId = filters.lessonId;
     if (filters.status) where.status = filters.status;
 
     const limit = filters.limit ?? 20;
-    const assignments = await this.prisma.assignment.findMany({
-      where,
-      orderBy: { createdAt: "desc" },
-      take: limit + 1,
-      cursor: filters.cursor ? { id: filters.cursor } : undefined,
-      include: { lesson: { select: { id: true, title: true } } },
-    });
+    const assignments: any[] = options?.studentSafe
+      ? await this.prisma.assignment.findMany({
+          where,
+          orderBy: { createdAt: "desc" },
+          take: limit + 1,
+          cursor: filters.cursor ? { id: filters.cursor } : undefined,
+          // Student index: navigation metadata only. Description,
+          // instructions, attempts and grading fields stay behind `/view`,
+          // which enforces enrollment + the per-student lesson grant.
+          select: {
+            id: true,
+            title: true,
+            status: true,
+            lessonId: true,
+            timerMinutes: true,
+            lesson: { select: { id: true, title: true } },
+          },
+        })
+      : await this.prisma.assignment.findMany({
+          where,
+          orderBy: { createdAt: "desc" },
+          take: limit + 1,
+          cursor: filters.cursor ? { id: filters.cursor } : undefined,
+          include: { lesson: { select: { id: true, title: true } } },
+        });
 
     let nextCursor: string | null = null;
     if (assignments.length > limit) {

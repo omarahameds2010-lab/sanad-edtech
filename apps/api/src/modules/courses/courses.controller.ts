@@ -329,7 +329,11 @@ export class TeacherLessonsController {
   }
 
   @Get("sections/:sectionId/lessons")
-  @RequirePermission({ action: "read", resourceType: "lesson" })
+  // Teacher authoring surface. `assertLessonAccessible` is deliberately not
+  // applied here: teachers have no per-student progression grant, so it would
+  // lock them out of editing their own lessons. Students use
+  // `/v1/student/lessons/:lessonId`, where the grant check runs.
+  @RequirePermission({ action: "update", resourceType: "lesson" })
   async listLessons(@Request() req, @Param("sectionId") sectionId: string) {
     const lessons = await this.lessonsService.listLessons(
       req.tenantId,
@@ -339,8 +343,10 @@ export class TeacherLessonsController {
   }
 
   @Get("lessons/:id")
+  // See the listLessons note above. This route returns linked assignment/exam
+  // rows, so a student `lesson:read` token must never reach it.
   @RequirePermission({
-    action: "read",
+    action: "update",
     resourceType: "lesson",
     resourceIdParam: "id",
   })

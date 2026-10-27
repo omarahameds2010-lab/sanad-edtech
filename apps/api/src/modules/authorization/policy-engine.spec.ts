@@ -106,6 +106,37 @@ describe("PolicyEngine (student loop)", () => {
     expect(decision.allowed).toBe(false);
   });
 
+  // Authoring reads include answer keys, every student's attempts, and
+  // locked lesson content. They must require `update`, never student `read`.
+  it.each([
+    ["exam", "exam-1"],
+    ["assignment", "a-1"],
+    ["lesson", "l-1"],
+  ])("denies a student authoring read on %s", async (resourceType, id) => {
+    const decision = await engine.can(
+      student,
+      "update",
+      resourceType as any,
+      { id },
+    );
+    expect(decision.allowed).toBe(false);
+    expect(decision.reason).toBe("INSUFFICIENT_PERMISSIONS");
+  });
+
+  it.each([
+    ["exam", "exam-1"],
+    ["assignment", "a-1"],
+    ["lesson", "l-1"],
+  ])("allows a teacher authoring read on %s", async (resourceType, id) => {
+    const decision = await engine.can(
+      { ...student, role: "TEACHER" },
+      "update",
+      resourceType as any,
+      { id },
+    );
+    expect(decision.allowed).toBe(true);
+  });
+
   it("allows a teacher to grade attempts", async () => {
     const decision = await engine.can(
       { ...student, role: "TEACHER" },

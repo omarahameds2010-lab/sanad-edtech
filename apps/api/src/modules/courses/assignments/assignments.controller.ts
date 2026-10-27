@@ -75,18 +75,32 @@ export class AssignmentsController {
   @Get()
   @RequirePermission({ action: "read", resourceType: "assignment" })
   async list(@Request() req, @Query() query: any) {
-    const result = await this.assignmentsService.listAssignments(req.tenantId, {
-      lessonId: query.lessonId,
-      status: query.status,
-      cursor: query.cursor,
-      limit: query.limit ? Number(query.limit) : undefined,
-    });
+    const result = await this.assignmentsService.listAssignments(
+      req.tenantId,
+      {
+        lessonId: query.lessonId,
+        status: query.status,
+        cursor: query.cursor,
+        limit: query.limit ? Number(query.limit) : undefined,
+      },
+      {
+        // Both students and teachers need this index. Students get metadata
+        // only; instructions/description stay behind `/view` and its lock
+        // check. Parents read the same safe index shape.
+        studentSafe:
+          req.user.role === "STUDENT" || req.user.role === "PARENT",
+      },
+    );
     return { data: result };
   }
 
   @Get(":assignmentId")
+  // Teacher/admin authoring read. The student-safe payload lives at `/view`,
+  // where enrollment and `assertLessonAccessible` run. Keeping this generic
+  // route behind `assignment:update` closes the locked-lesson bypass without
+  // granting students the teacher-shaped assignment object.
   @RequirePermission({
-    action: "read",
+    action: "update",
     resourceType: "assignment",
     resourceIdParam: "assignmentId",
   })
