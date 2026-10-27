@@ -22,9 +22,16 @@ import {
   buildGrowthSummary,
   buildScoreBlueprint,
 } from "./lib/progress";
-
-type AssignmentState =
-  "available" | "active" | "submitted" | "expired" | "unavailable" | "unknown";
+import {
+  assignmentStatusCopy,
+  deriveAssignmentState,
+  hasCompletedAttempt,
+  isLessonLockedError,
+  latestGradedSubmission,
+  latestSubmittedSubmission,
+  prerequisiteLabel,
+  type AssignmentState,
+} from "./lib/overview";
 
 type FilterId = "all" | "available" | "submitted" | "expired";
 type ViewMode = "list" | "path";
@@ -36,7 +43,9 @@ interface AssignmentRow {
   attempted: boolean;
   viewFailed: boolean;
   latest: AssignmentSubmissionSummary | null;
+  latestGraded: AssignmentSubmissionSummary | null;
   submissions: AssignmentSubmissionSummary[];
+  lock: { unlockType: string; lockStatus: string } | null;
 }
 
 interface RemedialState {
@@ -59,32 +68,14 @@ const FILTERS: Array<{ id: FilterId; label: string }> = [
   { id: "expired", label: "فات موعده" },
 ];
 
-const STATE_COPY: Record<
-  AssignmentState,
-  { label: string; tone: "green" | "neutral" | "red" | "muted" }
-> = {
-  available: { label: "متاح", tone: "green" },
-  active: { label: "قيد الحل", tone: "green" },
-  submitted: { label: "تم التسليم", tone: "neutral" },
-  expired: { label: "فات موعده", tone: "red" },
-  unavailable: { label: "غير متاح", tone: "muted" },
-  unknown: { label: "حالة غير مقروءة", tone: "muted" },
-};
-
-const ITEM_STATUS_LABELS: Record<string, string> = {
-  PUBLISHED: "متاح",
-  DRAFT: "مسودة",
-  CLOSED: "مغلق",
-  ARCHIVED: "مؤرشف",
-};
-
 const STATE_PRIORITY: Record<AssignmentState, number> = {
   available: 0,
   active: 1,
   submitted: 2,
-  expired: 3,
-  unknown: 4,
-  unavailable: 5,
+  locked: 3,
+  expired: 4,
+  unknown: 5,
+  unavailable: 6,
 };
 
 function FilePenIcon({ size = 20 }: { size?: number }) {
@@ -276,6 +267,25 @@ function RefreshIcon({ size = 16 }: { size?: number }) {
   );
 }
 
+function LockIcon({ size = 17 }: { size?: number }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <rect x="4.5" y="10" width="15" height="10.5" rx="2.5" />
+      <path d="M8 10V7.5a4 4 0 0 1 8 0V10M12 14.5v2.5" />
+    </svg>
+  );
+}
+
 function SparkIcon({ size = 16 }: { size?: number }) {
   return (
     <svg
@@ -304,41 +314,11 @@ function lessonEmbedUrl(lesson: StudentLesson): string | null {
     : null;
 }
 
-function deriveState(
-  item: AssignmentListItem,
-  view: StudentAssignmentView | null,
-  viewFailed: boolean,
-): AssignmentState {
-  if (item.status !== "PUBLISHED") return "unavailable";
-  if (viewFailed || !view) return "unknown";
-
-  if (view.activeSubmission) {
-    return view.isExpired ? "expired" : "active";
-  }
-
-  if (view.studentAttemptCount > 0) return "submitted";
-  if (view.canAttempt) return "available";
-  return "unavailable";
-}
-
 function matchesFilter(row: AssignmentRow, filter: FilterId): boolean {
   if (filter === "all") return true;
   if (filter === "available") return row.state === "available";
   if (filter === "submitted") return row.state === "submitted";
   return row.state === "expired";
-}
-
-function statusCopy(row: AssignmentRow) {
-  if (row.item.status !== "PUBLISHED" && row.state === "unavailable") {
-    return {
-      label: ITEM_STATUS_LABELS[row.item.status] ?? row.item.status,
-      tone: "muted" as const,
-    };
-  }
-  if (row.latest?.status === "GRADED" && row.latest.score !== null) {
-    return { label: "تم التصحيح", tone: "neutral" as const };
-  }
-  return STATE_COPY[row.state];
 }
 
 function SkeletonCard({ index }: { index: number }) {
@@ -413,7 +393,9 @@ export default function StudentAssignmentsPage() {
                 state: "unavailable" as AssignmentState,
                 attempted: false,
                 latest: null,
+                latestGraded: null,
                 submissions: [],
+                lock: null,
               };
             }
 
@@ -427,19 +409,45 @@ export default function StudentAssignmentsPage() {
               submissionsResult.status === "fulfilled"
                 ? submissionsResult.value
                 : [];
-            const viewFailed = viewResult.status === "rejected";
-            const state = deriveState(item, studentView, viewFailed);
-            const latestSubmitted =
-              submissions.find((s) => s.submittedAt !== null) ?? null;
+            const locked =
+              viewResult.status === "rejected" &&
+              isLessonLockedError(viewResult.reason);
+            const viewFailed = viewResult.status === "rejected" && !locked;
+
+            // The 403 tells us that the lesson is locked, not why. The lesson
+            // metadata endpoint is safe for locked lessons and carries the
+            // prerequisite type used by the lock card.
+            let lock: AssignmentRow["lock"] = null;
+            if (locked) {
+              try {
+                const lesson = await api.getStudentLesson(
+                  token,
+                  item.lesson?.id ?? item.lessonId,
+                );
+                lock = {
+                  unlockType: lesson.access.unlockType,
+                  lockStatus: lesson.access.lockStatus,
+                };
+              } catch {
+                // Keep the honest generic prerequisite; the 403 still stands.
+              }
+            }
+
+            const state = deriveAssignmentState(item.status, studentView, {
+              viewFailed,
+              locked,
+            });
 
             return {
               item,
               view: studentView,
               viewFailed,
               state,
-              attempted: state === "submitted",
-              latest: latestSubmitted,
+              attempted: hasCompletedAttempt(submissions),
+              latest: latestSubmittedSubmission(submissions),
+              latestGraded: latestGradedSubmission(submissions),
               submissions,
+              lock,
             };
           }),
         );
@@ -512,24 +520,27 @@ export default function StudentAssignmentsPage() {
     [allSubmissions],
   );
   const latestGradedRow = useMemo(() => {
-    const graded = (rows ?? []).filter(
-      (row) =>
-        row.latest?.status === "GRADED" && row.latest.score !== null,
+    // Scan every attempt, not just submissions[0]. A newer ungraded retake
+    // must not hide the last real grade from the review module.
+    const candidates = (rows ?? []).flatMap((row) =>
+      row.latestGraded
+        ? [{ row, submission: row.latestGraded }]
+        : [],
     );
     return (
-      [...graded].sort((a, b) => {
-        const aDate = a.latest?.gradedAt ?? a.latest?.submittedAt ?? "";
-        const bDate = b.latest?.gradedAt ?? b.latest?.submittedAt ?? "";
+      candidates.sort((a, b) => {
+        const aDate = a.submission.gradedAt ?? a.submission.submittedAt ?? "";
+        const bDate = b.submission.gradedAt ?? b.submission.submittedAt ?? "";
         return new Date(bDate).getTime() - new Date(aDate).getTime();
       })[0] ?? null
     );
   }, [rows]);
 
   useEffect(() => {
-    if (!latestGradedRow?.latest || latestGradedRow.latest.score === null) {
+    if (!latestGradedRow || latestGradedRow.submission.score === null) {
       return;
     }
-    const latest = latestGradedRow.latest;
+    const latest = latestGradedRow.submission;
     const score = latest.score;
     if (score === null || score < 90) return;
 
@@ -541,7 +552,7 @@ export default function StudentAssignmentsPage() {
     }
     setPraise({
       submissionId: latest.id,
-      title: latestGradedRow.item.title,
+      title: latestGradedRow.row.item.title,
       score,
     });
   }, [latestGradedRow]);
@@ -798,16 +809,18 @@ export default function StudentAssignmentsPage() {
                 ) : (
                   <div className="sw-list" data-view={view}>
                     {visible.map((row, index) => {
-                      const copy = statusCopy(row);
+                      const copy = assignmentStatusCopy(row);
                       const lessonId = row.item.lesson?.id ?? row.item.lessonId;
                       const canOpen = row.item.status === "PUBLISHED";
                       const titleId = `assignment-${row.item.id}-title`;
-                      const latest = row.latest;
-                      const latestScore = latest?.score ?? null;
-                      const graded =
-                        latest?.status === "GRADED" && latestScore !== null;
+                      const latestGraded = row.latestGraded;
+                      const latestScore = latestGraded?.score ?? null;
+                      const graded = latestGraded !== null;
+                      const hasActive = row.view?.activeSubmission != null;
+                      const isLocked = row.state === "locked";
                       const passingScore = row.view?.passingScore ?? null;
                       const hasGap =
+                        !hasActive &&
                         graded &&
                         passingScore !== null &&
                         latestScore !== null &&
@@ -819,6 +832,10 @@ export default function StudentAssignmentsPage() {
                           : row.state === "submitted"
                             ? "عرض التسليم"
                             : "فتح الواجب";
+                      const titleHref =
+                        isLocked && lessonId
+                          ? `/student/lessons/${lessonId}`
+                          : `/student/assignments/${row.item.id}`;
 
                       return (
                         <article
@@ -839,11 +856,7 @@ export default function StudentAssignmentsPage() {
                               <span className="sw-card-kicker">واجب</span>
                               <h2 className="sw-card-title" id={titleId}>
                                 {canOpen ? (
-                                  <Link
-                                    href={`/student/assignments/${row.item.id}`}
-                                  >
-                                    {row.item.title}
-                                  </Link>
+                                  <Link href={titleHref}>{row.item.title}</Link>
                                 ) : (
                                   row.item.title
                                 )}
@@ -889,7 +902,34 @@ export default function StudentAssignmentsPage() {
                           </div>
 
                           <div className="sw-card-actions">
-                            {hasGap ? (
+                            {isLocked ? (
+                              lessonId ? (
+                                <Link
+                                  href={`/student/lessons/${lessonId}`}
+                                  className="sw-btn sw-btn-primary"
+                                >
+                                  فتح الدرس السابق
+                                  <LockIcon size={15} />
+                                </Link>
+                              ) : (
+                                <span
+                                  className="sw-btn sw-btn-secondary sw-btn-disabled"
+                                  aria-disabled="true"
+                                >
+                                  مقفل
+                                </span>
+                              )
+                            ) : hasActive ? (
+                              <Link
+                                href={`/student/assignments/${row.item.id}`}
+                                className="sw-btn sw-btn-primary"
+                              >
+                                {row.state === "expired"
+                                  ? "عرض المحاولة"
+                                  : "متابعة الحل"}
+                                <ArrowIcon />
+                              </Link>
+                            ) : hasGap ? (
                               <button
                                 type="button"
                                 className="sw-btn sw-btn-primary"
@@ -918,7 +958,32 @@ export default function StudentAssignmentsPage() {
                               </span>
                             )}
 
-                            {hasGap ? (
+                            {isLocked ? (
+                              lessonId ? (
+                                <Link
+                                  href={`/student/lessons/${lessonId}`}
+                                  className="sw-btn sw-btn-secondary"
+                                >
+                                  صفحة الدرس
+                                </Link>
+                              ) : null
+                            ) : hasActive ? (
+                              latestGraded ? (
+                                <Link
+                                  href={`/student/assignments/${row.item.id}`}
+                                  className="sw-btn sw-btn-secondary"
+                                >
+                                  مراجعة المحاولة السابقة
+                                </Link>
+                              ) : lessonId ? (
+                                <Link
+                                  href={`/student/lessons/${lessonId}`}
+                                  className="sw-btn sw-btn-secondary"
+                                >
+                                  صفحة الدرس
+                                </Link>
+                              ) : null
+                            ) : hasGap ? (
                               <Link
                                 href={`/student/assignments/${row.item.id}`}
                                 className="sw-btn sw-btn-secondary"
@@ -932,7 +997,9 @@ export default function StudentAssignmentsPage() {
                                 onClick={() => void toggleRemedial(row)}
                                 aria-expanded={remedyOpen}
                               >
-                                {remedyOpen ? "إغلاق المراجعة" : "مراجعة أساس الواجب"}
+                                {remedyOpen
+                                  ? "إغلاق المراجعة"
+                                  : "مراجعة أساس الواجب"}
                               </button>
                             ) : lessonId && canOpen ? (
                               <Link
@@ -943,6 +1010,24 @@ export default function StudentAssignmentsPage() {
                               </Link>
                             ) : null}
                           </div>
+
+                          {isLocked ? (
+                            <div className="sw-card-lock" role="note">
+                              <span className="sw-card-lock-mark" aria-hidden>
+                                <LockIcon size={17} />
+                              </span>
+                              <div className="sw-card-lock-copy">
+                                <strong>الواجب مقفل</strong>
+                                <p>
+                                  لفتح هذا الواجب،{" "}
+                                  {prerequisiteLabel(row.lock?.unlockType)}.
+                                </p>
+                                <span>
+                                  افتح صفحة الدرس لمعرفة الخطوة المطلوبة.
+                                </span>
+                              </div>
+                            </div>
+                          ) : null}
 
                           {remedyOpen ? (
                             <div className="sw-card-remedy">
@@ -1028,20 +1113,20 @@ export default function StudentAssignmentsPage() {
                   </div>
                 )}
 
-                {latestGradedRow?.latest && token ? (
+                {latestGradedRow && token ? (
                   <div className="sw-main-extra">
                     <AssignmentResultReview
                       token={token}
-                      assignmentTitle={latestGradedRow.item.title}
-                      latest={latestGradedRow.latest}
+                      assignmentTitle={latestGradedRow.row.item.title}
+                      latest={latestGradedRow.submission}
                       passingScore={
-                        latestGradedRow.view?.passingScore ?? null
+                        latestGradedRow.row.view?.passingScore ?? null
                       }
                       lessonId={
-                        latestGradedRow.item.lesson?.id ??
-                        latestGradedRow.item.lessonId
+                        latestGradedRow.row.item.lesson?.id ??
+                        latestGradedRow.row.item.lessonId
                       }
-                      history={latestGradedRow.submissions}
+                      history={latestGradedRow.row.submissions}
                     />
                     {blueprint ? (
                       <AcademicBlueprint blueprint={blueprint} />

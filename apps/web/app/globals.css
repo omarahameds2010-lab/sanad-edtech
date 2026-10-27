@@ -8839,6 +8839,57 @@ body:has(.sw-canvas) {
 .sw-card[data-state="expired"] {
   opacity: 0.82;
 }
+.sw-card[data-state="locked"] {
+  border-color: rgba(161, 161, 170, 0.17);
+  background: linear-gradient(180deg, #141416 0%, #111113 100%);
+}
+.sw-card[data-state="locked"] .sw-card-icon {
+  border-color: rgba(161, 161, 170, 0.16);
+  background: rgba(161, 161, 170, 0.05);
+}
+.sw-card-lock {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-top: 2px;
+  padding-top: 16px;
+  border-top: 1px solid var(--sw-line);
+}
+.sw-card-lock-mark {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  flex-shrink: 0;
+  border: 1px solid rgba(161, 161, 170, 0.18);
+  border-radius: 10px;
+  background: rgba(161, 161, 170, 0.055);
+  color: var(--sw-dim);
+}
+.sw-card-lock-copy {
+  min-width: 0;
+}
+.sw-card-lock-copy strong {
+  display: block;
+  color: #e4e4e7;
+  font-size: 12.5px;
+  font-weight: 700;
+  line-height: 1.6;
+}
+.sw-card-lock-copy p {
+  margin: 1px 0 0;
+  color: var(--sw-muted);
+  font-size: 12px;
+  line-height: 1.7;
+}
+.sw-card-lock-copy span {
+  display: block;
+  margin-top: 2px;
+  color: var(--sw-faint);
+  font-size: 11px;
+  line-height: 1.6;
+}
 .sw-card-identity {
   grid-area: identity;
   display: flex;
@@ -11922,6 +11973,38 @@ html[data-theme="light"] .sw-card[data-state="available"] {
 
 html[data-theme="light"] .sw-card[data-state="expired"] {
   opacity: 0.74;
+}
+
+html[data-theme="light"] .sw-card[data-state="locked"] {
+  border-color: var(--hl-line);
+  background: linear-gradient(180deg, #fffefa 0%, #faf7ee 100%);
+}
+
+html[data-theme="light"] .sw-card[data-state="locked"] .sw-card-icon {
+  border-color: var(--hl-line);
+  background: var(--hl-surface-warm);
+}
+
+html[data-theme="light"] .sw-card-lock {
+  border-top-color: var(--hl-line);
+}
+
+html[data-theme="light"] .sw-card-lock-mark {
+  border-color: var(--hl-line);
+  background: var(--hl-surface-warm);
+  color: var(--hl-muted);
+}
+
+html[data-theme="light"] .sw-card-lock-copy strong {
+  color: var(--hl-ink);
+}
+
+html[data-theme="light"] .sw-card-lock-copy p {
+  color: var(--hl-muted);
+}
+
+html[data-theme="light"] .sw-card-lock-copy span {
+  color: var(--hl-dim);
 }
 
 html[data-theme="light"] .sw-card-icon {

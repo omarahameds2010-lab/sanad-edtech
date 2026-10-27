@@ -34,6 +34,7 @@ describe("AssignmentsService", () => {
         update: jest.fn(),
       },
       assignmentSubmission: {
+        aggregate: jest.fn(),
         count: jest.fn(),
         create: jest.fn(),
         findFirst: jest.fn(),
@@ -230,6 +231,64 @@ describe("AssignmentsService", () => {
       await expect(
         service.startAssignmentAttempt(tenantId, userId, "a1", "key1"),
       ).rejects.toThrow(ConflictException);
+    });
+
+    it("returns 409, not 400, when an active attempt is also the last one", async () => {
+      prisma.assignment.findFirst.mockResolvedValue({
+        id: "a1",
+        status: "PUBLISHED",
+        lessonId: "l1",
+        timerMinutes: 300,
+        maxAttempts: 1,
+      });
+      prisma.lesson.findUnique.mockResolvedValue({
+        id: "l1",
+        section: { courseId: "c1" },
+      });
+      prisma.enrollment.findFirst.mockResolvedValue({ id: "e1" });
+      prisma.assignmentSubmission.findFirst.mockResolvedValue({ id: "s1" });
+      prisma.assignmentSubmission.count.mockResolvedValue(1);
+
+      await expect(
+        service.startAssignmentAttempt(tenantId, userId, "a1", "key1"),
+      ).rejects.toThrow(ConflictException);
+      expect(prisma.assignmentSubmission.count).not.toHaveBeenCalled();
+    });
+
+    it("uses the highest attempt number when history has a gap", async () => {
+      prisma.assignment.findFirst.mockResolvedValue({
+        id: "a1",
+        status: "PUBLISHED",
+        lessonId: "l1",
+        timerMinutes: 300,
+        maxAttempts: 5,
+      });
+      prisma.lesson.findUnique.mockResolvedValue({
+        id: "l1",
+        section: { courseId: "c1" },
+      });
+      prisma.enrollment.findFirst.mockResolvedValue({ id: "e1" });
+      prisma.assignmentSubmission.findFirst.mockResolvedValue(null);
+      prisma.assignmentSubmission.count.mockResolvedValue(2);
+      prisma.assignmentSubmission.aggregate.mockResolvedValue({
+        _max: { attemptNumber: 3 },
+      });
+      prisma.assignmentSubmission.create.mockResolvedValue({
+        id: "s4",
+        attemptNumber: 4,
+      });
+
+      const result = await service.startAssignmentAttempt(
+        tenantId,
+        userId,
+        "a1",
+        "key1",
+      );
+
+      expect(result.attemptNumber).toBe(4);
+      expect(prisma.assignmentSubmission.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({ attemptNumber: 4 }),
+      });
     });
 
     it("creates submission with server-authoritative timer and triggers progression", async () => {

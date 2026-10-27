@@ -419,16 +419,10 @@ export class AssignmentsService {
     // only be reachable after the earlier lesson has unlocked this one.
     await assertLessonAccessible(this.prisma, tenantId, userId, lesson);
 
-    // Check attempt count
-    const attemptCount = await this.prisma.assignmentSubmission.count({
-      where: { assignmentId, studentId: userId },
-    });
-
-    if (attemptCount >= assignment.maxAttempts) {
-      throw new BadRequestException("Maximum attempts reached");
-    }
-
-    // Check for active attempt
+    // Active-attempt status wins over the max-attempt check: when an attempt
+    // is already open, the honest answer is "resume/conflict" (409), not a
+    // misleading "maximum attempts reached" (400). This also matters when the
+    // active row is the last allowed attempt.
     const activeSubmission = await this.prisma.assignmentSubmission.findFirst({
       where: {
         assignmentId,
@@ -441,13 +435,31 @@ export class AssignmentsService {
       throw new ConflictException("You already have an active attempt");
     }
 
+    // Count all rows for the maxAttempts policy, but derive the next number
+    // from the highest stored number. `count + 1` collides if an earlier row
+    // ever leaves a gap (manual intervention, failed cleanup).
+    const [attemptCount, latestAttempt] = await Promise.all([
+      this.prisma.assignmentSubmission.count({
+        where: { assignmentId, studentId: userId },
+      }),
+      this.prisma.assignmentSubmission.aggregate({
+        where: { assignmentId, studentId: userId },
+        _max: { attemptNumber: true },
+      }),
+    ]);
+
+    if (attemptCount >= assignment.maxAttempts) {
+      throw new BadRequestException("Maximum attempts reached");
+    }
+
     // Create submission with server-authoritative timer. `submittedAt` stays
     // null until the student actually hands the work in; `startedAt` is the
     // timer origin for this specific attempt.
     const startedAt = new Date();
     const expiresAt = new Date(startedAt);
     expiresAt.setMinutes(expiresAt.getMinutes() + assignment.timerMinutes);
-    const attemptNumber = attemptCount + 1;
+    const highestAttemptNumber = latestAttempt?._max?.attemptNumber ?? 0;
+    const attemptNumber = Math.max(attemptCount, highestAttemptNumber) + 1;
 
     let submission;
     try {
