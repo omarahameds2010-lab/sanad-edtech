@@ -33,6 +33,13 @@
 - Student curriculum/lesson redesign shipped (Heritage Manuscript); dark default + light mode; session restore on reload.
 - Demo passwords remain in `docs/CURRENT-STATE.md`; this file intentionally does not repeat them.
 
+### Pending hardening branch — 2026-10-26 (not deployed)
+
+- Branch `feat/security-quick-wins` adds a global per-IP `@nestjs/throttler` guard: 120/min per route, login 10/min, register 5/min, refresh 30/min; health/readiness and payment webhooks opt out.
+- It also redacts `assignment`/`exam`/`videos` from locked student lesson payloads and returns `403 LESSON_LOCKED` from student assignment/exam view/enter endpoints unless a per-student grant exists.
+- Throttler storage is in-memory per API instance; forwarded-header client IPs are best-effort, not an authorization boundary.
+- Local evidence: API **324/324** (33 suites), web **137/137**, build **4/4**, login-limit smoke `401`×10 → `429` with `Retry-After`. Production remains `4951e49` until this branch is merged and deployed.
+
 ## ⚠️ Verified Reality (audit trail — current release is above)
 
 > Full report: `docs/AUDIT-2026-10-16.md`. The dated entries below are kept as an audit trail. Use the **Current verified release — 2026-10-25** block above for today's runtime.
@@ -68,7 +75,8 @@
 
 **Still not true in runtime code (despite this file):**
 
-- **Progression unlock types beyond ENTER_*** (COMPLETE_*/PASS_EXAM/SCORE_THRESHOLD/TIME_ELAPSED, per-student MANUAL) are still future extension points; locked lessons still return content in student views (the lock is advisory in presentation — audit §6.2).
+- **Progression unlock types beyond ENTER_*** (COMPLETE_*/PASS_EXAM/SCORE_THRESHOLD/TIME_ELAPSED, per-student MANUAL) are still future extension points. Production `4951e49` still returns some locked-lesson content in student views; `feat/security-quick-wins` closes the lesson-payload and assessment-entry paths but is not deployed yet (audit §6.2).
+- **Rate limiting** is absent on production `4951e49`; the pending branch adds in-memory per-instance limits only. Distributed/shared storage and hostile-proxy tuning remain open.
 - **Word-level answer↔review highlighting is not persisted yet.** `AssignmentSubmission` stores only `content`, `score`, and `feedback`; the result review links the student answer and teacher review with an honest aggregate bridge. Real per-word evidence spans require a migration-first change to persist and expose the evaluator's `criteria[].evidence` / `knowledge_gaps`; never simulate highlights.
 - **Transactional outbox has no dispatcher** — events are written and never sent.
 - **No Bull processors** — Redis/Bull dependencies exist, but no `@Processor`/worker is registered. Reconciliation has models but no live worker.

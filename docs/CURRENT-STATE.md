@@ -1,6 +1,6 @@
-# Current State — 25 October 2026
+# Current State — 26 October 2026
 
-> **This is the canonical snapshot for the repository.** If another document disagrees with this file, this file wins. It was checked against the code, the live deployment, and the local test run on 25 October 2026.
+> **This is the canonical snapshot for the repository.** If another document disagrees with this file, this file wins. Production was checked against the live deployment on 25 October 2026; the pending hardening branch was checked locally on 26 October 2026.
 >
 > Historical reports keep their original date and evidence. They are not silently rewritten; they carry a banner pointing here.
 
@@ -10,6 +10,7 @@
 | --- | --- |
 | Production branch | `main` |
 | Verified app commit | `4951e49` — `feat(web): redesign student curriculum and lesson workspace` (later docs-only commits do not change runtime code) |
+| Pending hardening branch | `feat/security-quick-wins` — rate limiting + lock enforcement; local only, **not deployed** |
 | Web | <https://sanad-edtech.vercel.app> |
 | API (direct) | <https://sanad-edtech-production.up.railway.app> |
 | API through the web domain | <https://sanad-edtech.vercel.app/api/health> (Vercel rewrite to Railway) |
@@ -33,14 +34,16 @@ These are seeded demo accounts, not production customer accounts.
 
 | Check | Result |
 | --- | --- |
-| API unit suite | **311 / 311 passed**, 31 suites (`pnpm --filter api exec jest --config jest.config.js --runInBand`) |
+| API unit suite on `main` (`4951e49`) | **311 / 311 passed**, 31 suites (`pnpm --filter api exec jest --config jest.config.js --runInBand`) |
+| API unit suite on `feat/security-quick-wins` | **324 / 324 passed**, 33 suites (13 new security tests) |
 | Web unit suite | **137 / 137 passed**, 8 files (`pnpm --filter web test`) |
 | TypeScript | `pnpm --filter web exec tsc --noEmit` and the API typecheck pass |
 | Monorepo build | `pnpm build` → **4/4 tasks successful** |
 | Live health | Web `/api/health` and direct Railway `/api/health` both return **200**, database up |
+| Login-limit smoke (branch) | 10 attempts from one forwarded IP returned `401`; attempts 11–12 returned `429` with `Retry-After: 40` |
 | Curriculum/lesson QA | Course page, curriculum task links, video lesson, exam brief, assignment brief, locked-video prerequisite, and theme toggle verified in a browser at desktop and mobile widths |
 
-The API suite is the authoritative count for this commit. Older documents that mention 86, 179, 229, 276, 307, or 393 tests are historical snapshots, not the current count.
+The production API suite is **311/311**; the hardening branch is **324/324**. Older documents that mention 86, 179, 229, 276, 307, or 393 tests are historical snapshots, not the current count.
 
 ## Stack and repository facts
 
@@ -77,6 +80,18 @@ The repository does **not** have a root `tsconfig.base.json` or a root `.env.exa
 - Bunny Stream upload/signing code and video-protection primitives (signed playback token, watermark engine, playback sessions).
 - Unlisted YouTube attachment for lessons, which is the path used by the current demo content.
 
+## Pending hardening branch — not in production
+
+`feat/security-quick-wins` is local-only until it is merged and deployed. It adds:
+
+- A global `@nestjs/throttler` guard keyed by the forwarded client IP: **120 requests/minute per route** by default, with stricter auth limits (`login` 10/min, `register` 5/min, `refresh` 30/min). Health/readiness and Paymob/Fawry webhook routes opt out.
+- In-memory throttler storage. It is per API instance; a multi-replica deployment needs shared storage (for example Redis) before limits are cluster-wide.
+- Forwarded-IP extraction (`X-Forwarded-For` first, then `X-Real-IP`, then the socket address). This is a best-effort rate-limit key, not an authorization boundary; a direct caller can spoof the header.
+- Locked-lesson payload redaction: `GET /api/v1/student/lessons/:lessonId` returns title/description/access metadata but `assignment: null`, `exam: null`, and `videos: []` while locked.
+- Assessment lock enforcement: student assignment/exam view and enter endpoints return **403 `LESSON_LOCKED`** when the lesson is locked and the student has no per-student unlock grant.
+
+Production `4951e49` does not include any of these changes yet.
+
 ## Known limits and absent features
 
 Do not describe any of the following as shipped:
@@ -88,7 +103,8 @@ Do not describe any of the following as shipped:
 | Background jobs | Redis/Bull dependencies exist, but no processors or scheduled jobs are registered. |
 | Video provider webhook | There is no video webhook route. Bunny's provider-side webhook helper is not exposed as an HTTP endpoint. |
 | Advanced progression | Only `ENTER_ASSIGNMENT` and `ENTER_EXAM` are active. `COMPLETE_*`, `PASS_EXAM`, `SCORE_THRESHOLD`, `TIME_ELAPSED`, and manual unlocks are future extension points. |
-| Locked lesson content | Locks are enforced in the student presentation, but locked lessons can still return content in student API views. Treat locks as advisory until the API stops returning locked content. |
+| Locked lesson content | Production `4951e49` still treats locks as advisory in some student API views. `feat/security-quick-wins` closes the lesson-payload and assessment-entry paths, but it is not deployed yet. |
+| Rate limiting | Production `4951e49` has no application-level rate limiting. The pending branch adds in-memory per-IP limits; distributed/shared storage and hostile-proxy tuning remain open. |
 | Word-level review highlighting | `AssignmentSubmission` stores `content`, `score`, and `feedback`; per-word evidence spans are not persisted. The result screen uses an aggregate bridge, not fabricated highlights. |
 | Content versioning | Courses, lessons, and exams do not have a separate version/snapshot table. Publishing updates the current row; old attempts are not guaranteed to point at an immutable content version. |
 | Assignment retakes | `Assignment.maxAttempts` exists, but `@@unique([assignmentId, studentId])` permits one submission row per student/assignment. Retakes are not implemented. |

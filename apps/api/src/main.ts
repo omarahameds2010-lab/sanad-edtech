@@ -100,7 +100,13 @@ async function bootstrap() {
       "idempotency-key",
       "X-Requested-With",
     ],
-    exposedHeaders: ["set-cookie"],
+    exposedHeaders: [
+      "set-cookie",
+      "Retry-After",
+      "X-RateLimit-Limit",
+      "X-RateLimit-Remaining",
+      "X-RateLimit-Reset",
+    ],
     methods: ["GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"],
   });
 

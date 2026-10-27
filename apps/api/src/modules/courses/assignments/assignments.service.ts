@@ -15,6 +15,7 @@ import {
 } from "@prisma/client";
 import { IdempotencyService } from "../../payments/security/idempotency.service";
 import { ProgressionService } from "../progression/progression.service";
+import { assertLessonAccessible } from "../lessons/lesson-access";
 import { SanadClient, SanadError, SanadGrading } from "./sanad.client";
 import { resolveBranchSources } from "./sanad.scope";
 
@@ -282,6 +283,10 @@ export class AssignmentsService {
       throw new ForbiddenException("Not enrolled in this course");
     }
 
+    // The lesson page hides locked assessments, so the API must do the same:
+    // otherwise the assignment id is a direct bypass around the lock.
+    await assertLessonAccessible(this.prisma, tenantId, userId, lesson);
+
     // ONLY this student's submissions — previously every student's content,
     // score and feedback leaked into the response via `...assignment`.
     const submissions = await this.prisma.assignmentSubmission.findMany({
@@ -400,6 +405,10 @@ export class AssignmentsService {
     if (!enrollment) {
       throw new ForbiddenException("Not enrolled in this course");
     }
+
+    // Starting an attempt is the ENTER_ASSIGNMENT progression event. It must
+    // only be reachable after the earlier lesson has unlocked this one.
+    await assertLessonAccessible(this.prisma, tenantId, userId, lesson);
 
     // Check attempt count
     const attemptCount = await this.prisma.assignmentSubmission.count({

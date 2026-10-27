@@ -1,6 +1,6 @@
 # Architecture — Learning Platform
 
-> **Current runtime architecture, verified 25 October 2026.** This replaces the older aspirational architecture notes. For exact release/test facts see [`CURRENT-STATE.md`](CURRENT-STATE.md). For deployment steps see [`DEPLOY.md`](DEPLOY.md).
+> **Current runtime architecture, verified 25 October 2026; pending security branch checked 26 October 2026.** This replaces the older aspirational architecture notes. For exact release/test facts see [`CURRENT-STATE.md`](CURRENT-STATE.md). For deployment steps see [`DEPLOY.md`](DEPLOY.md).
 
 ## 1. System shape
 
@@ -68,6 +68,7 @@ Request
   → TenantResolverMiddleware
       host → tenant_domains lookup (SECURITY DEFINER)
       → AsyncLocalStorage tenant scope
+  → ClientIpThrottlerGuard (pending branch; health/webhooks skip)
   → JwtAuthGuard (access cookie)
   → AuthorizationGuard + @RequirePermission
   → Controller/DTO validation
@@ -138,6 +139,10 @@ Money columns are stored in minor units and serialized as strings. The global JS
 - CSRF: origin-checking guard for browser mutations; `ALLOWED_ORIGINS` is required in production.
 - JWT `tenantId` is bound to the request host tenant.
 
+### Rate limiting (pending branch)
+
+`ClientIpThrottlerGuard` is registered as an `APP_GUARD`. It keys on the first `X-Forwarded-For` address (falling back to `X-Real-IP`, then the socket address), because Railway/Vercel terminate TLS in front of the API. The default ceiling is 120 requests/minute per route; the auth controller narrows login to 10/min, register to 5/min, and refresh to 30/min. Health/readiness and provider webhooks are exempt. Storage is in-memory per API instance until a shared store is wired.
+
 ## 6. LMS domain
 
 ### Content
@@ -167,7 +172,7 @@ ENTER_EXAM       → unlock the next lesson for that student
 
 `StudentLessonUnlock` has a unique `(tenantId, userId, lessonId)` constraint. The grants are written in one transaction with `createMany` + `skipDuplicates`, so retries are idempotent. The enter response includes the resulting `unlocked` state.
 
-Future unlock types are not active. Locks are currently advisory in student content views: locked lessons can still return content. Do not claim server-enforced lock confidentiality until that is fixed.
+Future unlock types are not active. Production `4951e49` still treats locks as advisory in some student content views. The pending `feat/security-quick-wins` branch redacts videos/assessment payloads from locked lesson responses and makes the student assignment/exam view and enter endpoints return `403 LESSON_LOCKED` unless a per-student grant exists.
 
 ## 7. Payments
 
@@ -249,7 +254,7 @@ Vercel fail-safes:
 2. Outbox dispatcher.
 3. Video webhook route.
 4. Background job processors.
-5. Lock enforcement in student API views.
+5. Deploy the pending lock-enforcement and rate-limit branch to production.
 6. Persisted word-level review evidence.
 7. Provider sandbox verification.
 8. Reconciliation worker.

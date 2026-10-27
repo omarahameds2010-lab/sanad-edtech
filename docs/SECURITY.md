@@ -20,9 +20,9 @@
 
 ### *Protected by architecture, not by promises. Every claim below cites code.*
 
-> **Current security posture — verified 25 October 2026.** Read [`CURRENT-STATE.md`](CURRENT-STATE.md) for the canonical state. This document is a threat model and control catalogue; the dated dashboard below is a historical snapshot.
+> **Current security posture — production verified 25 October 2026; pending hardening branch checked 26 October 2026.** Read [`CURRENT-STATE.md`](CURRENT-STATE.md) for the canonical state. This document is a threat model and control catalogue; the dated dashboard below is a historical snapshot.
 >
-> **Active controls**
+> **Active controls on `main` (`4951e49`)**
 >
 > - Argon2id password hashing; JWT access cookie (15 min); rotating opaque refresh cookie (HttpOnly, hashed at rest).
 > - JWT `tenantId` bound to the host-resolved tenant; CSRF origin guard; CORS fail-closed when `ALLOWED_ORIGINS` is unset.
@@ -32,6 +32,12 @@
 > - Audit/security event writes for sensitive actions.
 > - DB-side: 138 RLS policies on 43 application tables, `FORCE ROW LEVEL SECURITY`, and per-request tenant context injection (runtime enforcement is **not** active; see the caveat below).
 >
+> **Additional controls on `feat/security-quick-wins` (not deployed)**
+>
+> - Global per-IP rate limiting: 120 requests/minute per route; login 10/min, register 5/min, refresh 30/min; health/readiness and payment webhooks exempt.
+> - Locked lesson payloads are metadata-only; student assignment/exam view and enter endpoints return `403 LESSON_LOCKED` without a per-student grant.
+> - Throttler storage is in-memory per API instance; the client key comes from forwarded headers and is best-effort, not an authorization boundary.
+>
 > **Critical caveat**
 >
 > - **RLS is not enforcing production traffic yet.** The runtime selects `MIGRATION_DATABASE_URL` first and connects with owner/superuser credentials. Until the runtime URL is `app_user` and the preference is flipped, application `tenantId` filters are the active isolation control.
@@ -40,7 +46,8 @@
 > - Published course/lesson/exam content has **no immutable version/snapshot layer yet**; the “publish = immutable snapshot” language below is a target control, not a current guarantee.
 > - Assignment attempts are `AssignmentSubmission` rows, not a separate `IN_PROGRESS` attempt table. The unique `(assignmentId, studentId)` constraint blocks retakes regardless of `maxAttempts`.
 > - Exam auto-submit is client-driven; the API marks a late submit `TIMED_OUT`, but no scheduled worker submits abandoned attempts.
-> - Rate limiting, 2FA, KMS/Vault, SIEM/Sentry/Prometheus, and WAF are not implemented.
+> - 2FA, KMS/Vault, SIEM/Sentry/Prometheus, and WAF are not implemented. Application-level rate limiting exists only on the pending branch and uses in-memory storage, not a shared cluster store.
+> - Production `4951e49` still treats lesson locks as advisory in some student API views; the pending branch closes the lesson-payload and assessment-entry paths.
 > - Do not treat the older “178 + 26 policies” or `20240101000000_init_rls.sql` references as current; the migration chain is now 7 migrations with 138 policies on 43 tables.
 
 [![RLS](https://img.shields.io/badge/RLS-policies_ready%2C_runtime_pending-4169E1?style=for-the-badge&logo=postgresql&logoColor=white)](#-5-tenancy--isolation-rls-the-last-wall)
@@ -441,6 +448,8 @@ await tx.session.update({ ..., refreshTokenHash: await argon2.hash(newRefreshTok
 | Breach-alert login | Password found in HIBP → allow login ONCE → force reset (no lockout-as-DoS) |
 | Admin path | Separate `/control/*` + IP allowlist 📋 + mandatory TOTP (§3.7) + shorter sessions |
 | Monitoring | `login_failures{tenant}` spike → alert (stuffing campaign); `REFRESH_REUSE_DETECTED` → page SEV-2 |
+
+> **Current implementation (pending branch):** login 10/min per forwarded IP, register 5/min, refresh 30/min, implemented with in-memory `@nestjs/throttler` storage. The IP+email counters, 30-minute lockout, CAPTCHA, and Redis-backed counters above remain target controls.
 
 ## 3.6 ACCOUNT LIFECYCLE (Join → Leave → Delete)
 

@@ -41,6 +41,7 @@ describe("AssignmentsService", () => {
         update: jest.fn(),
       },
       enrollment: { findFirst: jest.fn() },
+      studentLessonUnlock: { findFirst: jest.fn() },
     };
     idempotencyService = {
       checkAndStore: jest
@@ -163,6 +164,27 @@ describe("AssignmentsService", () => {
         section: { courseId: "c1" },
       });
       prisma.enrollment.findFirst.mockResolvedValue(null);
+
+      await expect(
+        service.startAssignmentAttempt(tenantId, userId, "a1", "key1"),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it("rejects a locked assignment without a per-student grant", async () => {
+      prisma.assignment.findFirst.mockResolvedValue({
+        id: "a1",
+        status: "PUBLISHED",
+        lessonId: "l1",
+        timerMinutes: 300,
+        maxAttempts: 3,
+      });
+      prisma.lesson.findUnique.mockResolvedValue({
+        id: "l1",
+        lockStatus: "LOCKED",
+        section: { courseId: "c1" },
+      });
+      prisma.enrollment.findFirst.mockResolvedValue({ id: "e1" });
+      prisma.studentLessonUnlock.findFirst.mockResolvedValue(null);
 
       await expect(
         service.startAssignmentAttempt(tenantId, userId, "a1", "key1"),
@@ -543,6 +565,20 @@ describe("AssignmentsService", () => {
       });
       expect(result).not.toHaveProperty("submissions");
       expect(result.studentAttemptCount).toBe(0);
+    });
+
+    it("rejects a locked assignment view until the student has a grant", async () => {
+      prisma.lesson.findUnique.mockResolvedValue({
+        id: "l1",
+        lockStatus: "LOCKED",
+        section: { courseId: "c1" },
+      });
+      prisma.studentLessonUnlock.findFirst.mockResolvedValue(null);
+
+      await expect(
+        service.getStudentAssignmentView(tenantId, userId, "a1"),
+      ).rejects.toThrow(ForbiddenException);
+      expect(prisma.assignmentSubmission.findMany).not.toHaveBeenCalled();
     });
 
     it("never requests submissions via the assignment include", async () => {

@@ -40,6 +40,7 @@ describe("ExamsService", () => {
         update: jest.fn(),
       },
       enrollment: { findFirst: jest.fn() },
+      studentLessonUnlock: { findFirst: jest.fn() },
     };
     idempotencyService = {
       checkAndStore: jest
@@ -156,6 +157,28 @@ describe("ExamsService", () => {
         section: { courseId: "c1" },
       });
       prisma.enrollment.findFirst.mockResolvedValue(null);
+
+      await expect(
+        service.startExamAttempt(tenantId, userId, "e1", "key1"),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it("rejects a locked exam without a per-student grant", async () => {
+      prisma.exam.findFirst.mockResolvedValue({
+        id: "e1",
+        status: "PUBLISHED",
+        lessonId: "l1",
+        timerMinutes: 70,
+        questions: [],
+        maxAttempts: 3,
+      });
+      prisma.lesson.findUnique.mockResolvedValue({
+        id: "l1",
+        lockStatus: "LOCKED",
+        section: { courseId: "c1" },
+      });
+      prisma.enrollment.findFirst.mockResolvedValue({ id: "en1" });
+      prisma.studentLessonUnlock.findFirst.mockResolvedValue(null);
 
       await expect(
         service.startExamAttempt(tenantId, userId, "e1", "key1"),
@@ -445,6 +468,20 @@ describe("ExamsService", () => {
       });
       expect(result).not.toHaveProperty("attempts");
       expect(result.studentAttemptCount).toBe(0);
+    });
+
+    it("rejects a locked exam view until the student has a grant", async () => {
+      prisma.lesson.findUnique.mockResolvedValue({
+        id: "l1",
+        lockStatus: "LOCKED",
+        section: { courseId: "c1" },
+      });
+      prisma.studentLessonUnlock.findFirst.mockResolvedValue(null);
+
+      await expect(
+        service.getStudentExamView(tenantId, userId, "e1"),
+      ).rejects.toThrow(ForbiddenException);
+      expect(prisma.examAttempt.findMany).not.toHaveBeenCalled();
     });
 
     it("never requests attempts via the exam include", async () => {

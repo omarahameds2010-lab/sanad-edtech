@@ -9,6 +9,7 @@ import {
   HttpCode,
   HttpStatus,
 } from "@nestjs/common";
+import { Throttle } from "@nestjs/throttler";
 import { AuthService } from "./auth.service";
 import { LocalAuthGuard } from "./guards/local-auth.guard";
 import { JwtAuthGuard } from "./guards/jwt-auth.guard";
@@ -29,6 +30,7 @@ export class AuthController {
    * needs it to build an Authorization header; it lives in React memory only
    * and expires in 15 minutes.
    */
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
   @Post("login")
   @UseGuards(LocalAuthGuard)
   @HttpCode(HttpStatus.OK)
@@ -45,6 +47,7 @@ export class AuthController {
     return { accessToken: tokens.accessToken, user };
   }
 
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
   @Post("register")
   @HttpCode(HttpStatus.CREATED)
   async register(
@@ -67,6 +70,7 @@ export class AuthController {
    * Emits a fresh cookie pair in the same response, which is what makes the
    * rotation atomic from the client's point of view.
    */
+  @Throttle({ default: { limit: 30, ttl: 60_000 } })
   @Post("refresh")
   @HttpCode(HttpStatus.OK)
   async refresh(@Request() req, @Response({ passthrough: true }) res) {

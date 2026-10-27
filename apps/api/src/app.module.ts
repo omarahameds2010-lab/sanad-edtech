@@ -1,8 +1,11 @@
 import { Module } from "@nestjs/common";
+import { APP_GUARD } from "@nestjs/core";
 import { ConfigModule } from "@nestjs/config";
 import { TerminusModule } from "@nestjs/terminus";
+import { ThrottlerModule } from "@nestjs/throttler";
 import { LoggerModule } from "nestjs-pino";
 import { HealthController } from "./common/health.controller";
+import { ClientIpThrottlerGuard } from "./common/guards/client-ip-throttler.guard";
 import { PrismaModule } from "./common/prisma/prisma.module";
 import { TenantModule } from "./modules/tenants/tenant.module";
 import { AuthModule } from "./modules/auth/auth.module";
@@ -33,6 +36,9 @@ import { CoursesModule } from "./modules/courses/courses.module";
         level: process.env.LOG_LEVEL || "info",
       },
     }),
+    // Global per-IP ceiling. Auth routes add stricter per-handler limits in
+    // AuthController; health and provider webhooks opt out below.
+    ThrottlerModule.forRoot([{ ttl: 60_000, limit: 120 }]),
     PrismaModule,
     TenantModule,
     TerminusModule,
@@ -50,5 +56,11 @@ import { CoursesModule } from "./modules/courses/courses.module";
     CoursesModule,
   ],
   controllers: [HealthController],
+  providers: [
+    {
+      provide: APP_GUARD,
+      useClass: ClientIpThrottlerGuard,
+    },
+  ],
 })
 export class AppModule {}

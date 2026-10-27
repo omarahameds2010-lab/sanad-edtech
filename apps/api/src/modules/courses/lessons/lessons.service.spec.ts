@@ -129,6 +129,33 @@ describe("LessonsService", () => {
       expect(result.lesson.title).toBe("L1");
     });
 
+    it("redacts video and assessment content from a locked lesson", async () => {
+      prisma.lesson.findFirst.mockResolvedValue({
+        id: "l1",
+        title: "Locked exam",
+        type: "EXAM",
+        isFree: false,
+        section: { courseId: "c1" },
+        assignment: { id: "a1", title: "Assignment" },
+        exam: { id: "e1", title: "Final exam" },
+        videos: [{ id: "v1", providerVideoId: "secret-video" }],
+        lockStatus: "LOCKED",
+        unlockType: "ENTER_ASSIGNMENT",
+        description: null,
+        duration: 600,
+        orderIndex: 1,
+        status: "PUBLISHED",
+      });
+      prisma.enrollment.findFirst.mockResolvedValue({ id: "e1" });
+
+      const result = await service.getStudentLesson(tenantId, userId, "l1");
+
+      expect(result.access.isLocked).toBe(true);
+      expect(result.assignment).toBeNull();
+      expect(result.exam).toBeNull();
+      expect(result.videos).toEqual([]);
+    });
+
     it("honours a per-student unlock grant even when the lesson is authored LOCKED", async () => {
       prisma.lesson.findFirst.mockResolvedValue({
         id: "l1",

@@ -9,8 +9,13 @@ import {
   Param,
 } from "@nestjs/common";
 import { Request } from "express";
+import { SkipThrottle } from "@nestjs/throttler";
 import { WebhookInboxService } from "./webhook-inbox.service";
 
+// Provider retries and bursts are normal; HMAC verification and the idempotent
+// inbox are the controls here. A 429 from a shared provider IP could silently
+// drop a payment callback.
+@SkipThrottle()
 @Controller("payments/webhooks")
 export class WebhookController {
   constructor(private webhookInbox: WebhookInboxService) {}

@@ -39,7 +39,7 @@ Browser
    pnpm build
    ```
 
-   Current expected evidence: **137/137 web**, **311/311 API**, **4/4 build**.
+   Current expected evidence on `main`: **137/137 web**, **311/311 API**, **4/4 build**. The pending `feat/security-quick-wins` branch adds 13 API tests: **324/324 API**, same web/build counts.
 
 3. Do not commit `.env`, logs, or generated scratch files.
 

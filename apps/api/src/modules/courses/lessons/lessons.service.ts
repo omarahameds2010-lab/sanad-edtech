@@ -226,6 +226,18 @@ export class LessonsService {
     const effectiveLockStatus = grant ? "UNLOCKED" : lesson.lockStatus;
     const isLocked = effectiveLockStatus === "LOCKED";
 
+    // A locked lesson is metadata-only. Video provider ids and assessment
+    // briefs are content, not navigation hints; returning them made the lock
+    // advisory (audit 2026-10-16 §6.2). The title and description stay so the
+    // curriculum can explain which prerequisite opens the lesson.
+    const content = isLocked
+      ? { assignment: null, exam: null, videos: [] }
+      : {
+          assignment: lesson.assignment ?? null,
+          exam: lesson.exam ?? null,
+          videos: lesson.videos ?? [],
+        };
+
     return {
       lesson: {
         id: lesson.id,
@@ -241,9 +253,7 @@ export class LessonsService {
         unlockType: lesson.unlockType,
         lockStatus: effectiveLockStatus,
       },
-      assignment: lesson.assignment ?? null,
-      exam: lesson.exam ?? null,
-      videos: lesson.videos ?? [],
+      ...content,
     };
   }
 }

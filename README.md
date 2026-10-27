@@ -33,7 +33,9 @@ The production database is seeded with the `sanad-demo` tenant and three publish
 
 These are **demo accounts**. Never reuse demo credentials for a real tenant.
 
-Production is `main`; the verified app release is `4951e49`. Documentation-only commits after it do not change runtime code. The last verified run: **311/311 API tests, 137/137 web tests, 4/4 build tasks**, and both health endpoints returning `200` with the database up. Full evidence: [`docs/CURRENT-STATE.md`](docs/CURRENT-STATE.md).
+Production is `main`; the verified app release is `4951e49`. Documentation-only commits after it do not change runtime code. The last verified production run: **311/311 API tests, 137/137 web tests, 4/4 build tasks**, and both health endpoints returning `200` with the database up. Full evidence: [`docs/CURRENT-STATE.md`](docs/CURRENT-STATE.md).
+
+A pending hardening branch, `feat/security-quick-wins`, adds per-IP/auth rate limiting and server-side lock enforcement. Its local evidence is **324/324 API tests (33 suites), 137/137 web tests, 4/4 build tasks**, plus a live local login-limit smoke. It is **not deployed** yet; production remains `4951e49`.
 
 ---
 
@@ -80,6 +82,7 @@ It is not a marketplace and not a collection of unrelated demo pages. The shippe
 | Video webhook | No HTTP route exposes the provider webhook. |
 | Reconciliation | Models exist; no live reconciliation worker or route. |
 | Advanced progression | Only `ENTER_ASSIGNMENT` and `ENTER_EXAM` are active. Other unlock types are extension points. |
+| Rate limiting + lock enforcement | Implemented on `feat/security-quick-wins`, not deployed: global per-IP limits, stricter login/register/refresh limits, metadata-only locked lessons, and 403 responses from locked assessment endpoints. The throttler uses in-memory storage per API instance. |
 | Word-level review evidence | Submissions store `content`, `score`, and `feedback`; per-word evidence spans are not persisted. |
 | Provider sandbox proof | Paymob/Fawry integration code and local webhook smokes exist; a real provider sandbox run is still pending. |
 
@@ -199,7 +202,7 @@ ENTER_EXAM       → unlock the next lesson
 
 No score threshold is required. Grants are stored per student in `student_lesson_unlocks` with a unique `(tenantId, userId, lessonId)` constraint, written inside one transaction with `createMany + skipDuplicates`. Retries are idempotent.
 
-Future unlock types (`COMPLETE_*`, `PASS_EXAM`, `SCORE_THRESHOLD`, `TIME_ELAPSED`, manual) are not active. Locked lessons still return content in some student API views; the lock is currently advisory in presentation. See the known-limits table in [`docs/CURRENT-STATE.md`](docs/CURRENT-STATE.md).
+Future unlock types (`COMPLETE_*`, `PASS_EXAM`, `SCORE_THRESHOLD`, `TIME_ELAPSED`, manual) are not active. On production `4951e49` the lock is still advisory in some student API views. The pending `feat/security-quick-wins` branch redacts video/assessment payloads from locked lessons and rejects locked assessment views/entries unless the student has a grant. See the known-limits table in [`docs/CURRENT-STATE.md`](docs/CURRENT-STATE.md).
 
 ---
 
@@ -432,7 +435,8 @@ Current verified counts:
 
 | Suite | Result |
 | --- | --- |
-| API | **311/311**, 31 suites |
+| API on `main` (`4951e49`) | **311/311**, 31 suites |
+| API on `feat/security-quick-wins` | **324/324**, 33 suites |
 | Web | **137/137**, 8 files |
 | Build | **4/4** tasks |
 | Live health | **200**, database up |
@@ -503,11 +507,12 @@ Implemented:
 - Idempotency keys and database uniqueness constraints for money and progression.
 - Audit rows for sensitive actions.
 - No secrets in git; `.env` is ignored.
+- On the pending hardening branch: per-IP rate limiting (login 10/min, register 5/min, refresh 30/min, 120/min per route otherwise), metadata-only locked lessons, and 403 responses from locked assessment endpoints.
 
 Not complete:
 
 - RLS runtime activation (see above).
-- Rate limiting on login/webhooks/token issue.
+- Distributed rate limiting (the pending branch uses in-memory storage per API instance).
 - TOTP 2FA.
 - KMS/Vault-backed secret management.
 - SIEM/Prometheus/Sentry wiring.
@@ -545,8 +550,8 @@ Ordered by operational risk, not by novelty:
 2. **Wire the outbox dispatcher** and replace the current write-only queue.
 3. **Add the video provider webhook** and verify a real Bunny upload end to end.
 4. **Run a real Paymob/Fawry sandbox transaction** and record the evidence.
-5. **Harden the remaining control gaps**: rate limits, 2FA, secret manager, observability.
-6. **Expand progression** beyond entry-based unlocks only after the lock is enforced server-side.
+5. **Harden the remaining control gaps**: distributed rate limiting (the pending branch has in-memory limits), 2FA, secret manager, observability.
+6. **Expand progression** beyond entry-based unlocks; the pending branch closes the server-side lock gap for lesson payloads and assessment entry.
 
 Not on the roadmap: fabricated metrics, fake review highlights, or claiming a provider is live before it has processed a real sandbox transaction.
 

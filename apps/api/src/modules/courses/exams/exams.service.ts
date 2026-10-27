@@ -15,6 +15,7 @@ import {
 } from "@prisma/client";
 import { IdempotencyService } from "../../payments/security/idempotency.service";
 import { ProgressionService } from "../progression/progression.service";
+import { assertLessonAccessible } from "../lessons/lesson-access";
 
 @Injectable()
 export class ExamsService {
@@ -337,6 +338,10 @@ export class ExamsService {
       throw new ForbiddenException("Not enrolled in this course");
     }
 
+    // The lesson page hides locked assessments, so the API must do the same:
+    // otherwise the exam id is a direct bypass around the lock.
+    await assertLessonAccessible(this.prisma, tenantId, userId, lesson);
+
     // ONLY this student's attempts — previously every attempt's answers,
     // score and gradingData leaked into the response via `...exam`.
     const attempts = await this.prisma.examAttempt.findMany({
@@ -451,6 +456,10 @@ export class ExamsService {
     if (!enrollment) {
       throw new ForbiddenException("Not enrolled in this course");
     }
+
+    // Starting an attempt is the ENTER_EXAM progression event. It must only be
+    // reachable after the earlier assignment has unlocked this lesson.
+    await assertLessonAccessible(this.prisma, tenantId, userId, lesson);
 
     // Check attempt count
     const attemptCount = await this.prisma.examAttempt.count({

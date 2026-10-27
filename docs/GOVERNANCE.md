@@ -58,7 +58,7 @@ pnpm --filter api exec jest --config jest.config.js --runInBand
 pnpm build
 ```
 
-Current expected results: **137/137 web**, **311/311 API**, **4/4 build**.
+Current expected results on `main`: **137/137 web**, **311/311 API**, **4/4 build**. On the pending `feat/security-quick-wins` branch, the API count is **324/324** (33 suites).
 
 Older versions of this document claimed the design-system build had 24 pre-existing errors and the web suite had 8 port-drift failures. Those conditions are no longer true at `4951e49`; do not use them to justify skipping gates.
 
