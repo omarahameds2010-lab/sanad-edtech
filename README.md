@@ -92,23 +92,23 @@ No isolation guarantees            PostgreSQL RLS (FORCE ROW LEVEL SECURITY)
 
 ---
 
-### 🖼️ Product Tour (Placeholders — replace with real screenshots)
+### 🖼️ Product Tour — live production captures
 
-> Drop screenshots/GIFs here. Recommended size: 1280×720. Keep < 500KB each (use WebP).
+> Every image below is a real capture from the production app on 28 October 2026. Captured at 1440×900, WebP, under 50 KB each.
 
 | Landing | Teacher Discovery | Teacher Space |
 |---------|-------------------|---------------|
-| ![Landing](docs/assets/landing.png) | ![Teachers](docs/assets/teachers.png) | ![Teacher Space](docs/assets/teacher-space.png) |
+| ![Landing](docs/assets/readme/01-landing.webp) | ![Teachers](docs/assets/readme/10-teacher-discovery.webp) | ![Teacher Space](docs/assets/readme/02-teacher-dashboard.webp) |
 | *Master identity + subject motifs* | *Teacher cards with ENTER SPACE →* | *Same platform, own environment* |
 
 | Student Dashboard | Learning Page | Exam Experience |
 |-------------------|---------------|-----------------|
-| ![Student](docs/assets/student.png) | ![Learning](docs/assets/learning.png) | ![Exam](docs/assets/exam.png) |
+| ![Student](docs/assets/readme/04-student-dashboard.webp) | ![Learning](docs/assets/readme/05-curriculum.webp) | ![Exam](docs/assets/readme/06-assessment-brief.webp) |
 | *What should I do next?* | *CONTENT > NAVIGATION > SECONDARY* | *Very low motion, server timer* |
 
 | Course Builder | Analytics | Checkout |
 |----------------|-----------|----------|
-| ![Builder](docs/assets/builder.png) | ![Analytics](docs/assets/analytics.png) | ![Pay](docs/assets/checkout.png) |
+| ![Builder](docs/assets/readme/03-course-workspace.webp) | ![Analytics](docs/assets/readme/12-analytics.webp) | ![Pay](docs/assets/readme/11-enrollment.webp) |
 | *Production env, not CRUD forms* | *One metric + context + trend + action* | *Order → Intent → Provider → Ledger* |
 
 🎬 **Demo video:** `https://demo.learning-platform.example` _(placeholder)_
@@ -2910,9 +2910,10 @@ Built with ❤️ by **OMAR AHMED** — 16-year-old high-school student & founde
 [![Fork](https://img.shields.io/github/forks/omarahameds2010-lab/sanad-edtech?style=social)](https://github.com/omarahameds2010-lab/sanad-edtech/fork)
 [![LinkedIn](https://img.shields.io/badge/LinkedIn-OMAR_AHMED-0A66C2?style=social&logo=linkedin)](https://www.linkedin.com/in/omar-ahmed-7b97613b1/)
 
-<sub>Last updated: 2026-10-07 · Source of truth: <code>AGENTS.md</code> + <code>docs/STATUS.md</code> + <code>docs/ARCHITECTURE.md</code> + <code>docs/SECURITY.md</code> + <code>docs/VIDEO_PROTECTION.md</code> · README line target: 2000+ (this file) · Next: record demo GIFs into <code>docs/assets/</code> and replace placeholders</sub>
+<sub>Last updated: 2026-10-28 · Source of truth: <code>AGENTS.md</code> + <code>docs/STATUS.md</code> + <code>docs/ARCHITECTURE.md</code> + <code>docs/SECURITY.md</code> + <code>docs/VIDEO_PROTECTION.md</code> · README line target: 2000+ (this file) · Product tour: real production captures in <code>docs/assets/readme/</code></sub>
 
 </div>
+
 
 
 
