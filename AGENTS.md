@@ -21,38 +21,40 @@
 | CI/CD       | GitHub Actions workflow exists; local tests/build are the release evidence                                                                                                                     |
 | Infra       | Docker + Terraform (later)                                                                                                                                                                   |
 
-## Current verified release — 2026-10-25
+## Current verified release — 2026-10-28
 
 > Canonical document: `docs/CURRENT-STATE.md`. This is the state to use for answers and documentation. Older entries below are an audit trail.
 
-- Production branch `main`; verified app release `4951e49` (later docs-only commits do not change runtime code). Web `https://sanad-edtech.vercel.app`; API `https://sanad-edtech-production.up.railway.app`.
-- `/api/health` = **200**, database **up**; `sanad-demo` has 3 published Arabic prep courses + exam/assignment.
-- Tests: **311/311 API** (31 suites), **137/137 web** (8 files), build **4/4**, `tsc --noEmit` clean.
-- 43 Prisma models, 7 migrations, 138 RLS policies / 43 tables.
-- RLS runtime **inactive** (runtime uses owner/superuser URL); outbox has no dispatcher; no video webhook; no Bull processors.
+- Production branch `main`. Web runtime code `cd03fb0` (web-only SANAD grading selector on top of `5ac122d`; Vercel auto-deploy; later docs-only commits do not change runtime code). API deployment `5ac122d` via manual `railway up` (deployment `16a33f07-f1dd-404f-b110-ba4497ac7408`, status SUCCESS). Web `https://sanad-edtech.vercel.app`; API `https://sanad-edtech-production.up.railway.app`.
+- `/api/health` = **200**, database **up**; `sanad-demo` has 3 published Arabic prep courses + exam/assignment. The demo assignment is now `maxAttempts=2`; the demo student has submitted attempts 1 and 2 from the production smoke.
+- Tests: **357/357 API** (35 suites) on production code, **147/147 web** (10 files) on `cd03fb0`, build **4/4**.
+- 43 Prisma models, **8 migrations** (migration #8 applied 28 October 2026), 138 RLS policies / 43 tables.
+- RLS runtime **inactive** (runtime uses owner/superuser URL); outbox has no dispatcher; no video webhook; no Bull processors. Railway did not auto-deploy the 28 October push; the API deploy was manual and remains manual until the integration is fixed.
 - Student curriculum/lesson redesign shipped (Heritage Manuscript); dark default + light mode; session restore on reload.
 - Demo passwords remain in `docs/CURRENT-STATE.md`; this file intentionally does not repeat them.
+- SETH-9 advanced controls (post-quantum signing, ZK delivery, homomorphic grading, active deception, crypto-shredding) are **roadmap-only**, not implemented; see `docs/SETH-9-ROADMAP.md`.
 
-### Pending hardening branch — 2026-10-26 (not deployed)
+### Deployed hardening — 2026-10-28
 
 - Branch `feat/security-quick-wins` adds a global per-IP `@nestjs/throttler` guard: 120/min per route, login 10/min, register 5/min, refresh 30/min; health/readiness and payment webhooks opt out.
 - It also redacts `assignment`/`exam`/`videos` from locked student lesson payloads and returns `403 LESSON_LOCKED` from student assignment/exam view/enter endpoints unless a per-student grant exists.
 - Authoring reads now require `update`: `GET /api/v1/exams/:examId`, the generic assignment read, teacher lesson routes, and legacy lesson routes. Student lists return navigation metadata only; pre-start exam views withhold the question paper but expose `questionCount`.
 - Throttler storage is in-memory per API instance; forwarded-header client IPs are best-effort, not an authorization boundary.
-- Local evidence: API **344/344** (34 suites), web **137/137**, build **4/4**, login-limit smoke `401`×10 → `429` with `Retry-After`. Production remains `4951e49` until this branch is merged and deployed.
+- Deployed in production on 28 October 2026. Pre-merge evidence: API **344/344** (34 suites), web **137/137**, build **4/4**, login-limit smoke `401`×10 → `429` with `Retry-After`. Production evidence: student assignment list is metadata-only, the locked-assignment card renders in dark/light, and `403 LESSON_LOCKED` guards the assessment view/enter paths. Rate limits are in-memory per API instance; distributed storage and hostile-proxy tuning remain open.
 
-### Pending assignment-retakes branch — 2026-10-27 (not deployed)
+### Deployed assignment retakes — 2026-10-28
 
 - Branch `feat/assignment-retakes` merges `feat/security-quick-wins` (merge commit `a26d946`) and carries the retake lifecycle.
 - Migration #8 (`20261027000001_assignment_retakes`) adds `attemptNumber`, `startedAt`, nullable `submittedAt`, the `IN_PROGRESS` submission status, and replaces the one-row unique key with `(assignmentId, studentId, attemptNumber)`. Existing rows are backfilled as submitted attempt #1 with `startedAt = submittedAt`.
 - Active work is an `IN_PROGRESS` row with `submittedAt = null`; submitting sets the final timestamp. The student view/timer and teacher queue use the active marker, and teacher/student history excludes in-progress rows from grading.
 - The API enforces `maxAttempts`, starts attempt N+1 after a completed attempt, checks an active attempt before the max-attempt count (`409`, not `400`), derives the next number from the highest stored attempt (gap-tolerant), and converts a concurrent duplicate insert into `409`. The web runner labels the next start as a new attempt; the teacher queue displays the attempt number.
 - Student overview fixes: completion uses `submissions.some((s) => s.submittedAt !== null)`, an active attempt outranks an older grade in status/CTA, result review scans every attempt, and `LESSON_LOCKED` renders a prerequisite lock card instead of a failure state.
-- Local evidence: API **353/353** (34 suites), web **145/145** (9 files), API/web `tsc --noEmit` clean, build **4/4**, fresh local PostgreSQL migration chain **8/8**, a legacy-shaped database backfilled as attempt #1 (`startedAt = submittedAt`), `prisma migrate diff` no drift, retake HTTP smoke (attempt 1 → submit → attempt 2 → max-attempt 400 → teacher queue excludes active), concurrent-start smoke **201/409** with one active row, read-only production preflight (1 total / 1 submitted / 0 null content), and browser QA: active attempt #2 with a prior grade showed «قيد الحل», «متابعة الحل», secondary «مراجعة المحاولة السابقة», and 100% completion; a locked assignment showed «مقفل» and «سلّم الواجب السابق أولًا» in dark and light themes with no horizontal overflow. Production still has **7** migrations and no retakes until this branch is merged and deployed; migration #8 and a Railway backup remain pending.
+- Deployed in production on 28 October 2026. Pre-merge evidence: API **353/353** (34 suites), web **145/145** (9 files), API/web `tsc --noEmit` clean, build **4/4**, fresh local PostgreSQL migration chain **8/8**, a legacy-shaped database backfilled as attempt #1 (`startedAt = submittedAt`), `prisma migrate diff` no drift, retake HTTP smoke (attempt 1 → submit → attempt 2 → max-attempt 400 → teacher queue excludes active), concurrent-start smoke **201/409** with one active row, and browser QA: active attempt #2 with a prior grade showed «قيد الحل», «متابعة الحل», secondary «مراجعة المحاولة السابقة», and 100% completion; a locked assignment showed «مقفل» and «سلّم الواجب السابق أولًا» in dark and light themes with no horizontal overflow.
+- Production evidence: a custom-format dump + globals was restore-tested into local PostgreSQL 18 (44 tables, 3 courses, 1 submission, 7 migrations at backup time); migration #8 applied (**8/8**); production retake smoke **31/31** (metadata-only list, concurrent start **201/409**, attempts 1 and 2 submitted, third start **400**, teacher queue excludes `IN_PROGRESS`, health **200**). Final DB state: 3 submissions (2 at attempt 1, 1 at attempt 2), 0 in progress, 0 null timestamps; demo assignment `maxAttempts=2`.
 
 ## ⚠️ Verified Reality (audit trail — current release is above)
 
-> Full report: `docs/AUDIT-2026-10-16.md`. The dated entries below are kept as an audit trail. Use the **Current verified release — 2026-10-25** block above for today's runtime.
+> Full report: `docs/AUDIT-2026-10-16.md`. The dated entries below are kept as an audit trail. Use the **Current verified release — 2026-10-28** block above for today's runtime.
 
 **Railway go-live — 2026-10-20 (API is LIVE).** API live at `https://sanad-edtech-production.up.railway.app` — verified `/api/health` **200** (`{"status":"ok","database":"up"}`), teacher login `01000000001` **200**, `/api/tenants/current` → `sanad-demo`, `/api/v1/teacher/courses` → 3 seeded courses. Two root causes fixed:
 1. **Tenant middleware path bug (`9f57ee8`).** `TenantResolverMiddleware` checked `req.path.startsWith("/api/health")` — but Nest mounts `forRoutes("*")` middleware under the global prefix (`app.use("/api/*")`), and Express rewrites `req.path` to `/` inside a wildcard mount. The exemption never matched: every cloud request (including health) hit tenant resolution and 404'd with `Tenant not found` until `tenant_domains` had the host. Fix reads `req.originalUrl` (`apps/api/src/modules/tenants/tenant-resolver.middleware.ts`), regression spec `tenant-resolver.middleware.spec.ts` (4 tests), api suite **311/311**.
@@ -66,7 +68,7 @@
 
 **Student curriculum / lesson redesign — 2026-10-25 (`4951e49`, web LIVE).** The student course page is now a manuscript-like curriculum board (`/student/courses/[id]`) with real task counts, section/lesson rows, task chips, progress, and direct assignment/exam/lesson links. The lesson workspace (`/student/lessons/[id]`) handles video, exam brief, assignment brief, and locked-video prerequisite state, with dark/light parity and mobile layouts. Browser QA at 1440/1000/390 verified course tasks/links, video lesson, exam brief, assignment brief, locked-video state, and theme toggle; final local evidence: `tsc --noEmit` EXIT 0, web **137/137**, root build **4/4**. This replaces the old “cards on a dark stage” description in earlier notes.
 
-**Seed state (Railway DB):** `pnpm seed:path2` applied with `PROD_TENANT_DOMAINS=sanad-edtech-production.up.railway.app` (teacher `01000000001` / `Joker-Arabic#2026`, student `01000000002` / `Student123!`, 3 Arabic prep courses, exam + assignment). Local `.env` `DATABASE_URL`/`MIGRATION_DATABASE_URL` reach this DB (7/7 migrations). Runtime still connects as the DB owner — **RLS activation (app_user) remains pending**.
+**Seed state (Railway DB):** `pnpm seed:path2` applied with `PROD_TENANT_DOMAINS=sanad-edtech-production.up.railway.app` (teacher `01000000001` / `Joker-Arabic#2026`, student `01000000002` / `Student123!`, 3 Arabic prep courses, exam + assignment). Local `.env` `DATABASE_URL`/`MIGRATION_DATABASE_URL` reach this DB (**8/8 migrations**). The demo assignment is set to `maxAttempts=2`; the demo student has submitted attempts 1 and 2. Runtime still connects as the DB owner — **RLS activation (app_user) remains pending**.
 
 **Credential incident — resolved; rotation pending (2026-10-16 evening).** Commit `78b9d69` (pushed) fixed `apps/api/src/modules/tenants/prisma.service.ts` to read `MIGRATION_DATABASE_URL` / `DATABASE_URL` from env. Same day: the working-tree leak in `apps/api/prisma/seed-path2.ts` was reverted and `apps/api/srv.txt` deleted — `git status` clean, git history never contained the secret. **By hand only:** rotate the Railway DB password in the dashboard. Never paste credentials into source, logs, or chat.
 
@@ -85,20 +87,20 @@
 
 **Still not true in runtime code (despite this file):**
 
-- **Progression unlock types beyond ENTER_*** (COMPLETE_*/PASS_EXAM/SCORE_THRESHOLD/TIME_ELAPSED, per-student MANUAL) are still future extension points. Production `4951e49` still returns some locked-lesson content in student views; `feat/security-quick-wins` closes the lesson-payload and assessment-entry paths but is not deployed yet (audit §6.2).
-- **Rate limiting** is absent on production `4951e49`; the pending branch adds in-memory per-instance limits only. Distributed/shared storage and hostile-proxy tuning remain open.
-- **Assignment retakes** are implemented on the pending `feat/assignment-retakes` branch but are not deployed; production `4951e49` still has one submission row per student/assignment and no working `maxAttempts`.
+- **Progression unlock types beyond ENTER_*** (COMPLETE_*/PASS_EXAM/SCORE_THRESHOLD/TIME_ELAPSED, per-student MANUAL) are still future extension points. The locked-lesson payload and assessment-entry paths are now deployed; other content types may still need their own enforcement review.
+- **Rate limiting** is live as in-memory per-instance limits only. Distributed/shared storage and hostile-proxy tuning remain open.
+- **Assignment retakes** are deployed with migration #8; `maxAttempts` is server-enforced and concurrent starts return `201`/`409`. The demo assignment is configured with `maxAttempts=2`.
 - **Word-level answer↔review highlighting is not persisted yet.** `AssignmentSubmission` stores only `content`, `score`, and `feedback`; the result review links the student answer and teacher review with an honest aggregate bridge. Real per-word evidence spans require a migration-first change to persist and expose the evaluator's `criteria[].evidence` / `knowledge_gaps`; never simulate highlights.
 - **Transactional outbox has no dispatcher** — events are written and never sent.
 - **No Bull processors** — Redis/Bull dependencies exist, but no `@Processor`/worker is registered. Reconciliation has models but no live worker.
 - **No video webhook route** — Bunny has a webhook verification helper, not an HTTP endpoint. VdoCipher is a stub. The current demo uses unlisted YouTube, which does not exercise the Bunny token/watermark pipeline.
-- **Payment webhooks work now — including the full round trip** (bundle B, `035a838` + `7ebc124`): HMAC-signed callback → PAID → CONFIRMED → ledger + entitlement + intent SUCCEEDED in ONE transaction; PENDING claims resume; orphan paid events FAIL as `INTENT_NOT_FOUND`; queue rejections cannot crash the API. At the time of bundle B: live smoke **25/25**; api **276/276**. Checkout (`ee766e2`) and refunds (bundle C, `69063d2` + fixes) also landed: live smoke **26/26**. Current suite at `4951e49`: **311/311**. Still absent: the video webhook route.
+- **Payment webhooks work now — including the full round trip** (bundle B, `035a838` + `7ebc124`): HMAC-signed callback → PAID → CONFIRMED → ledger + entitlement + intent SUCCEEDED in ONE transaction; PENDING claims resume; orphan paid events FAIL as `INTENT_NOT_FOUND`; queue rejections cannot crash the API. At the time of bundle B: live smoke **25/25**; api **276/276**. Checkout (`ee766e2`) and refunds (bundle C, `69063d2` + fixes) also landed: live smoke **26/26**. Current suite on production API code (`5ac122d`): **357/357** (35 suites). Still absent: the video webhook route.
 - Canonical ports: **web :3001, api :3002** (older docs still say `:3000` in places).
 - Dual jest configs: run API tests as `jest --config jest.config.js` inside `apps/api`.
 
 **Rules that follow:**
 
-1. P1 isolation core has landed and is verified locally. Remaining P1 = **activate on Railway**: rotate the DB password by hand → apply all migrations (7 on production; 8 once `feat/assignment-retakes` is merged; `migrate resolve --applied` only for pre-baseline histories) → point the runtime `DATABASE_URL` at `app_user` → remove/avoid `MIGRATION_DATABASE_URL` in runtime → flip the preference in `prisma.service.ts` → re-run RLS e2e 5/5.
+1. P1 isolation core has landed and is verified locally. Remaining P1 = **activate on Railway**: rotate the DB password by hand → keep all migrations at **8/8** (`migrate resolve --applied` only for pre-baseline histories) → point the runtime `DATABASE_URL` at `app_user` → remove/avoid `MIGRATION_DATABASE_URL` in runtime → flip the preference in `prisma.service.ts` → re-run RLS e2e 5/5.
 2. Claims about RLS / flags / outbox / webhooks / progression / funnel & idempotency must cite working code — not intent.
 3. Secrets live only in `.env` (gitignored). Never paste credentials into source, logs, or chat.
 
@@ -201,7 +203,7 @@ pnpm --filter api exec jest --config jest.config.js --runInBand
 - Submitting sets `submittedAt` and moves the status to `SUBMITTED` (on time), `LATE` (allowed late), or `REJECTED` (late disallowed); teacher grading writes score + feedback and `GRADED`/`RETURNED`.
 - Each attempt is unique by `(assignmentId, studentId, attemptNumber)`; `maxAttempts` is enforced server-side. A student may have one active attempt at a time; a concurrent duplicate start returns `409`.
 - In-progress attempts never enter the teacher grading queue, and the student history includes them with `submittedAt: null`.
-- **Production `4951e49` still uses the old one-row model** (`@@unique([assignmentId, studentId])`, `submittedAt` as timer start). Retakes are implemented on the pending `feat/assignment-retakes` branch, not deployed.
+- **Production uses the attempt model** (migration #8, applied 28 October 2026): unique on `(assignmentId, studentId, attemptNumber)`, `startedAt` is the timer start, and `submittedAt` is nullable while in progress. The production smoke verified attempt 1 → submit → attempt 2 → submit → third start `400` at `maxAttempts=2`; concurrent starts returned `201`/`409`.
 
 ### Exam timer and attempt
 

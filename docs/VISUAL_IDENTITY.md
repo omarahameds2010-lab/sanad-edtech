@@ -160,10 +160,10 @@ This section supersedes older “P0 next commits” language where it disagrees.
 
 ### F. Evidence
 
-- Web suite: **137/137**, including **26** dashboard math tests and **36** curriculum tests.
+- Web suite: **147/147**, including **26** dashboard math tests and **36** curriculum tests.
 - Monorepo build: **4/4**.
 - Live browser QA at 1440/1000/390 widths across dashboard, curriculum, lesson, assignment, exam, profile, confirm dialog, and both themes, with no document-level horizontal overflow.
-- Deployed at `4951e49`.
+- Current web deployment: `cd03fb0`; the design first shipped at `4951e49`.
 
 ### G. Explicitly not shipped
 

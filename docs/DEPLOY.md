@@ -1,7 +1,7 @@
 # Deployment Runbook — Vercel + Railway
 
 > **Current production:** web on Vercel, API and PostgreSQL on Railway.
-> **Verified 25 October 2026:** production branch `main`, verified app commit `4951e49` (later docs-only commits do not change runtime code), `/api/health` **200** with database **up**. Pending retakes branch was verified locally on 27 October 2026 and is **not deployed**.
+> **Verified 28 October 2026:** production branch `main`; web runtime code `cd03fb0` (Vercel auto-deploy; later docs-only commits do not change runtime code), API `5ac122d` (manual `railway up`, deployment `16a33f07-f1dd-404f-b110-ba4497ac7408`); migration #8 applied (**8/8**); `/api/health` **200** with database **up**; production retake smoke **31/31**.
 > Canonical state: [`CURRENT-STATE.md`](CURRENT-STATE.md).
 
 ## 0. Topology
@@ -39,7 +39,7 @@ Browser
    pnpm build
    ```
 
-   Current expected evidence on `main`: **137/137 web**, **311/311 API**, **4/4 build**. The pending `feat/security-quick-wins` branch is **344/344 API**; the `feat/assignment-retakes` branch (with hardening merged) is **353/353 API**, **145/145 web**, **4/4 build**, plus the local retake, concurrent-start, lock-card, and migration-preflight checks.
+   Current expected evidence on `main`: **147/147 web**, **357/357 API**, **4/4 build**. Production migration is **8/8**, and the 28 October release passed the retake, concurrent-start, teacher-queue, and lock-card smokes.
 
 3. Do not commit `.env`, logs, or generated scratch files.
 
@@ -59,6 +59,17 @@ node apps/api/dist/src/main
 ```
 
 The root `Dockerfile` is intentional: Railway's automatic pnpm-monorepo plan previously failed with `No start command could be found`.
+
+### Deployment trigger
+
+On 28 October 2026 the GitHub-linked service did **not** create a deployment for the `main` push. Deploy the API explicitly and verify the deployment status:
+
+```powershell
+railway up --service sanad-edtech --environment production -c -y
+railway service status --service sanad-edtech
+```
+
+The release deployment was `16a33f07-f1dd-404f-b110-ba4497ac7408`, status **SUCCESS**. Do not assume a GitHub push redeploys the API until the integration is fixed.
 
 ### Required environment
 
@@ -150,7 +161,7 @@ Then log in through the browser as the teacher and load `/teacher/courses`; conf
 
 ## 4. Database migrations
 
-Production has **7** migrations. The stacked retakes branch adds an eighth:
+Production has **8** migrations. Migration #8 was applied on 28 October 2026:
 
 ```text
 0_init
@@ -160,19 +171,12 @@ Production has **7** migrations. The stacked retakes branch adds an eighth:
 20261016000001_tenant_resolution_fn
 20261017000000_webhook_raw_payload
 20261017000001_student_lesson_unlocks
-20261027000001_assignment_retakes   # retakes branch only
+20261027000001_assignment_retakes
 ```
 
-Migration #8 is additive: existing submissions are backfilled as submitted attempt #1 with `startedAt = submittedAt`, then `submittedAt` becomes nullable and the unique key becomes `(assignmentId, studentId, attemptNumber)`. Apply it only after the branch is approved, and take a database backup first.
+Migration #8 is additive: existing submissions are backfilled as submitted attempt #1 with `startedAt = submittedAt`, then `submittedAt` becomes nullable and the unique key becomes `(assignmentId, studentId, attemptNumber)`. It was applied after a full backup.
 
-Run the read-only preflight before the migration:
-
-```sql
-SELECT COUNT(*) FROM assignment_submissions
-WHERE status = 'SUBMITTED' AND content IS NULL;
-```
-
-The production preflight on 27 October 2026 returned **1 total submission, 1 submitted, 0 with null content, 0 empty content**. No migration was applied by that check; a Railway backup is still required.
+The production preflight on 27 October 2026 returned **1 total submission, 1 submitted, 0 with null content, 0 empty content**. The backup was a custom-format dump plus globals, restore-tested into a local PostgreSQL 18 container: **44 tables, 3 courses, 1 submission, 7 migrations** at backup time. Post-migration `prisma migrate status` reports **8/8** and “Database schema is up to date!”.
 
 Apply with the migration/owner URL. Prisma's datasource reads `DATABASE_URL`, so set it to the owner URL for the migration command:
 
@@ -183,6 +187,8 @@ $env:DATABASE_URL=$env:MIGRATION_DATABASE_URL
 pnpm exec prisma migrate deploy
 pnpm exec prisma migrate status
 ```
+
+On this Windows host, Prisma 5.22's Windows schema engine returned `P1001` even though `psql` and `prisma db execute` reached the database. The same Prisma 5.22 CLI inside a Linux Node 20 Alpine container (with OpenSSL installed) applied the migration successfully. Use a Linux environment/container for production migrations if this recurs.
 
 For a database whose history predates the baseline, resolve the already-applied migrations first, then deploy:
 
@@ -282,6 +288,10 @@ RLS being inactive is a known P1 gap, not a reason to claim isolation is complet
 | Course curriculum | tasks and progress render from API |
 | Lesson | video/exam/assignment state renders |
 | Theme toggle | light/dark persists after reload |
+| Assignment retake | concurrent start **201 + 409**; third start **400** at `maxAttempts=2` |
+| Teacher grading queue | excludes `IN_PROGRESS`; shows both submitted attempts |
+| Locked assignment | **403 `LESSON_LOCKED`**; lock card in dark and light with no overflow |
+| Railway deployment | `railway service status --service sanad-edtech` reports **SUCCESS** for the intended deployment |
 | Logout → refresh | **401**, `/student` redirected to login |
 
 ## 7. Known deployment gaps
@@ -290,7 +300,9 @@ RLS being inactive is a known P1 gap, not a reason to claim isolation is complet
 - Outbox dispatcher (events are written, not delivered).
 - No video webhook route.
 - No Bull processors.
+- Railway may not auto-deploy a `main` push; the 28 October API deploy was manual with `railway up`.
 - Real provider sandbox transaction not yet recorded.
+- SETH-9 advanced controls are roadmap-only; see [`SETH-9-ROADMAP.md`](SETH-9-ROADMAP.md).
 - CI workflow is present but not the release evidence; use the local commands above.
 
 ## 8. Costs and operations

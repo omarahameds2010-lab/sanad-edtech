@@ -114,10 +114,10 @@
 > الثيم بيتحفظ، والجلسة بتترجع بعد إعادة التحميل من غير ما التوكن يتخزن في المتصفح.
 >
 > دي SANAD: منصة واحدة، مساحات كثيرة، وتجربة تعليمية كاملة.
-> والأرقام؟ **311 اختبار API، 137 اختبار ويب، وبناء 4/4.**
+> والأرقام؟ **357 اختبار API، 147 اختبار ويب، وبناء 4/4، و8/8 هجرات إنتاج.**
 > مش أرقام على السلايد — دي نتائج التشغيل.
 
-**On screen:** live URLs + `311/311`, `137/137`, `4/4`.
+**On screen:** live URLs + `357/357`, `147/147`, `4/4`, `8/8` migrations.
 
 ---
 
@@ -164,9 +164,12 @@ Do not claim every provider is live.
 | Claim | Status |
 | --- | --- |
 | 3 published Arabic courses | Seeded in `sanad-demo` |
-| 311 API tests | Verified 25 Oct 2026 |
-| 137 web tests | Verified 25 Oct 2026 |
-| Build 4/4 | Verified 25 Oct 2026 |
+| 357 API tests | Verified 28 Oct 2026 |
+| 147 web tests | Verified 28 Oct 2026 |
+| Build 4/4 | Verified 28 Oct 2026 |
+| Production migrations 8/8 | Verified 28 Oct 2026 |
+| Assignment retakes live | Yes — production smoke 31/31 |
+| Rate limiting + lock enforcement live | Yes — still in-memory per API instance |
 | RLS enforced in production | **No** — runtime still owner/superuser |
 | Outbox delivered | **No** — no dispatcher |
 | Video webhook | **No** — no route |

@@ -319,7 +319,7 @@ VDOCIPHER_BASE_URL="https://dev.vdocipher.com/api"
 
 ## Testing Requirements
 
-> The checklists below are acceptance criteria for the protection design, not a statement that every test exists today. The current API suite is **311/311**; the video module has a service spec, but there is no browser `WatermarkOverlay` test because no such component is shipped. Do not mark a box complete without a real test.
+> The checklists below are acceptance criteria for the protection design, not a statement that every test exists today. The current API suite is **357/357**; the video module has a service spec, but there is no browser `WatermarkOverlay` test because no such component is shipped. Do not mark a box complete without a real test.
 
 ### Unit Tests
 - [ ] `WatermarkEngine.positionAt()` deterministic with same seed
@@ -579,7 +579,7 @@ NEXT LESSON becomes available
 
 ## Testing Requirements
 
-> The checklists below are acceptance criteria for the protection design, not a statement that every test exists today. The current API suite is **311/311**; the video module has a service spec, but there is no browser `WatermarkOverlay` test because no such component is shipped. Do not mark a box complete without a real test.
+> The checklists below are acceptance criteria for the protection design, not a statement that every test exists today. The current API suite is **357/357**; the video module has a service spec, but there is no browser `WatermarkOverlay` test because no such component is shipped. Do not mark a box complete without a real test.
 
 ### Unit Tests
 - [ ] `WatermarkEngine.positionAt()` deterministic with same seed

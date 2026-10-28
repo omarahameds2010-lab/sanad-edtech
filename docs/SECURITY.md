@@ -20,9 +20,9 @@
 
 ### *Protected by architecture, not by promises. Every claim below cites code.*
 
-> **Current security posture — production verified 25 October 2026; pending hardening branch checked 26 October 2026, retakes branch checked 27 October 2026.** Read [`CURRENT-STATE.md`](CURRENT-STATE.md) for the canonical state. This document is a threat model and control catalogue; the dated dashboard below is a historical snapshot.
+> **Current security posture — production verified 28 October 2026 after migration #8 and the hardening/retakes release.** Read [`CURRENT-STATE.md`](CURRENT-STATE.md) for the canonical state. This document is a threat model and control catalogue; the dated dashboard below is a historical snapshot.
 >
-> **Active controls on `main` (`4951e49`)**
+> **Active controls on production**
 >
 > - Argon2id password hashing; JWT access cookie (15 min); rotating opaque refresh cookie (HttpOnly, hashed at rest).
 > - JWT `tenantId` bound to the host-resolved tenant; CSRF origin guard; CORS fail-closed when `ALLOWED_ORIGINS` is unset.
@@ -31,31 +31,21 @@
 > - Refund idempotency, CAS transitions, ledger reversal, and entitlement revocation.
 > - Audit/security event writes for sensitive actions.
 > - DB-side: 138 RLS policies on 43 application tables, `FORCE ROW LEVEL SECURITY`, and per-request tenant context injection (runtime enforcement is **not** active; see the caveat below).
->
-> **Additional controls on `feat/security-quick-wins` (not deployed)**
->
-> - Global per-IP rate limiting: 120 requests/minute per route; login 10/min, register 5/min, refresh 30/min; health/readiness and payment webhooks exempt.
+> - Global per-IP rate limiting: 120 requests/minute per route; login 10/min, register 5/min, refresh 30/min; health/readiness and payment webhooks exempt. Storage is in-memory per API instance.
 > - Locked lesson payloads are metadata-only; student assignment/exam view and enter endpoints return `403 LESSON_LOCKED` without a per-student grant.
 > - Authoring reads require `update`: generic exam/assignment reads, teacher lesson routes, and legacy lesson routes. Student lists expose navigation metadata only, and pre-start exam views withhold the question paper.
-> - Throttler storage is in-memory per API instance; the client key comes from forwarded headers and is best-effort, not an authorization boundary.
+> - Attempts are unique on `(assignmentId, studentId, attemptNumber)`; `maxAttempts` is enforced server-side and concurrent duplicate starts return `409`. An active attempt is checked before the max-attempt count. Migration #8 is applied and existing rows are backfilled as submitted attempt #1.
 >
-> **Additional controls on `feat/assignment-retakes` (not deployed)**
->
-> - Attempts are unique on `(assignmentId, studentId, attemptNumber)`; the API enforces `maxAttempts` server-side and returns `409` for a concurrent duplicate start. An active attempt is checked before the max-attempt count, so the final open attempt returns `409`, not `400`.
-> - An active attempt is `IN_PROGRESS` with `submittedAt = null`; teacher grading queues and teacher student-file history exclude it, while the student can resume it. The next number is derived from the highest stored attempt, tolerating history gaps.
-> - Migration #8 backfills existing rows as submitted attempt #1 and keeps their original timestamps. The read-only production preflight passed; the migration and a backup remain pending.
->
-> **Critical caveat**
+> **Critical caveats**
 >
 > - **RLS is not enforcing production traffic yet.** The runtime selects `MIGRATION_DATABASE_URL` first and connects with owner/superuser credentials. Until the runtime URL is `app_user` and the preference is flipped, application `tenantId` filters are the active isolation control.
 > - There is no video webhook route; the video webhook design below is not exposed.
 > - There is no outbox dispatcher.
 > - Published course/lesson/exam content has **no immutable version/snapshot layer yet**; the “publish = immutable snapshot” language below is a target control, not a current guarantee.
-> - Production `4951e49` still uses `@@unique([assignmentId, studentId])`, so `maxAttempts` does not enable retakes. The pending `feat/assignment-retakes` branch adds `IN_PROGRESS`, `attemptNumber`, `startedAt`, nullable `submittedAt`, and the attempt key, but it is not deployed.
 > - Exam auto-submit is client-driven; the API marks a late submit `TIMED_OUT`, but no scheduled worker submits abandoned attempts.
-> - 2FA, KMS/Vault, SIEM/Sentry/Prometheus, and WAF are not implemented. Application-level rate limiting exists only on the pending branch and uses in-memory storage, not a shared cluster store.
-> - Production `4951e49` still treats lesson locks as advisory in some student API views; the pending branch closes the lesson-payload and assessment-entry paths.
-> - Do not treat the older “178 + 26 policies” or `20240101000000_init_rls.sql` references as current; production has 7 migrations with 138 policies on 43 tables, and the retakes branch has migration #8.
+> - 2FA, KMS/Vault, SIEM/Sentry/Prometheus, and WAF are not implemented. Application-level rate limiting uses in-memory storage, not a shared cluster store.
+> - SETH-9 post-quantum signing, ZK delivery, homomorphic grading, active deception, and crypto-shredding are **roadmap-only**; see [`SETH-9-ROADMAP.md`](SETH-9-ROADMAP.md).
+> - Do not treat the older “178 + 26 policies” or `20240101000000_init_rls.sql` references as current; production has 8 migrations with 138 policies on 43 tables.
 
 [![RLS](https://img.shields.io/badge/RLS-policies_ready%2C_runtime_pending-4169E1?style=for-the-badge&logo=postgresql&logoColor=white)](#-5-tenancy--isolation-rls-the-last-wall)
 [![Argon2id](https://img.shields.io/badge/Hashing-Argon2id-2D3748?style=for-the-badge)](#-31-password-security-argon2id-real)
@@ -456,7 +446,7 @@ await tx.session.update({ ..., refreshTokenHash: await argon2.hash(newRefreshTok
 | Admin path | Separate `/control/*` + IP allowlist 📋 + mandatory TOTP (§3.7) + shorter sessions |
 | Monitoring | `login_failures{tenant}` spike → alert (stuffing campaign); `REFRESH_REUSE_DETECTED` → page SEV-2 |
 
-> **Current implementation (pending branch):** login 10/min per forwarded IP, register 5/min, refresh 30/min, implemented with in-memory `@nestjs/throttler` storage. The IP+email counters, 30-minute lockout, CAPTCHA, and Redis-backed counters above remain target controls.
+> **Current implementation (deployed):** login 10/min per forwarded IP, register 5/min, refresh 30/min, implemented with in-memory `@nestjs/throttler` storage. The IP+email counters, 30-minute lockout, CAPTCHA, and Redis-backed counters above remain target controls.
 
 ## 3.6 ACCOUNT LIFECYCLE (Join → Leave → Delete)
 
@@ -1484,6 +1474,7 @@ DELIVERABLE: findings with SEVERITY + REPRO (requestIds) + retest window. Fix SL
 | v1.0 | 2026-10-08 | Full rewrite, 4000+ lines: 10 parts + appendices; EVERY control cited to code (file:line) or marked 🧪/📋; posture dashboard from live grep (Argon2, rotation, 22 actions, redeem-closed, RLS 178+26, HMAC ×5 surfaces, boot validator); 6 runbooks; STRIDE ×6 domains; Egypt PDPL/PCI/minors; pentest scope |
 | v2.0 | 2026-10-25 | Current-state banner; RLS counts corrected to 138 policies / 43 tables with runtime activation pending; Bunny webhook marked helper-only; outbox/Bull/video-route gaps called out; token TTL confirmed 5 minutes; local test/build evidence recorded |
 | v2.1 | 2026-10-27 | Pending retakes branch documented: active-attempt status, attempt uniqueness, server-side `maxAttempts`, active-before-max `409`, gap-tolerant numbering, grading-queue exclusion, migration #8 backfill/preflight; authoring-read bypass fixes added to the hardening branch; production remains on the one-row model |
+| v2.2 | 2026-10-28 | Hardening and retakes merged and deployed; migration #8 applied (8/8); backup restore-tested; production retake smoke 31/31; rate limiting/lock enforcement/authoring-read fixes live; RLS activation and distributed rate limiting remain open; SETH-9 recorded as roadmap-only |
 
 ---
 

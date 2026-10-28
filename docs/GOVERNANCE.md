@@ -58,16 +58,16 @@ pnpm --filter api exec jest --config jest.config.js --runInBand
 pnpm build
 ```
 
-Current expected results on `main`: **137/137 web**, **311/311 API**, **4/4 build**. On the pending `feat/security-quick-wins` branch, the API count is **344/344** (34 suites). On the `feat/assignment-retakes` branch (with hardening merged), the expected results are **145/145 web**, **353/353 API**, and **4/4 build**, with migration #8 verified as **8/8** on a fresh local PostgreSQL and a read-only production preflight before any Railway migration.
+Current expected results on production code: **147/147 web**, **357/357 API**, **4/4 build**, **8/8 production migrations**, and the production retake smoke **31/31**. The hardening and retakes branches were verified pre-merge at **344/344** and **353/353** API / **145/145** web; those are historical counts, not the current gate.
 
-Older versions of this document claimed the design-system build had 24 pre-existing errors and the web suite had 8 port-drift failures. Those conditions are no longer true at `4951e49`; do not use them to justify skipping gates.
+Older versions of this document claimed the design-system build had 24 pre-existing errors and the web suite had 8 port-drift failures. Those conditions are no longer true at the current release; do not use them to justify skipping gates.
 
 ## 4. Commit content
 
 - Commit source, tests, migrations, and documentation.
 - Never commit `.env`, credentials, tokens, database URLs, or provider keys.
 - Never commit generated proof logs, scratch `.txt` files, or screenshot dumps. The root `.gitignore` blocks common log/scratch patterns; `git status` is still the final check.
-- A schema change needs a migration, RLS policies/grants, and a tenant-scoped query review. The retakes migration is additive but includes a backfill; verify it on a fresh and a legacy-shaped database before applying it to production.
+- A schema change needs a migration, RLS policies/grants, and a tenant-scoped query review. The retakes migration was additive but included a backfill; it was verified on a fresh and a legacy-shaped database, restore-tested, and applied after a full production backup.
 - A webhook change needs signature verification, raw-body handling, replay handling, and a test.
 
 ## 5. Ignored files and cleanup

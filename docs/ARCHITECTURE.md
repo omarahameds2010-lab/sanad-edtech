@@ -1,6 +1,6 @@
 # Architecture — Learning Platform
 
-> **Current runtime architecture, verified 25 October 2026; pending security branch checked 26 October 2026; pending retakes branch checked 27 October 2026.** This replaces the older aspirational architecture notes. For exact release/test facts see [`CURRENT-STATE.md`](CURRENT-STATE.md). For deployment steps see [`DEPLOY.md`](DEPLOY.md).
+> **Current runtime architecture, verified 28 October 2026 after migration #8 and the hardening/retakes release.** This replaces the older aspirational architecture notes. For exact release/test facts see [`CURRENT-STATE.md`](CURRENT-STATE.md). For deployment steps see [`DEPLOY.md`](DEPLOY.md).
 
 ## 1. System shape
 
@@ -68,7 +68,7 @@ Request
   → TenantResolverMiddleware
       host → tenant_domains lookup (SECURITY DEFINER)
       → AsyncLocalStorage tenant scope
-  → ClientIpThrottlerGuard (pending branch; health/webhooks skip)
+  → ClientIpThrottlerGuard (deployed; health/webhooks skip)
   → JwtAuthGuard (access cookie)
   → AuthorizationGuard + @RequirePermission
   → Controller/DTO validation
@@ -99,7 +99,7 @@ Interactive `$transaction` callbacks are not automatically wrapped; those sites 
 
 The database side is installed:
 
-- 7 production migrations (8 on the pending retakes branch);
+- 8 production migrations (migration #8 applied 28 October 2026);
 - 43 application tables;
 - 138 policies;
 - `FORCE ROW LEVEL SECURITY` on application tables;
@@ -139,7 +139,7 @@ Money columns are stored in minor units and serialized as strings. The global JS
 - CSRF: origin-checking guard for browser mutations; `ALLOWED_ORIGINS` is required in production.
 - JWT `tenantId` is bound to the request host tenant.
 
-### Rate limiting (pending branch)
+### Rate limiting (deployed)
 
 `ClientIpThrottlerGuard` is registered as an `APP_GUARD`. It keys on the first `X-Forwarded-For` address (falling back to `X-Real-IP`, then the socket address), because Railway/Vercel terminate TLS in front of the API. The default ceiling is 120 requests/minute per route; the auth controller narrows login to 10/min, register to 5/min, and refresh to 30/min. Health/readiness and provider webhooks are exempt. Storage is in-memory per API instance until a shared store is wired.
 
@@ -153,7 +153,7 @@ Money columns are stored in minor units and serialized as strings. The global JS
 
 Assignment and exam timers are server-owned, but the two models differ:
 
-- **Assignment (pending retakes branch):** starting creates an `AssignmentSubmission` with status `IN_PROGRESS`, `startedAt = now`, and `submittedAt = null`. `expiresAt` is derived (`startedAt + timerMinutes`) and is not stored in a column. Each attempt is unique on `(assignmentId, studentId, attemptNumber)`; `maxAttempts` is enforced server-side and concurrent duplicate starts return `409`. Submitting sets `submittedAt`; in-progress rows are excluded from teacher grading. Production `4951e49` still uses the old one-row model where `submittedAt` is the timer start and `maxAttempts` does not enable retakes.
+- **Assignment:** starting creates an `AssignmentSubmission` with status `IN_PROGRESS`, `startedAt = now`, and `submittedAt = null`. `expiresAt` is derived (`startedAt + timerMinutes`) and is not stored in a column. Each attempt is unique on `(assignmentId, studentId, attemptNumber)`; `maxAttempts` is enforced server-side and concurrent duplicate starts return `409`. Submitting sets `submittedAt`; in-progress rows are excluded from teacher grading. Production runs migration #8 and the attempt model; the 28 October smoke verified attempts 1 and 2 and a rejected third start at `maxAttempts=2`.
 - **Exam:** `ExamAttempt.startedAt` is the timer start. `expiresAt` is derived (`startedAt + timerMinutes`) and is not stored in a column.
 - The UI only displays remaining time; refresh does not extend it.
 - Expiration is computed server-side. The exam client auto-submits at zero; the API records a late submit as `TIMED_OUT`. No background auto-submit worker is registered.
@@ -172,7 +172,7 @@ ENTER_EXAM       → unlock the next lesson for that student
 
 `StudentLessonUnlock` has a unique `(tenantId, userId, lessonId)` constraint. The grants are written in one transaction with `createMany` + `skipDuplicates`, so retries are idempotent. The enter response includes the resulting `unlocked` state.
 
-Future unlock types are not active. Production `4951e49` still treats locks as advisory in some student content views. The pending `feat/security-quick-wins` branch redacts videos/assessment payloads from locked lesson responses and makes the student assignment/exam view and enter endpoints return `403 LESSON_LOCKED` unless a per-student grant exists.
+Future unlock types are not active. Production redacts videos/assessment payloads from locked lesson responses and makes the student assignment/exam view and enter endpoints return `403 LESSON_LOCKED` unless a per-student grant exists. The lock card was verified in production in dark and light themes.
 
 ## 7. Payments
 
@@ -254,11 +254,12 @@ Vercel fail-safes:
 2. Outbox dispatcher.
 3. Video webhook route.
 4. Background job processors.
-5. Deploy the pending lock-enforcement and rate-limit branch to production.
-6. Deploy the stacked retakes branch and apply migration #8 to production.
-7. Persisted word-level review evidence.
-8. Provider sandbox verification.
-9. Reconciliation worker.
-10. CI workflow verification (local evidence is authoritative for `4951e49`).
+5. Persisted word-level review evidence.
+6. Provider sandbox verification.
+7. Reconciliation worker.
+8. Distributed rate limiting (current limits are in-memory per instance).
+9. Railway API auto-deploy (the 28 October release was manual).
+10. CI workflow verification (local evidence is authoritative for the 28 October release).
+11. SETH-9 advanced controls remain roadmap-only; see [`SETH-9-ROADMAP.md`](SETH-9-ROADMAP.md).
 
 These are tracked with acceptance criteria in [`STATUS.md`](STATUS.md) and [`CURRENT-STATE.md`](CURRENT-STATE.md).

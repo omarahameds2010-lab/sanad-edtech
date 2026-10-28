@@ -33,11 +33,9 @@ The production database is seeded with the `sanad-demo` tenant and three publish
 
 These are **demo accounts**. Never reuse demo credentials for a real tenant.
 
-Production is `main`; the verified app release is `4951e49`. Documentation-only commits after it do not change runtime code. The last verified production run: **311/311 API tests, 137/137 web tests, 4/4 build tasks**, and both health endpoints returning `200` with the database up. Full evidence: [`docs/CURRENT-STATE.md`](docs/CURRENT-STATE.md).
+Production is `main`; web runtime code is `cd03fb0` (a web-only SANAD grading-selector commit; later docs-only commits do not change it) and the API is deployed from `5ac122d`. The 28 October release added rate limiting, locked-content enforcement, authoring-read fixes, and assignment retakes (migration #8). Verified production run: **357/357 API tests (35 suites), 147/147 web tests (10 files), 4/4 build tasks**, **8/8** migrations, and both health endpoints returning `200` with the database up. Production retake smoke passed **31/31**. Full evidence: [`docs/CURRENT-STATE.md`](docs/CURRENT-STATE.md).
 
-A pending hardening branch, `feat/security-quick-wins`, adds per-IP/auth rate limiting, server-side lock enforcement, and authoring-read bypass fixes. Its local evidence is **344/344 API tests (34 suites), 137/137 web tests, 4/4 build tasks**, plus a live local login-limit smoke. It is **not deployed** yet; production remains `4951e49`.
-
-The `feat/assignment-retakes` branch (hardening merged) adds a real attempt model (migration #8), server-side `maxAttempts`, active-before-max ordering, and retake-aware student/teacher UI. Its local evidence is **353/353 API tests (34 suites), 145/145 web tests, 4/4 build tasks**, an **8/8** fresh migration chain, retake plus concurrent-start HTTP smokes, and browser QA for active retakes and locked assignments. Migration #8 has **not** been applied to Railway; the read-only preflight passed and a backup is still required.
+Railway did not auto-deploy the 28 October `main` push; the API was deployed manually with `railway up` (deployment `16a33f07-f1dd-404f-b110-ba4497ac7408`, SUCCESS). Vercel auto-deployed the web. The demo assignment is set to `maxAttempts=2`; the demo student has attempts 1 and 2 submitted from the smoke.
 
 ---
 
@@ -53,7 +51,7 @@ It is not a marketplace and not a collection of unrelated demo pages. The shippe
 
 ---
 
-## Current state — verified 25 October 2026
+## Current state — verified 28 October 2026
 
 ### Shipped and exercised
 
@@ -67,6 +65,8 @@ It is not a marketplace and not a collection of unrelated demo pages. The shippe
 | Timers | Server-authoritative assignment timer (300 minutes) and exam timer (70 minutes); refresh does not reset the derived expiry |
 | Progression | Per-student `ENTER_ASSIGNMENT` → linked exam unlock, `ENTER_EXAM` → next lesson unlock; idempotent grants |
 | Grading | Teacher exam grading queue and assignment submission review |
+| Assignment retakes | Per-attempt rows, server-side `maxAttempts`, `409` on concurrent duplicate starts, and in-progress attempts excluded from teacher grading |
+| Security hardening | Per-IP/auth rate limits, metadata-only locked lessons, `403 LESSON_LOCKED` assessment guards, and `update`-only authoring reads |
 | Student dashboard | `/student` Command Center; all numbers derive from server payloads |
 | Payments | Paymob, Fawry, and voucher checkout; signed webhooks; idempotency; ledger; entitlements; refunds |
 | Refunds | Admin-only, idempotent, CAS transitions, ledger reversal, surgical entitlement revocation |
@@ -84,10 +84,10 @@ It is not a marketplace and not a collection of unrelated demo pages. The shippe
 | Video webhook | No HTTP route exposes the provider webhook. |
 | Reconciliation | Models exist; no live reconciliation worker or route. |
 | Advanced progression | Only `ENTER_ASSIGNMENT` and `ENTER_EXAM` are active. Other unlock types are extension points. |
-| Rate limiting + lock enforcement | Implemented on `feat/security-quick-wins`, not deployed: global per-IP limits, stricter login/register/refresh limits, metadata-only locked lessons, and 403 responses from locked assessment endpoints. The throttler uses in-memory storage per API instance. |
-| Assignment retakes | Implemented on the stacked `feat/assignment-retakes` branch, not deployed: `IN_PROGRESS`, per-attempt rows, server-side `maxAttempts`, and migration #8. Production still has one submission row per student/assignment. |
 | Word-level review evidence | Submissions store `content`, `score`, and `feedback`; per-word evidence spans are not persisted. |
 | Provider sandbox proof | Paymob/Fawry integration code and local webhook smokes exist; a real provider sandbox run is still pending. |
+| Distributed rate limiting | Rate limits are live, but storage is in-memory per API instance; shared storage is still required for cluster-wide limits. |
+| SETH-9 advanced controls | Post-quantum signing, ZK delivery, homomorphic grading, active deception, and crypto-shredding are roadmap-only; see [`docs/SETH-9-ROADMAP.md`](docs/SETH-9-ROADMAP.md). |
 
 Read [`docs/CURRENT-STATE.md`](docs/CURRENT-STATE.md) before making a claim about any of these. It is the canonical snapshot.
 
@@ -179,14 +179,14 @@ Until then, **every query must still carry `tenantId`**. Application filters are
 ### Assignment timer
 
 - Default duration: **300 minutes** (configurable per assignment, maximum 10,080).
-- Start (pending retakes branch): the API creates an `IN_PROGRESS` `AssignmentSubmission` with a server-set `startedAt` and `submittedAt = null`.
+- Start: the API creates an `IN_PROGRESS` `AssignmentSubmission` with a server-set `startedAt` and `submittedAt = null`.
 - Expiry: derived as `startedAt + timerMinutes`; it is not stored as a separate column.
 - The frontend displays the derived remaining time only; it never owns it.
 - Refresh or browser restart does not reset the timer; re-entering resumes the same active row.
 - Submitting sets `submittedAt` and the final status: `SUBMITTED` on time, `LATE` when allowed, or `REJECTED` when not; grading writes `GRADED`/`RETURNED`.
 - Each attempt is unique on `(assignmentId, studentId, attemptNumber)`, and `maxAttempts` is enforced server-side. A concurrent duplicate start returns `409`.
 - In-progress attempts are excluded from teacher grading; the student history includes them with `submittedAt: null`.
-- Production `4951e49` still uses the old one-row model, where `submittedAt` is the timer start and `maxAttempts` does not enable retakes.
+- Production uses the attempt model (migration #8): the 28 October smoke verified attempt 1 → submit → attempt 2 → submit → third start `400` at `maxAttempts=2`, and concurrent starts returned `201`/`409`.
 
 ### Exam timer
 
@@ -207,7 +207,7 @@ ENTER_EXAM       → unlock the next lesson
 
 No score threshold is required. Grants are stored per student in `student_lesson_unlocks` with a unique `(tenantId, userId, lessonId)` constraint, written inside one transaction with `createMany + skipDuplicates`. Retries are idempotent.
 
-Future unlock types (`COMPLETE_*`, `PASS_EXAM`, `SCORE_THRESHOLD`, `TIME_ELAPSED`, manual) are not active. On production `4951e49` the lock is still advisory in some student API views. The pending `feat/security-quick-wins` branch redacts video/assessment payloads from locked lessons and rejects locked assessment views/entries unless the student has a grant. See the known-limits table in [`docs/CURRENT-STATE.md`](docs/CURRENT-STATE.md).
+Future unlock types (`COMPLETE_*`, `PASS_EXAM`, `SCORE_THRESHOLD`, `TIME_ELAPSED`, manual) are not active. Production now redacts video/assessment payloads from locked lessons and rejects locked assessment views/entries with `403 LESSON_LOCKED` unless the student has a grant; the lock card was verified in dark and light themes. See the known-limits table in [`docs/CURRENT-STATE.md`](docs/CURRENT-STATE.md).
 
 ---
 
@@ -440,11 +440,10 @@ Current verified counts:
 
 | Suite | Result |
 | --- | --- |
-| API on `main` (`4951e49`) | **311/311**, 31 suites |
-| API on `feat/security-quick-wins` | **344/344**, 34 suites |
-| API on `feat/assignment-retakes` | **353/353**, 34 suites |
-| Web | **145/145**, 9 files |
-| Build | **4/4** tasks |
+| API on production code (`5ac122d`) | **357/357**, 35 suites |
+| Web on `cd03fb0` | **147/147**, 10 files |
+| Build on `cd03fb0` | **4/4** tasks |
+| Production migrations | **8/8** |
 | Live health | **200**, database up |
 
 The API e2e specs (`test/rls-isolation.e2e-spec.ts`, `test/golden-flow.e2e-spec.ts`) require live database URLs and are run separately. Do not count them in the unit total.
@@ -513,14 +512,14 @@ Implemented:
 - Idempotency keys and database uniqueness constraints for money and progression.
 - Audit rows for sensitive actions.
 - No secrets in git; `.env` is ignored.
-- On the pending hardening branch: per-IP rate limiting (login 10/min, register 5/min, refresh 30/min, 120/min per route otherwise), metadata-only locked lessons, and 403 responses from locked assessment endpoints.
-- On the pending retakes branch: per-attempt uniqueness, server-side `maxAttempts`, `409` on concurrent duplicate starts, and active-attempt exclusion from grading.
+- Per-IP rate limiting (login 10/min, register 5/min, refresh 30/min, 120/min per route otherwise), metadata-only locked lessons, and `403 LESSON_LOCKED` from locked assessment endpoints.
+- Per-attempt uniqueness, server-side `maxAttempts`, `409` on concurrent duplicate starts, and active-attempt exclusion from grading.
 
 Not complete:
 
 - RLS runtime activation (see above).
-- Distributed rate limiting (the pending branch uses in-memory storage per API instance).
-- Assignment retakes in production (the attempt model is on the pending branch).
+- Distributed rate limiting (current limits use in-memory storage per API instance).
+- Railway auto-deploy for the API (the 28 October release was deployed manually with `railway up`).
 - TOTP 2FA.
 - KMS/Vault-backed secret management.
 - SIEM/Prometheus/Sentry wiring.
@@ -558,8 +557,9 @@ Ordered by operational risk, not by novelty:
 2. **Wire the outbox dispatcher** and replace the current write-only queue.
 3. **Add the video provider webhook** and verify a real Bunny upload end to end.
 4. **Run a real Paymob/Fawry sandbox transaction** and record the evidence.
-5. **Harden the remaining control gaps**: distributed rate limiting (the pending branch has in-memory limits), 2FA, secret manager, observability.
-6. **Expand progression** beyond entry-based unlocks; the pending branch closes the server-side lock gap for lesson payloads and assessment entry.
+5. **Harden the remaining control gaps**: distributed rate limiting (current limits are in-memory per instance), 2FA, secret manager, observability.
+6. **Expand progression** beyond entry-based unlocks; the lesson-payload and assessment-entry lock gap is closed, but other content types still need their own enforcement review.
+7. **Review the SETH-9 roadmap** for crypto agility, PQC, ZK, confidential grading, deception, and crypto-shredding without claiming them as shipped; see [`docs/SETH-9-ROADMAP.md`](docs/SETH-9-ROADMAP.md).
 
 Not on the roadmap: fabricated metrics, fake review highlights, or claiming a provider is live before it has processed a real sandbox transaction.
 
