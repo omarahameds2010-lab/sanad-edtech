@@ -284,7 +284,7 @@ PLATFORM (universe)
 | ENTER_ASSIGNMENT → unlock EXAM | ✅ | Idempotent unlock |
 | ENTER_EXAM → unlock NEXT LESSON | ✅ | Idempotent unlock |
 | Attempt lifecycles | ✅ | IN_PROGRESS → SUBMITTED/EXPIRED/CANCELLED → GRADED |
-| Teacher grading flow | � | Score + feedback |
+| Teacher grading flow | 🚧 | Score + feedback |
 | Question types (MCQ, TF, SHORT, ESSAY, MATCHING) | � | Shuffling + versioning |
 
 ### 2.5 Frontend
