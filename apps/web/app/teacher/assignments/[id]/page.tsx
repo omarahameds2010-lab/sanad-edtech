@@ -13,17 +13,7 @@ import {
   type AssignmentDetail,
   type GradingSubmission,
 } from "@/app/lib/api";
-
-const BRANCHES: { id: string; label: string; color: string }[] = [
-  { id: "all", label: "الكل", color: "#8b5cf6" },
-  { id: "nahw", label: "النحو والإعراب", color: "#10b981" },
-  { id: "sarf", label: "الصرف والإملاء", color: "#0ea5e9" },
-  { id: "balagha", label: "البلاغة والنقد", color: "#f59e0b" },
-  { id: "arood", label: "العروض والشعر", color: "#ec4899" },
-  { id: "lugha", label: "اللغة والمفردات", color: "#6366f1" },
-  { id: "quran", label: "القرآن وعلومه", color: "#14b8a6" },
-  { id: "sira", label: "السيرة والتاريخ", color: "#f97316" },
-];
+import { SANAD_BRANCHES as BRANCHES } from "@/app/lib/sanad-branches";
 
 function branchColor(branch: string): string {
   return BRANCHES.find((b) => b.id === branch)?.color ?? "#6b7280";
