@@ -279,7 +279,7 @@ PLATFORM (universe)
 | Feature | Status | Notes |
 |---------|--------|-------|
 | Lesson content types (VIDEO, ASSIGNMENT, EXAM, RESOURCE) | 🚧 | Schema extension in progress |
-| Assignment model (300m default) | 🚧 | Timer server-authoritative |
+| Assignment model (300m default) | ✅  | Timer server-authoritative |
 | Exam model (70m default) | 🚧 | Never expose answers |
 | ENTER_ASSIGNMENT → unlock EXAM | 🚧 | Idempotent unlock |
 | ENTER_EXAM → unlock NEXT LESSON | 🚧 | Idempotent unlock |
