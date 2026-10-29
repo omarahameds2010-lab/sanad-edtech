@@ -136,7 +136,7 @@ No isolation guarantees            PostgreSQL RLS (FORCE ROW LEVEL SECURITY)
 
 > Two cinematic walkthroughs explain the vision and the architecture. A third slot is reserved for the founder's five-minute story. Full films open on Google Drive.
 
-| [![SANAD AI — male voiceover](docs/assets/readme/video-01-sanad-ai-male.webp)](https://drive.google.com/) | [![SANAD architecture — female voiceover](docs/assets/readme/video-02-architecture-female.webp)](https://drive.google.com/) |
+| [![SANAD AI — male voiceover](docs/assets/readme/video-01-sanad-ai-male.webp)](https://drive.google.com/file/d/1QFr_5h92Lv7EhiWP4AbodGqsZD4CT4th/view?usp=sharing) | [![SANAD architecture — female voiceover](docs/assets/readme/video-02-architecture-female.webp)](https://drive.google.com/file/d/1I-qPFIRHM_etNrpNWXC3VpiMgOdhZOTT/view?usp=sharing) |
 |---|---|
 | **SANAD AI**<br><sub>07:49 · Arabic voiceover · Male</sub><br><sub>The vision: sovereign Arabic AI, evaluation, and evidence-based feedback.</sub> | **The Architecture**<br><sub>07:29 · Arabic voiceover · Female</sub><br><sub>Inside the platform: tenancy, isolation, and the system behind the screens.</sub> |
 
@@ -146,7 +146,7 @@ No isolation guarantees            PostgreSQL RLS (FORCE ROW LEVEL SECURITY)
 
 > 🚀 **Live platform:** [sanad-edtech.vercel.app](https://sanad-edtech.vercel.app) · 📖 **Documentation:** [docs/](docs/)
 
-<!-- TODO(video-links): replace the two https://drive.google.com/ links with the final Google Drive URLs. -->
+<!-- TODO(founder-video): add the 5-minute founder walkthrough link when the final cut is ready. -->
 
 ---
 
