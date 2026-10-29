@@ -92,28 +92,57 @@ No isolation guarantees            PostgreSQL RLS (FORCE ROW LEVEL SECURITY)
 
 ---
 
-### 🖼️ Product Tour — live production captures
+### 🖼️ Product Tour — 14 real screens from production
 
-> Every image below is a real capture from the production app on 28 October 2026. Captured at 1440×900, WebP, under 50 KB each.
+> **From the first click to the last grade.** Fourteen production captures, grouped by the three surfaces that matter: the public layer, the student experience, and the teacher operating system. Click any frame for full resolution — no mockups.
 
-| Landing | Teacher Discovery | Teacher Space |
-|---------|-------------------|---------------|
-| ![Landing](docs/assets/readme/01-landing.webp) | ![Teachers](docs/assets/readme/10-teacher-discovery.webp) | ![Teacher Space](docs/assets/readme/02-teacher-dashboard.webp) |
-| *Master identity + subject motifs* | *Teacher cards with ENTER SPACE →* | *Same platform, own environment* |
+`2 public surfaces` · `4 student screens` · `8 teacher surfaces` · `3 films`
 
-| Student Dashboard | Learning Page | Exam Experience |
-|-------------------|---------------|-----------------|
-| ![Student](docs/assets/readme/04-student-dashboard.webp) | ![Learning](docs/assets/readme/05-curriculum.webp) | ![Exam](docs/assets/readme/06-assessment-brief.webp) |
-| *What should I do next?* | *CONTENT > NAVIGATION > SECONDARY* | *Very low motion, server timer* |
+#### 🌍 01 · The Public Layer
 
-| Course Builder | Analytics | Checkout |
-|----------------|-----------|----------|
-| ![Builder](docs/assets/readme/03-course-workspace.webp) | ![Analytics](docs/assets/readme/12-analytics.webp) | ![Pay](docs/assets/readme/11-enrollment.webp) |
-| *Production env, not CRUD forms* | *One metric + context + trend + action* | *Order → Intent → Provider → Ledger* |
+| [![SANAD public landing page](docs/assets/readme/01-landing.webp)](docs/assets/readme/01-landing.webp) | [![SANAD teacher discovery](docs/assets/readme/06-teacher-discovery.webp)](docs/assets/readme/06-teacher-discovery.webp) |
+|---|---|
+| **Public landing**<br><sub>Identity, subject motifs, and one clear path into the platform.</sub> | **Teacher discovery**<br><sub>White-label teacher spaces with their own identity and entry point.</sub> |
 
-🎬 **Demo video:** `https://demo.learning-platform.example` _(placeholder)_
-📖 **Interactive docs:** `https://docs.learning-platform.example` _(placeholder)_
-🚀 **Live staging:** `https://staging.learning-platform.example` _(placeholder)_
+#### 🎓 02 · The Student Experience
+
+| [![Student dashboard](docs/assets/readme/03-student-dashboard.webp)](docs/assets/readme/03-student-dashboard.webp) | [![Lesson workspace](docs/assets/readme/05-lesson-workspace.webp)](docs/assets/readme/05-lesson-workspace.webp) |
+|---|---|
+| **Student dashboard**<br><sub>Progress, next action, deadlines, and streak in one command center.</sub> | **Lesson workspace**<br><sub>Course map, lesson states, and the next unlocked step.</sub> |
+
+| [![Student homework](docs/assets/readme/04-student-homework.webp)](docs/assets/readme/04-student-homework.webp) | [![Student profile](docs/assets/readme/02-student-profile.webp)](docs/assets/readme/02-student-profile.webp) |
+|---|---|
+| **Homework**<br><sub>Assignment brief, server-authoritative timer, and submission state.</sub> | **Student profile**<br><sub>Identity, enrollments, and active session controls.</sub> |
+
+#### 🧑‍🏫 03 · The Teacher Operating System
+
+| [![Teacher dashboard](docs/assets/readme/07-teacher-dashboard.webp)](docs/assets/readme/07-teacher-dashboard.webp) | [![Teacher publish hub](docs/assets/readme/08-publish-hub.webp)](docs/assets/readme/08-publish-hub.webp) |
+|---|---|
+| **Teacher dashboard**<br><sub>Grading queue, course distribution, and the next action.</sub> | **Publish hub**<br><sub>Every course and stage in one publishing surface.</sub> |
+
+| [![Teacher course workspace](docs/assets/readme/09-course-workspace.webp)](docs/assets/readme/09-course-workspace.webp) | [![Teacher students](docs/assets/readme/10-teacher-students.webp)](docs/assets/readme/10-teacher-students.webp) |
+|---|---|
+| **Course workspace**<br><sub>Sections, lessons, exams, assignments, and publish state.</sub> | **Students**<br><sub>Roster, activity, and student files — ready for the first enrollment.</sub> |
+
+| [![Teacher assignments](docs/assets/readme/11-teacher-assignments.webp)](docs/assets/readme/11-teacher-assignments.webp) | [![Teacher exams](docs/assets/readme/12-teacher-exams.webp)](docs/assets/readme/12-teacher-exams.webp) |
+|---|---|
+| **Assignments**<br><sub>Grading queue, status filters, and submission review.</sub> | **Exams**<br><sub>Exam bank, publish state, and grading entry points.</sub> |
+
+| [![Teacher payments](docs/assets/readme/13-teacher-payments.webp)](docs/assets/readme/13-teacher-payments.webp) | [![Teacher settings](docs/assets/readme/14-teacher-settings.webp)](docs/assets/readme/14-teacher-settings.webp) |
+|---|---|
+| **Payments**<br><sub>Revenue summary and order ledger — ready for the first order.</sub> | **Settings**<br><sub>Tenant identity, slug, status, and session controls.</sub> |
+
+#### 🎬 04 · SANAD Films
+
+> Two cinematic walkthroughs explain the vision and the architecture. A third slot is reserved for the founder's five-minute story. Full films open on Google Drive.
+
+| [![SANAD AI — male voiceover](docs/assets/readme/video-01-sanad-ai-male.webp)](https://drive.google.com/) | [![SANAD architecture — female voiceover](docs/assets/readme/video-02-architecture-female.webp)](https://drive.google.com/) | ![Founder walkthrough — reserved](docs/assets/readme/video-03-founder-story.webp) |
+|---|---|---|
+| **SANAD AI**<br><sub>07:49 · Arabic voiceover · Male</sub><br><sub>The vision: sovereign Arabic AI, evaluation, and evidence-based feedback.</sub> | **The Architecture**<br><sub>07:29 · Arabic voiceover · Female</sub><br><sub>Inside the platform: tenancy, isolation, and the system behind the screens.</sub> | **Founder Walkthrough**<br><sub>05:00 · Reserved</sub><br><sub>A dedicated slot for Omar's five-minute story.</sub> |
+
+> 🚀 **Live platform:** [sanad-edtech.vercel.app](https://sanad-edtech.vercel.app) · 📖 **Documentation:** [docs/](docs/)
+
+<!-- TODO(video-links): replace the two https://drive.google.com/ links with the final Google Drive URLs. -->
 
 ---
 
@@ -2910,7 +2939,7 @@ Built with ❤️ by **OMAR AHMED** — 16-year-old high-school student & founde
 [![Fork](https://img.shields.io/github/forks/omarahameds2010-lab/sanad-edtech?style=social)](https://github.com/omarahameds2010-lab/sanad-edtech/fork)
 [![LinkedIn](https://img.shields.io/badge/LinkedIn-OMAR_AHMED-0A66C2?style=social&logo=linkedin)](https://www.linkedin.com/in/omar-ahmed-7b97613b1/)
 
-<sub>Last updated: 2026-10-28 · Source of truth: <code>AGENTS.md</code> + <code>docs/STATUS.md</code> + <code>docs/ARCHITECTURE.md</code> + <code>docs/SECURITY.md</code> + <code>docs/VIDEO_PROTECTION.md</code> · README line target: 2000+ (this file) · Product tour: real production captures in <code>docs/assets/readme/</code></sub>
+<sub>Last updated: 2026-10-29 · Source of truth: <code>AGENTS.md</code> + <code>docs/STATUS.md</code> + <code>docs/ARCHITECTURE.md</code> + <code>docs/SECURITY.md</code> + <code>docs/VIDEO_PROTECTION.md</code> · README line target: 2000+ (this file) · Product tour: 14 production screens + 3 film posters in <code>docs/assets/readme/</code></sub>
 
 </div>
 
