@@ -136,9 +136,13 @@ No isolation guarantees            PostgreSQL RLS (FORCE ROW LEVEL SECURITY)
 
 > Two cinematic walkthroughs explain the vision and the architecture. A third slot is reserved for the founder's five-minute story. Full films open on Google Drive.
 
-| [![SANAD AI — male voiceover](docs/assets/readme/video-01-sanad-ai-male.webp)](https://drive.google.com/) | [![SANAD architecture — female voiceover](docs/assets/readme/video-02-architecture-female.webp)](https://drive.google.com/) | ![Founder walkthrough — reserved](docs/assets/readme/video-03-founder-story.webp) |
-|---|---|---|
-| **SANAD AI**<br><sub>07:49 · Arabic voiceover · Male</sub><br><sub>The vision: sovereign Arabic AI, evaluation, and evidence-based feedback.</sub> | **The Architecture**<br><sub>07:29 · Arabic voiceover · Female</sub><br><sub>Inside the platform: tenancy, isolation, and the system behind the screens.</sub> | **Founder Walkthrough**<br><sub>05:00 · Reserved</sub><br><sub>A dedicated slot for Omar's five-minute story.</sub> |
+| [![SANAD AI — male voiceover](docs/assets/readme/video-01-sanad-ai-male.webp)](https://drive.google.com/) | [![SANAD architecture — female voiceover](docs/assets/readme/video-02-architecture-female.webp)](https://drive.google.com/) |
+|---|---|
+| **SANAD AI**<br><sub>07:49 · Arabic voiceover · Male</sub><br><sub>The vision: sovereign Arabic AI, evaluation, and evidence-based feedback.</sub> | **The Architecture**<br><sub>07:29 · Arabic voiceover · Female</sub><br><sub>Inside the platform: tenancy, isolation, and the system behind the screens.</sub> |
+
+| <img src="docs/assets/readme/video-03-founder-story.webp" alt="Founder Walkthrough — reserved" width="720"> |
+|---|
+| **Founder Walkthrough**<br><sub>05:00 · Reserved</sub><br><sub>A dedicated slot for Omar's five-minute story — the final cut lands here.</sub> |
 
 > 🚀 **Live platform:** [sanad-edtech.vercel.app](https://sanad-edtech.vercel.app) · 📖 **Documentation:** [docs/](docs/)
 
