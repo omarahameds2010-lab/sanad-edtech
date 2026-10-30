@@ -134,19 +134,19 @@ No isolation guarantees            PostgreSQL RLS (FORCE ROW LEVEL SECURITY)
 
 #### 🎬 04 · SANAD Films
 
-> Two cinematic walkthroughs explain the vision and the architecture. A third slot is reserved for the founder's five-minute story. Full films open on Google Drive.
+> Three films: the vision, the architecture, and the founder's five-minute story. Full films open on Google Drive.
 
 | [![SANAD AI — male voiceover](docs/assets/readme/video-01-sanad-ai-male.webp)](https://drive.google.com/file/d/1QFr_5h92Lv7EhiWP4AbodGqsZD4CT4th/view?usp=sharing) | [![SANAD architecture — female voiceover](docs/assets/readme/video-02-architecture-female.webp)](https://drive.google.com/file/d/1I-qPFIRHM_etNrpNWXC3VpiMgOdhZOTT/view?usp=sharing) |
 |---|---|
 | **SANAD AI**<br><sub>07:49 · Arabic voiceover · Male</sub><br><sub>The vision: sovereign Arabic AI, evaluation, and evidence-based feedback.</sub> | **The Architecture**<br><sub>07:29 · Arabic voiceover · Female</sub><br><sub>Inside the platform: tenancy, isolation, and the system behind the screens.</sub> |
 
-| <img src="docs/assets/readme/video-03-founder-story.webp" alt="Founder Walkthrough — reserved" width="720"> |
+| <a href="https://drive.google.com/file/d/1j_6TDQVtOVDRyEcU1q0Jbt2ZMC5-zzIW/view?usp=sharing"><img src="docs/assets/readme/video-03-founder-story.webp" alt="Founder Walkthrough — Behind SANAD" width="720"></a> |
 |---|
-| **Founder Walkthrough**<br><sub>05:00 · Reserved</sub><br><sub>A dedicated slot for Omar's five-minute story — the final cut lands here.</sub> |
+| **Founder Walkthrough**<br><sub>05:00 · Founder cut</sub><br><sub>The story behind SANAD — five minutes with Omar.</sub> |
 
 > 🚀 **Live platform:** [sanad-edtech.vercel.app](https://sanad-edtech.vercel.app) · 📖 **Documentation:** [docs/](docs/)
 
-<!-- TODO(founder-video): add the 5-minute founder walkthrough link when the final cut is ready. -->
+<!-- All three film cards now link to their Google Drive files. -->
 
 ---
 
@@ -2943,7 +2943,7 @@ Built with ❤️ by **OMAR AHMED** — 16-year-old high-school student & founde
 [![Fork](https://img.shields.io/github/forks/omarahameds2010-lab/sanad-edtech?style=social)](https://github.com/omarahameds2010-lab/sanad-edtech/fork)
 [![LinkedIn](https://img.shields.io/badge/LinkedIn-OMAR_AHMED-0A66C2?style=social&logo=linkedin)](https://www.linkedin.com/in/omar-ahmed-7b97613b1/)
 
-<sub>Last updated: 2026-10-29 · Source of truth: <code>AGENTS.md</code> + <code>docs/STATUS.md</code> + <code>docs/ARCHITECTURE.md</code> + <code>docs/SECURITY.md</code> + <code>docs/VIDEO_PROTECTION.md</code> · README line target: 2000+ (this file) · Product tour: 14 production screens + 3 film posters in <code>docs/assets/readme/</code></sub>
+<sub>Last updated: 2026-10-30 · Source of truth: <code>AGENTS.md</code> + <code>docs/STATUS.md</code> + <code>docs/ARCHITECTURE.md</code> + <code>docs/SECURITY.md</code> + <code>docs/VIDEO_PROTECTION.md</code> · README line target: 2000+ (this file) · Product tour: 14 production screens + 3 film posters in <code>docs/assets/readme/</code></sub>
 
 </div>
 
