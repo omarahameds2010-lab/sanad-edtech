@@ -68,10 +68,21 @@ The README Product Tour also has the three film cards and 14 production screensh
 
 ---
 
+## Ready-made first slide
+
+Use this 16:9 slide as-is, or open the editable HTML source and change the copy:
+
+- **PNG:** [`assets/readme/01-demo-first-slide.png`](assets/readme/01-demo-first-slide.png)
+- **HTML source:** [`assets/readme/demo-first-slide.html`](assets/readme/demo-first-slide.html)
+
+![SANAD demo first slide](assets/readme/01-demo-first-slide.png)
+
+---
+
 ## Submission / first-slide checklist
 
-- [ ] Put **https://sanad-edtech.vercel.app/demo** on the first slide.
-- [ ] Put the QR code (`docs/assets/readme/demo-qr.png`) next to it.
+- [x] Put **https://sanad-edtech.vercel.app/demo** on the first slide.
+- [x] Put the QR code (`docs/assets/readme/demo-qr.png`) next to it.
 - [ ] Write the 4-step path above under the QR.
 - [ ] Open `/demo` 10 minutes before judging and click both demo buttons once (pre-warm).
 - [ ] Keep the founder film link visible as the fallback.
