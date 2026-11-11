@@ -3,6 +3,8 @@
 > **Verified 25 October 2026.** This runbook uses only shipped flows. Do not improvise claims about RLS enforcement, RAG benchmarks, or live payment providers.
 > Current state: [`CURRENT-STATE.md`](CURRENT-STATE.md).
 
+> **Judge-facing entry:** `https://sanad-edtech.vercel.app/demo` — one-click student/teacher access, no signup. See [`DEMO-JUDGES.md`](DEMO-JUDGES.md) for the 90-second path, manual credentials, QR asset, and reset command (`pnpm demo:reset`).
+
 ## 1. What the demo proves
 
 In three minutes:

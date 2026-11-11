@@ -9,6 +9,7 @@ export interface Dict {
     faq: string;
     login: string;
     signup: string;
+    demo: string;
     dashboard: string;
     menuOpen: string;
     menuClose: string;
@@ -156,6 +157,43 @@ export interface Dict {
     signupLink: string;
     brandLines: { strong: string; rest: string }[];
   };
+  demo: {
+    nav: string;
+    heroLink: string;
+    loginDivider: string;
+    badge: string;
+    title: string;
+    lead: string;
+    noSignup: string;
+    studentCta: string;
+    teacherCta: string;
+    studentHint: string;
+    teacherHint: string;
+    pending: string;
+    invalid: string;
+    offline: string;
+    manual: string;
+    pathEyebrow: string;
+    pathTitle: string;
+    pathLead: string;
+    steps: { title: string; body: string }[];
+    credentialsEyebrow: string;
+    credentialsTitle: string;
+    credentialsLead: string;
+    student: string;
+    teacher: string;
+    phone: string;
+    password: string;
+    reset: string;
+    qrTitle: string;
+    qrHint: string;
+    film: string;
+    filmHint: string;
+    banner: string;
+    bannerLink: string;
+    bannerClose: string;
+    backHome: string;
+  };
   signup: {
     title: string;
     subtitle: string;
@@ -256,6 +294,7 @@ export const dict: Record<Lang, Dict> = {
       faq: "الأسئلة الشائعة",
       login: "دخول",
       signup: "إنشاء حساب",
+      demo: "جرّب الديمو",
       dashboard: "لوحتي",
       menuOpen: "فتح القائمة",
       menuClose: "إغلاق القائمة",
@@ -632,6 +671,62 @@ export const dict: Record<Lang, Dict> = {
         { strong: "وتقييم ذكي", rest: " يراجعه مدرسك البشري." },
       ],
     },
+    demo: {
+      nav: "جرّب الديمو",
+      heroLink: "أو جرّب المنصة الآن بدون تسجيل ←",
+      loginDivider: "أو جرّب بدون تسجيل",
+      badge: "بيئة تجريبية · بدون تسجيل",
+      title: "جرّب سند في 90 ثانية.",
+      lead: "ادخل كطالب أو كمعلم بضغطة واحدة. لا تسجيل، لا بيانات موبايل، ولا انتظار. المسار جاهز من أول درس إلى آخر تصحيح.",
+      noSignup: "حسابان تجريبيان جاهزان — اختر دورك وابدأ.",
+      studentCta: "ادخل كطالب تجريبي",
+      teacherCta: "ادخل كمعلم تجريبي",
+      studentHint: "كورس، درس، واجب، وامتحان بمؤقت حقيقي",
+      teacherHint: "طابور تصحيح، نشر، وتحليلات",
+      pending: "جاري فتح الديمو…",
+      invalid: "تعذر الدخول التجريبي — جرّب مرة أخرى",
+      offline: "الديمو غير متاح الآن — شاهد الفيلم أو جرّب بعد قليل.",
+      manual: "بيانات الدخول اليدوية",
+      pathEyebrow: "المسار الكامل",
+      pathTitle: "من أول ضغطة إلى آخر تصحيح",
+      pathLead:
+        "أربع خطوات فقط. كل خطوة تفتح اللي بعدها، وكل الأرقام جايّة من السيرفر.",
+      steps: [
+        {
+          title: "ادخل كطالب",
+          body: "افتح لوحة الطالب وشوف تقدمك، كورساتك، وآخر نشاط.",
+        },
+        {
+          title: "افتح الكورس والدرس",
+          body: "المسار يوريك الدرس والواجب والاختبار في مكان واحد.",
+        },
+        {
+          title: "ادخل الاختبار وسلّم",
+          body: "المؤقت من الخادم — جرّب التسليم وشوف النتيجة.",
+        },
+        {
+          title: "ادخل كمعلم وصحّح",
+          body: "افتح طابور التصحيح، راجع الإجابة، واحفظ الدرجة.",
+        },
+      ],
+      credentialsEyebrow: "لو الأزرار مش شغالة",
+      credentialsTitle: "بيانات الدخول اليدوية",
+      credentialsLead:
+        "استخدم البيانات دي من صفحة الدخول. الحسابان للعرض فقط.",
+      student: "الطالب",
+      teacher: "المعلم",
+      phone: "رقم الموبايل",
+      password: "كلمة السر",
+      reset: "بيئة تجريبية — البيانات قابلة لإعادة الضبط قبل كل عرض.",
+      qrTitle: "افتح الديمو من الموبايل",
+      qrHint: "امسح الكود أو حطه في أول سلايد.",
+      film: "شاهد الفيلم — 5 دقائق",
+      filmHint: "خطة بديلة لو الـAPI مش متاح.",
+      banner: "وضع تجريبي — البيانات قابلة لإعادة الضبط",
+      bannerLink: "خريطة الديمو",
+      bannerClose: "إغلاق",
+      backHome: "العودة للرئيسية",
+    },
     signup: {
       title: "إنشاء حساب جديد",
       subtitle: "خطوتان فقط ويبدأ مسارك التعليمي",
@@ -773,6 +868,7 @@ export const dict: Record<Lang, Dict> = {
       faq: "FAQ",
       login: "Log in",
       signup: "Sign up",
+      demo: "Live demo",
       dashboard: "My space",
       menuOpen: "Open menu",
       menuClose: "Close menu",
@@ -1155,6 +1251,64 @@ export const dict: Record<Lang, Dict> = {
           rest: " reviewed by your human teacher.",
         },
       ],
+    },
+    demo: {
+      nav: "Live demo",
+      heroLink: "Or try the live demo now — no signup →",
+      loginDivider: "Or try it without signing up",
+      badge: "Demo environment · no signup",
+      title: "Try SANAD in 90 seconds.",
+      lead: "Enter as a student or a teacher in one click. No signup, no phone number, no waiting. The path runs from the first lesson to the final grade.",
+      noSignup: "Two demo accounts are ready — pick a role and start.",
+      studentCta: "Enter as demo student",
+      teacherCta: "Enter as demo teacher",
+      studentHint: "Course, lesson, assignment, and a real server timer",
+      teacherHint: "Grading queue, publishing, and analytics",
+      pending: "Opening the demo…",
+      invalid: "Demo login failed — please try again",
+      offline:
+        "The demo is unavailable right now — watch the film or try again shortly.",
+      manual: "Manual credentials",
+      pathEyebrow: "The full path",
+      pathTitle: "From the first click to the final grade",
+      pathLead:
+        "Four steps. Each one unlocks the next, and every number comes from the server.",
+      steps: [
+        {
+          title: "Enter as a student",
+          body: "Open the student command center and see real progress, courses, and activity.",
+        },
+        {
+          title: "Open the course and lesson",
+          body: "The path shows the lesson, assignment, and exam in one place.",
+        },
+        {
+          title: "Enter the exam and submit",
+          body: "The timer is server-authoritative — submit and see the result.",
+        },
+        {
+          title: "Enter as a teacher and grade",
+          body: "Open the grading queue, review the answer, and save the score.",
+        },
+      ],
+      credentialsEyebrow: "If the buttons fail",
+      credentialsTitle: "Manual credentials",
+      credentialsLead:
+        "Use these on the login page. Both accounts are demo-only.",
+      student: "Student",
+      teacher: "Teacher",
+      phone: "Phone",
+      password: "Password",
+      reset:
+        "Demo environment — data can be reset before every walkthrough.",
+      qrTitle: "Open the demo on mobile",
+      qrHint: "Scan the code or drop it on the first slide.",
+      film: "Watch the film — 5 minutes",
+      filmHint: "A fallback if the API is unavailable.",
+      banner: "Demo mode — data can be reset",
+      bannerLink: "Demo map",
+      bannerClose: "Close",
+      backHome: "Back home",
     },
     signup: {
       title: "Create a new account",

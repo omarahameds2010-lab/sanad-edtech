@@ -37,6 +37,30 @@
 [![RLS Enforced](https://img.shields.io/badge/RLS-FORCE_ROW_LEVEL_SECURITY-purple?style=for-the-badge&logo=postgresql&logoColor=white)](docs/ARCHITECTURE.md)
 [![Conventional Commits](https://img.shields.io/badge/Commits-Conventional-FE5196?style=for-the-badge&logo=git&logoColor=white)](https://www.conventionalcommits.org/)
 [![Powered by pnpm](https://img.shields.io/badge/pm-pnpm_only-F69220?style=for-the-badge)](https://pnpm.io/)
+[![Live Demo](https://img.shields.io/badge/Live_Demo-open-047857?style=for-the-badge&logo=googlechrome&logoColor=white)](https://sanad-edtech.vercel.app/demo)
+
+---
+
+### 🚀 Live Demo — no signup required
+
+> **For competition judges:** open **[sanad-edtech.vercel.app/demo](https://sanad-edtech.vercel.app/demo)**, pick **Student demo** or **Teacher demo**, and explore the full path in 90 seconds. The buttons use the seeded demo accounts; no account creation, no phone number.
+
+| Role | Phone | Password |
+| ---- | ----- | -------- |
+| 🎓 Student demo | `01000000002` | `Student123!` |
+| 🧑‍🏫 Teacher demo | `01000000001` | `Joker-Arabic#2026` |
+
+**90-second path:** enter as student → open the Arabic course and lesson → enter the exam and submit → return to `/demo` → enter as teacher → open the grading queue and save a grade.
+
+<p align="center">
+  <a href="https://sanad-edtech.vercel.app/demo">
+    <img src="docs/assets/readme/demo-qr.png" alt="QR code to open the SANAD demo" width="180" />
+  </a>
+  <br />
+  <sub>Scan to open the demo on a phone.</sub>
+</p>
+
+<sub>Demo-only accounts — never reuse them for a real tenant. Data can be reset before every walkthrough with `pnpm demo:reset`; see [`docs/DEMO-JUDGES.md`](docs/DEMO-JUDGES.md). Fallback film: [five-minute founder cut](https://drive.google.com/file/d/1j_6TDQVtOVDRyEcU1q0Jbt2ZMC5-zzIW/view?usp=sharing).</sub>
 
 ---
 
@@ -111,9 +135,7 @@ No isolation guarantees            PostgreSQL RLS (FORCE ROW LEVEL SECURITY)
 | ![Builder](docs/assets/readme/03-course-workspace.webp) | ![Analytics](docs/assets/readme/12-analytics.webp) | ![Pay](docs/assets/readme/11-enrollment.webp) |
 | *Production env, not CRUD forms* | *One metric + context + trend + action* | *Order → Intent → Provider → Ledger* |
 
-🎬 **Demo video:** `https://demo.learning-platform.example` _(placeholder)_
-📖 **Interactive docs:** `https://docs.learning-platform.example` _(placeholder)_
-🚀 **Live staging:** `https://staging.learning-platform.example` _(placeholder)_
+> 🚀 **Live platform:** [sanad-edtech.vercel.app](https://sanad-edtech.vercel.app) · 🧪 **Judge demo:** [sanad-edtech.vercel.app/demo](https://sanad-edtech.vercel.app/demo) · 📖 **Documentation:** [docs/](docs/)
 
 ---
 
@@ -2882,6 +2904,7 @@ Built with ❤️ by **OMAR AHMED** — 16-year-old high-school student & founde
 | If you want… | Read… |
 |--------------|-------|
 | Rules + decisions (source of truth) | [`AGENTS.md`](AGENTS.md) |
+| Judge demo + 90-second path | [`docs/DEMO-JUDGES.md`](docs/DEMO-JUDGES.md) |
 | System architecture + data flows | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) |
 | Visual + motion system | [`docs/VISUAL_IDENTITY.md`](docs/VISUAL_IDENTITY.md) |
 | Video security math | [`docs/VIDEO_PROTECTION.md`](docs/VIDEO_PROTECTION.md) |
@@ -2910,6 +2933,6 @@ Built with ❤️ by **OMAR AHMED** — 16-year-old high-school student & founde
 [![Fork](https://img.shields.io/github/forks/omarahameds2010-lab/sanad-edtech?style=social)](https://github.com/omarahameds2010-lab/sanad-edtech/fork)
 [![LinkedIn](https://img.shields.io/badge/LinkedIn-OMAR_AHMED-0A66C2?style=social&logo=linkedin)](https://www.linkedin.com/in/omar-ahmed-7b97613b1/)
 
-<sub>Last updated: 2026-10-28 · Source of truth: <code>AGENTS.md</code> + <code>docs/STATUS.md</code> + <code>docs/ARCHITECTURE.md</code> + <code>docs/SECURITY.md</code> + <code>docs/VIDEO_PROTECTION.md</code> · README line target: 2000+ (this file) · Product tour: real production captures in <code>docs/assets/readme/</code></sub>
+<sub>Last updated: 2026-11-11 · Source of truth: <code>AGENTS.md</code> + <code>docs/CURRENT-STATE.md</code> + <code>docs/ARCHITECTURE.md</code> + <code>docs/SECURITY.md</code> + <code>docs/VIDEO_PROTECTION.md</code> · README line target: 2000+ (this file) · Demo: <code>/demo</code> + QR + 90-second judge path · Product tour: real production captures in <code>docs/assets/readme/</code></sub>
 
 </div>

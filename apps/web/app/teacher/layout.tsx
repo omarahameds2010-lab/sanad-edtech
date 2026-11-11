@@ -6,6 +6,7 @@ import { useAuth } from "@/app/lib/auth";
 import SiteFooter from "@/app/components/landing/SiteFooter";
 import TeacherCommandRegistrar from "./TeacherCommandRegistrar";
 import { TeacherMobileNav, TeacherSidebar } from "./components/TeacherNav";
+import DemoBanner from "@/app/components/demo/DemoBanner";
 
 /**
  * The teacher shell.
@@ -38,7 +39,10 @@ export default function TeacherLayout({
       <TeacherCommandRegistrar />
       <TeacherSidebar pathname={pathname} />
 
-      <main className="tc-inner">{children as any}</main>
+      <main className="tc-inner">
+        <DemoBanner dark />
+        {children as any}
+      </main>
 
       <TeacherMobileNav pathname={pathname} />
       <SiteFooter compact theme="dark" />

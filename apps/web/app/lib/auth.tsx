@@ -22,6 +22,8 @@ interface AuthState {
   userId: string | null;
   userName: string | null;
   role: string | null;
+  /** True only for a session opened from the one-click demo entry points. */
+  isDemo: boolean;
 }
 
 interface AuthContextValue extends AuthState {
@@ -31,7 +33,11 @@ interface AuthContextValue extends AuthState {
    * the user to /login before the refresh cookie had a chance to restore them.
    */
   ready: boolean;
-  login: (phone: string, password: string) => Promise<import("./api").LoginResult>;
+  login: (
+    phone: string,
+    password: string,
+    options?: { demo?: boolean },
+  ) => Promise<import("./api").LoginResult>;
   applySession: (result: import("./api").LoginResult) => void;
   logout: () => void;
 }
@@ -43,6 +49,7 @@ const INITIAL_STATE: AuthState = {
   userId: null,
   userName: null,
   role: null,
+  isDemo: false,
 };
 
 /**
@@ -61,7 +68,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const hasSession = useRef(false);
 
   const adopt = useCallback(
-    (token: string, user: { id: string; name: string; role: string }) => {
+    (
+      token: string,
+      user: { id: string; name: string; role: string },
+      isDemo = false,
+    ) => {
       hasSession.current = true;
       setMemoryAccessToken(token);
       setState({
@@ -69,15 +80,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         userId: user.id,
         userName: user.name,
         role: user.role,
+        isDemo,
       });
     },
     [],
   );
 
   const login = useCallback(
-    async (phone: string, password: string) => {
+    async (phone: string, password: string, options?: { demo?: boolean }) => {
       const result = await api.login(phone, password);
-      adopt(result.accessToken, result.user);
+      adopt(result.accessToken, result.user, Boolean(options?.demo));
       return result;
     },
     [adopt],
