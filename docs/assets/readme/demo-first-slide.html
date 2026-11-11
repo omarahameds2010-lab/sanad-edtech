@@ -1,0 +1,224 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+  <head>
+    <meta charset="utf-8" />
+    <title>SANAD — Demo First Slide</title>
+    <style>
+      @page {
+        size: 1280px 720px;
+        margin: 0;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        background: #0b0d10;
+      }
+      body {
+        font-family: Tahoma, "Segoe UI", Arial, sans-serif;
+      }
+      .slide {
+        position: relative;
+        width: 1280px;
+        height: 720px;
+        overflow: hidden;
+        padding: 64px 72px;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        color: #f7f4eb;
+        background:
+          radial-gradient(circle at 14% 20%, rgba(4, 120, 87, 0.32), transparent 34%),
+          radial-gradient(circle at 82% 80%, rgba(200, 164, 92, 0.14), transparent 38%),
+          #0e1116;
+      }
+      .grid {
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        opacity: 0.35;
+        background-image:
+          linear-gradient(rgba(247, 244, 235, 0.045) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(247, 244, 235, 0.045) 1px, transparent 1px);
+        background-size: 48px 48px;
+        mask-image: linear-gradient(to bottom, transparent, black 22%, black 78%, transparent);
+      }
+      .top,
+      .main,
+      .bottom {
+        position: relative;
+        z-index: 1;
+      }
+      .top {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+      .brand {
+        font-size: 34px;
+        font-weight: 800;
+        letter-spacing: -1px;
+      }
+      .brand span {
+        color: #c8a45c;
+      }
+      .badge {
+        padding: 10px 18px;
+        border: 1px solid rgba(200, 164, 92, 0.45);
+        border-radius: 999px;
+        color: #e6c98f;
+        font-size: 15px;
+        letter-spacing: 0.3px;
+      }
+      .main {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 48px;
+      }
+      .copy {
+        max-width: 680px;
+      }
+      .kicker {
+        margin-bottom: 12px;
+        color: #8fd3b6;
+        font-size: 20px;
+        font-weight: 700;
+      }
+      h1 {
+        margin: 0;
+        font-size: 76px;
+        line-height: 1.05;
+        letter-spacing: -2px;
+      }
+      h1 em {
+        color: #e6c98f;
+        font-style: normal;
+      }
+      .sub {
+        margin: 24px 0 0;
+        color: #d7d2c6;
+        font-size: 24px;
+        line-height: 1.6;
+      }
+      .path {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 10px;
+        margin-top: 28px;
+        color: #b9b3a6;
+        font-size: 17px;
+      }
+      .chip {
+        padding: 8px 14px;
+        border: 1px solid rgba(247, 244, 235, 0.16);
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.04);
+      }
+      .arrow {
+        color: #c8a45c;
+      }
+      .url {
+        display: inline-flex;
+        align-items: center;
+        margin-top: 30px;
+        padding: 15px 22px;
+        border-radius: 14px;
+        background: #047857;
+        color: #ffffff;
+        font-size: 21px;
+        font-weight: 700;
+        direction: ltr;
+      }
+      .qr-card {
+        width: 330px;
+        padding: 26px;
+        border-radius: 24px;
+        background: #f7f4eb;
+        color: #111111;
+        text-align: center;
+        transform: rotate(-1.5deg);
+        box-shadow: 0 30px 80px rgba(0, 0, 0, 0.4);
+      }
+      .qr-card img {
+        display: block;
+        width: 230px;
+        height: 230px;
+        margin: 0 auto 16px;
+      }
+      .qr-title {
+        font-size: 21px;
+        font-weight: 800;
+      }
+      .qr-sub {
+        margin-top: 6px;
+        color: #5b5b5b;
+        font-size: 14px;
+        line-height: 1.5;
+      }
+      .bottom {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding-top: 20px;
+        border-top: 1px solid rgba(247, 244, 235, 0.12);
+        color: #a9a396;
+        font-size: 14px;
+      }
+      .bottom strong {
+        color: #e6c98f;
+      }
+      .hint {
+        color: #8fd3b6;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="slide" id="slide">
+      <div class="grid"></div>
+
+      <div class="top">
+        <div class="brand">سند<span>.</span></div>
+        <div class="badge">بيئة تجريبية · بدون تسجيل</div>
+      </div>
+
+      <div class="main">
+        <div class="copy">
+          <div class="kicker">مسار الحكم · 90 ثانية</div>
+          <h1>جرّب <em>سند</em><br />في 90 ثانية.</h1>
+          <p class="sub">
+            ادخل كطالب أو كمعلم بضغطة واحدة. كورس حقيقي، امتحان بمؤقت، وطابور تصحيح — بدون حساب ولا بيانات موبايل.
+          </p>
+          <div class="path">
+            <span class="chip">طالب</span>
+            <span class="arrow">←</span>
+            <span class="chip">كورس</span>
+            <span class="arrow">←</span>
+            <span class="chip">اختبار</span>
+            <span class="arrow">←</span>
+            <span class="chip">تصحيح</span>
+          </div>
+          <div class="url">sanad-edtech.vercel.app/demo</div>
+        </div>
+
+        <div class="qr-card">
+          <img src="demo-qr.png" alt="QR code to the SANAD demo" />
+          <div class="qr-title">امسح وابدأ</div>
+          <div class="qr-sub">أو افتح الرابط مباشرة<br />من أي متصفح</div>
+        </div>
+      </div>
+
+      <div class="bottom">
+        <div>
+          <strong>بيئة تجريبية</strong> · البيانات قابلة لإعادة الضبط ·
+          <span class="hint">الفيلم متاح كخطة بديلة</span>
+        </div>
+        <div>2026 · SANAD EdTech</div>
+      </div>
+    </div>
+  </body>
+</html>
