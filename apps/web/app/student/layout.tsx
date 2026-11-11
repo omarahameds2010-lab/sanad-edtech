@@ -1,5 +1,6 @@
 import StudentCommandRegistrar from "./StudentCommandRegistrar";
 import StudentDock from "./components/StudentDock";
+import DemoBanner from "@/app/components/demo/DemoBanner";
 
 export default function StudentLayout({
   children,
@@ -14,6 +15,7 @@ export default function StudentLayout({
         className="lp-container"
         style={{ paddingTop: 24, paddingBottom: 64, maxWidth: 1020 }}
       >
+        <DemoBanner />
         {(children as any)}
       </main>
     </div>

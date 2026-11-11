@@ -21,6 +21,7 @@ export default function SiteHeader() {
   }, []);
 
   const links = [
+    { href: "/demo", label: t.header.demo },
     { href: "/courses", label: t.header.courses },
     { href: "/teachers", label: t.header.teachers },
     { href: "/#how", label: t.header.how },
@@ -72,9 +73,12 @@ export default function SiteHeader() {
               href={l.href}
               onClick={() => setOpen(false)}
               style={{
-                color: "var(--ink-700)",
+                color:
+                  l.href === "/demo"
+                    ? "var(--color-action-strong)"
+                    : "var(--ink-700)",
                 fontSize: 14,
-                fontWeight: 600,
+                fontWeight: l.href === "/demo" ? 800 : 600,
                 textDecoration: "none",
                 padding: "8px 4px",
               }}

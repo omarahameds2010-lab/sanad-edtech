@@ -1,5 +1,7 @@
 # Demo Runbook — مساحة الأستاذ صالح حسين (جوكر اللغة العربية) + Exam Loop
 
+> **Judge-facing entry:** `https://sanad-edtech.vercel.app/demo` — one-click student/teacher access, no signup. See [`DEMO-JUDGES.md`](DEMO-JUDGES.md) for the 90-second path, manual credentials, QR asset, and reset command (`pnpm demo:reset`).
+
 ## What this proves (3-minute pitch)
 
 0. المساحة العامة للمعلم (`/teachers/saleh-hussein`) — «The Teacher Space»: هيرو غامق `ink-950` بأورورا زمردي خفيفة + حبيبات ورق (`grain` 2%)، أفاتار وشرائح زجاجية، وكروت «غلاف كتاب» 16:9 لكورساته الثلاثة (الأول 60% والثاني/الثالث 40%) بأرقام حقيقية من السيرفر (مدة/دروس/اختبارات/سعر) — ثم «ثالوث الثقة» بفواصل تحريرية وأيقونات SVG، ولحظة تباين ختامية غامقة بدل الصندوق البيج — بظهور متدرج وزر مغناطيسي. ومن اللاندنج: كبسولة لغة زجاجية (AR/EN بزحلقة ناعمة)، صفحة «منصات المعلمين» (`/teachers`) بكارت غلاف للمدرس، وكتالوج `/courses` بكروت الغلاف نفسها وحالة «مسجل» مع شريط تقدم حقيقي.

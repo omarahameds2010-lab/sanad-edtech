@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import TeacherCommandRegistrar from "./TeacherCommandRegistrar";
+import DemoBanner from "@/app/components/demo/DemoBanner";
 
 const navItems = [
   { href: "/teacher", label: "نظرة عامة" },
@@ -181,7 +182,10 @@ export default function TeacherLayout({
         </Link>
       </nav>
 
-      <main className="tc-inner">{children as any}</main>
+      <main className="tc-inner">
+        <DemoBanner dark />
+        {children as any}
+      </main>
     </div>
   );
 }

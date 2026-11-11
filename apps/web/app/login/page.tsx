@@ -7,6 +7,7 @@ import { useAuth } from "@/app/lib/auth";
 import { ApiError, landingForRole } from "@/app/lib/api";
 import { Magnetic } from "@/app/components/landing/interactive";
 import { LanguageSwitcher, useLang } from "@/app/components/landing/i18n";
+import DemoAccess from "@/app/components/demo/DemoAccess";
 
 function EyeIcon({ open }: { open: boolean }) {
   return (
@@ -38,6 +39,7 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const L = t.login;
+  const D = t.demo;
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -224,6 +226,16 @@ export default function LoginPage() {
               )}
             </button>
           </Magnetic>
+
+          <div className="lp-login-demo">
+            <div className="lp-login-demo-divider" aria-hidden>
+              <span />
+              <strong>{D.loginDivider}</strong>
+              <span />
+            </div>
+            <DemoAccess compact showManual />
+          </div>
+
           <p style={{ marginTop: 20, fontSize: 13, color: "var(--text-muted)", textAlign: "center", lineHeight: 1.8 }}>
             {L.signupPrompt}{" "}
             <Link href="/signup" style={{ fontWeight: 700 }}>

@@ -15,6 +15,7 @@
     "format": "turbo run format",
     "clean": "turbo run clean && rm -rf node_modules",
     "export:openapi": "ts-node -r tsconfig-paths/register apps/api/scripts/export-openapi.ts",
+    "demo:reset": "pnpm --filter api seed:path2",
     "prepare": "husky",
     "precommit:check": "pnpm --filter api exec tsc --noEmit -p tsconfig.json && pnpm --filter api run build"
   },

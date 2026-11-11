@@ -15,10 +15,16 @@ interface AuthState {
   userId: string | null;
   userName: string | null;
   role: string | null;
+  /** True only for a session opened from the one-click demo entry points. */
+  isDemo: boolean;
 }
 
 interface AuthContextValue extends AuthState {
-  login: (phone: string, password: string) => Promise<import("./api").LoginResult>;
+  login: (
+    phone: string,
+    password: string,
+    options?: { demo?: boolean },
+  ) => Promise<import("./api").LoginResult>;
   applySession: (result: import("./api").LoginResult) => void;
   logout: () => void;
 }
@@ -30,6 +36,7 @@ const INITIAL_STATE: AuthState = {
   userId: null,
   userName: null,
   role: null,
+  isDemo: false,
 };
 
 /**
@@ -40,16 +47,20 @@ const INITIAL_STATE: AuthState = {
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<AuthState>(INITIAL_STATE);
 
-  const login = useCallback(async (phone: string, password: string) => {
-    const result = await api.login(phone, password);
-    setState({
-      token: result.accessToken,
-      userId: result.user.id,
-      userName: result.user.name,
-      role: result.user.role,
-    });
-    return result;
-  }, []);
+  const login = useCallback(
+    async (phone: string, password: string, options?: { demo?: boolean }) => {
+      const result = await api.login(phone, password);
+      setState({
+        token: result.accessToken,
+        userId: result.user.id,
+        userName: result.user.name,
+        role: result.user.role,
+        isDemo: Boolean(options?.demo),
+      });
+      return result;
+    },
+    [],
+  );
 
   const applySession = useCallback(
     (result: import("./api").LoginResult) => {
@@ -58,6 +69,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         userId: result.user.id,
         userName: result.user.name,
         role: result.user.role,
+        isDemo: false,
       });
     },
     [],

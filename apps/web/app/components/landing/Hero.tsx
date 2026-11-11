@@ -60,7 +60,12 @@ export default function Hero() {
           </div>
         </Reveal>
         <Reveal delay={300}>
-          <p style={{ marginTop: 24, fontSize: 14, color: "var(--text-muted)" }}>
+          <p style={{ marginTop: 20, fontSize: 14, color: "var(--text-muted)" }}>
+            <Link href="/demo" style={{ fontWeight: 800 }}>
+              {t.demo.heroLink}
+            </Link>
+          </p>
+          <p style={{ marginTop: 10, fontSize: 14, color: "var(--text-muted)" }}>
             {t.hero.footnote}
           </p>
         </Reveal>
