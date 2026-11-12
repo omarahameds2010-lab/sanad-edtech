@@ -8,8 +8,23 @@ import { fileURLToPath } from "node:url";
 // Production (Vercel): API_PROXY_TARGET points at the Railway API, so every
 // /api/* call stays same-origin for the browser — first-party cookies work
 // (no SameSite=None, no third-party-cookie blocking) and there is no CORS.
+//
+// Fail-safe defaults keep a deploy alive when the env var is missing: a build
+// without API_PROXY_TARGET once baked `http://localhost:3002`, and Vercel
+// refuses to proxy to private hosts (X-Vercel-Error:
+// DNS_HOSTNAME_RESOLVED_PRIVATE), 404-ing every /api/* call.
+const PRODUCTION_API_ORIGIN = "https://sanad-edtech-production.up.railway.app";
+
+// TEMPORARY local-demo bridge: while Railway is stopped and the Vercel
+// API_PROXY_TARGET env var is being fixed, route production /api/* traffic to
+// the active Cloudflare quick tunnel. Revert this after the env var is verified.
+const DEMO_TUNNEL_ORIGIN =
+  "https://republican-anyone-telecommunications-pastor.trycloudflare.com";
+
 const apiProxyTarget = (
-  process.env.API_PROXY_TARGET ?? "http://localhost:3002"
+  process.env.VERCEL
+    ? DEMO_TUNNEL_ORIGIN
+    : (process.env.API_PROXY_TARGET ?? "http://localhost:3002")
 ).replace(/\/+$/, "");
 
 const nextConfig = {
