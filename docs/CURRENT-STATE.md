@@ -1,6 +1,6 @@
-# Current State — 28 October 2026
+# Current State — 13 November 2026
 
-> **This is the canonical snapshot for the repository.** If another document disagrees with this file, this file wins. Production was checked against the live deployment on 28 October 2026 after migration #8 and the hardening/retakes release.
+> **This is the canonical snapshot for the repository.** If another document disagrees with this file, this file wins. The live deployment was checked on 13 November 2026 after the Sprint 1 demo-hardening release.
 >
 > Historical reports keep their original date and evidence. They are not silently rewritten; they carry a banner pointing here.
 
@@ -8,20 +8,19 @@
 
 | Item | Value |
 | --- | --- |
-| Production branch | `main` |
-| Web runtime code | `cd03fb0` — `Show all eight SANAD branches in grading UI` (web-only, on top of `5ac122d`); later docs-only commits do not change web runtime code |
-| API deployment | `5ac122d` — `Update SANAD Arabic scope to all 35 sources`; deployed with `railway up` (deployment `16a33f07-f1dd-404f-b110-ba4497ac7408`, status SUCCESS) |
-| Security hardening | **deployed** — per-IP rate limiting, locked-lesson payload redaction, `403 LESSON_LOCKED` assessment guards, authoring-read fixes, and pre-start exam withholding |
-| Assignment retakes | **deployed** — migration #8; `IN_PROGRESS`, `attemptNumber`, server-enforced `maxAttempts`, active-attempt ordering |
+| Production branch | `main` (GitHub's default branch is `master`; Vercel follows `main`) |
+| Web runtime code | `1c09fe0` — Sprint 1 demo hardening; Vercel deployment status SUCCESS |
+| API code | `5ac122d` — unchanged; Sprint 1 contains no API code or migration change |
+| API runtime | Local compiled NestJS API on `:3002`; start with `pnpm demo:start` |
+| API public origin | <https://timer-surprised-governing-prize.trycloudflare.com> — Cloudflare quick tunnel; the URL changes on restart until a stable ngrok domain is configured |
 | Web | <https://sanad-edtech.vercel.app> |
-| API (direct) | <https://sanad-edtech-production.up.railway.app> |
-| API through the web domain | <https://sanad-edtech.vercel.app/api/health> (Vercel rewrite to Railway) |
+| API through the web domain | <https://sanad-edtech.vercel.app/api/health> (Vercel rewrite to the current tunnel) |
 | Health check | `/api/health` → **200** `{"status":"ok","database":"up"}` |
 | Login page | `/login` → **200** |
-| Database | Managed PostgreSQL 18.6 on Railway; **8/8** Prisma migrations applied; 43 models |
+| Database | Local Docker PostgreSQL `learning_platform`; **8/8** Prisma migrations, 3 courses, 0 submissions at verification |
 | Demo tenant | `sanad-demo` |
 
-Railway's GitHub-linked service did **not** auto-deploy the 28 October push. The API was deployed explicitly with `railway up --service sanad-edtech --environment production -c -y`; do not assume a push to `main` redeploys the API until that integration is fixed.
+The Railway API (`https://sanad-edtech-production.up.railway.app`) and its database remain the historical production deployment, but the current demo web app is proxied to the laptop tunnel. The live student dashboard shows 0 submissions, matching the local Docker database (0 rows), not the Railway demo state (3 submissions). Railway's GitHub-linked service also did **not** auto-deploy the 28 October push; do not assume a push to `main` redeploys that API until the integration is fixed.
 
 The production demo seed contains **3 published Arabic prep courses**, one exam and one assignment. The student curriculum screen shows the real task counts from the API; do not hardcode the demo's current numbers into marketing copy.
 
@@ -40,20 +39,34 @@ The demo assignment was set to `maxAttempts = 2` for the production retake smoke
 
 | Check | Result |
 | --- | --- |
-| API unit suite on production code (`5ac122d`) | **357 / 357 passed**, 35 suites (`pnpm --filter api exec jest --config jest.config.js --runInBand`) |
-| Web unit suite on `cd03fb0` | **147 / 147 passed**, 10 files (`pnpm --filter web test`) |
-| Monorepo build on `cd03fb0` | **4/4 tasks successful** (`pnpm build`) |
+| API unit suite on production code (`5ac122d`) | **357 / 357 passed**, 35 suites, run 13 November 2026 (`pnpm --filter api exec jest --config jest.config.js --runInBand`) |
+| Web unit suite on `1c09fe0` | **150 / 150 passed**, 10 files, run 13 November 2026 (`pnpm --filter web test`) |
+| Monorepo build on `1c09fe0` | **4/4 tasks successful** (`pnpm build`) |
+| Live judge path | `/demo` **200**; one-click teacher and student access reached `/teacher` and `/student`; demo banner present; teacher navigation has no analytics link; `/teacher/analytics` redirects to `/teacher`; an unknown URL renders the branded Arabic 404 |
+| Local database | **8/8** migrations, 3 courses, 0 submissions (`learning-platform-db`) |
 | Production migration chain | **8/8**; `prisma migrate status` reports “Database schema is up to date!” |
 | Migration #8 schema checks | `attemptNumber` NOT NULL default 1; `startedAt` NOT NULL default CURRENT_TIMESTAMP; `submittedAt` nullable; unique key `(assignmentId, studentId, attemptNumber)`; `SubmissionStatus` includes `IN_PROGRESS` |
 | Migration backfill | Existing production row preserved as attempt #1 with `startedAt = submittedAt`; no null content |
 | Backup before migration | Custom-format dump + globals, restore-tested into a local PostgreSQL 18 container: **44 tables, 3 courses, 1 submission, 7 migrations** at backup time |
 | Production retake smoke | **31/31 checks passed**: metadata-only list, `maxAttempts=2`, concurrent start **201 + 409**, attempt 1 submit, attempt 2 start/submit, third attempt **400**, teacher queue excludes `IN_PROGRESS` and includes both submitted attempts, health **200** |
 | Production lock-card QA | Assignment lesson temporarily set to `LOCKED` with `ENTER_ASSIGNMENT`; the student page rendered «الواجب مقفل» and «لفتح هذا الواجب، سلّم الواجب السابق أولًا.» in dark and light themes with no horizontal overflow; the lesson was restored to `UNLOCKED`/`NONE` |
-| Live health | Web `/api/health` and direct Railway `/api/health` both return **200**, database **up** |
+| Live health | Web `/api/health` returns **200**, database **up**, through the current laptop tunnel; the direct Railway endpoint remains a separate historical deployment |
 | Fresh local chain (historical) | Local PostgreSQL 15: **8/8** migrations and `prisma migrate diff` no drift |
 | Pre-merge branch evidence (historical) | API **344/344** on `feat/security-quick-wins`; API **353/353**, web **145/145** on `feat/assignment-retakes`; local retake, concurrent-start, and lock-card QA |
 
-Production final database state after the smoke: **3 submissions** (2 at attempt 1, 1 at attempt 2), **0** in progress, **0** null `startedAt`/`submittedAt`; demo assignment `maxAttempts=2`. Older documents that mention 86, 179, 229, 276, 307, 311, 344, 353, or 393 tests are historical snapshots, not the current count.
+Production final database state after the 28 October smoke: **3 submissions** (2 at attempt 1, 1 at attempt 2), **0** in progress, **0** null `startedAt`/`submittedAt`; demo assignment `maxAttempts=2`. That is the Railway state and is not the current local demo state. Older documents that mention 86, 179, 229, 276, 307, 311, 344, 353, or 393 tests are historical snapshots, not the current count.
+
+## Sprint 1 demo hardening — 2026-11-13
+
+Sprint 1 makes the judge path survive a laptop reboot without changing the Vercel frontend or the API code.
+
+- Added `scripts/demo/start.ps1` (Docker, compiled API, tunnel, optional watchdog), `stop.ps1`, `smoke.ps1`, `backup.ps1`, and `install-autostart.ps1`, exposed as `pnpm demo:start`, `demo:start:watch`, `demo:stop`, `demo:smoke`, `demo:backup`, and `demo:autostart`.
+- Added the runbook in [`DEMO-STABILITY.md`](DEMO-STABILITY.md): stable ngrok domain setup, Cloudflare quick-tunnel fallback, watchdog, smoke, backup, autostart, and troubleshooting.
+- `apps/web/next.config.mjs` now resolves the API proxy from `API_PROXY_TARGET` or `DEMO_TUNNEL_ORIGIN`, strips invisible Unicode marks (LRM/RLM/ZWSP/BOM), validates the origin, and logs the target during the Vercel build. The temporary hardcoded quick-tunnel fallback remains until a stable domain is configured and verified.
+- Removed the four fabricated teacher screens: `/teacher/analytics` redirects to `/teacher`; course `builder`, `preview`, and `publish` redirect to the real course workspace. Analytics was removed from the teacher navigation and command palette, and dead creation commands were replaced with real publish/payments commands.
+- Added branded Arabic `not-found.tsx`, `error.tsx`, and `loading.tsx` with dark/light styles in `apps/web/app/system-pages.css`.
+- Verified locally: start/stop on an isolated `:3099` API, public smoke **2/2**, backup dump **0.25 MB**, autostart install/remove, browser QA of student and teacher one-click access, redirects, and the 404 in dark/light themes. The live deployment then verified `/demo`, both one-click logins, the teacher dashboard, the analytics redirect, and the branded 404.
+- Remaining: install ngrok, claim a free static domain, set its authtoken locally, start with `pnpm demo:start -- -Tunnel ngrok -NgrokDomain <domain> -Watch`, set Vercel Production `API_PROXY_TARGET=https://<domain>`, redeploy once, and verify before removing the hardcoded fallback. Do not install autostart before the stable domain exists.
 
 ## Stack and repository facts
 
@@ -68,7 +81,7 @@ Production final database state after the smoke: **3 submissions** (2 at attempt
 | Video | Bunny Stream provider, VdoCipher scaffold, unlisted YouTube attach path; student player uses the YouTube IFrame API |
 | Payments | Paymob, Fawry, and voucher providers; Instapay, Vodafone Cash, and e&money are scaffolding |
 | Monorepo | pnpm `9.15.0` + Turborepo 2 |
-| Web pages | 35 App Router pages |
+| Web pages | 35 App Router pages plus root loading/error/not-found states |
 | Node | Node 20 in the API Docker image; `.nvmrc` is 20 |
 
 The repository does **not** have a root `tsconfig.base.json` or a root `.env.example`; the API template lives at `apps/api/.env.example`.
@@ -137,6 +150,9 @@ Do not overstate the following controls; each row is the current limit.
 | Content versioning | Courses, lessons, and exams do not have a separate version/snapshot table. Publishing updates the current row; old attempts are not guaranteed to point at an immutable content version. |
 | Assignment retakes | Live with migration #8; `maxAttempts` is server-enforced and concurrent starts are serialized to one `201` and one `409`. The demo assignment is configured with `maxAttempts=2`. |
 | Railway auto-deploy | The GitHub-linked Railway service did not create a deployment for the 28 October push. The API was deployed manually with `railway up`; verify the deployment status after each push until the integration is fixed. |
+| Demo tunnel | The live web app currently uses a Cloudflare quick tunnel. The URL changes when cloudflared restarts, so a reboot requires updating Vercel `API_PROXY_TARGET` or relying on the temporary hardcoded fallback. A free ngrok static domain is the next step; see `docs/DEMO-STABILITY.md`. |
+| Demo autostart | The Windows Startup-folder entry is not installed yet. `pnpm demo:autostart` is a manual step after the stable ngrok domain exists; installing it before that would start a tunnel with a new URL at every logon. |
+| Vercel proxy environment | The local machine does not have the Vercel CLI, so the production `API_PROXY_TARGET` value has not been inspected directly. The live deployment currently works through the current tunnel and the fallback; confirm the env value when the stable domain is configured. |
 | SETH-9 advanced security | Post-quantum signing, zero-knowledge delivery, homomorphic grading, active deception, and crypto-shredding are **not implemented**. A dependency-ordered, phased roadmap/ADR is recorded in [`SETH-9-ROADMAP.md`](SETH-9-ROADMAP.md). |
 | Exam auto-submit | The student client submits when the timer reaches zero; the API records a late submit as `TIMED_OUT`. There is no server-side scheduled auto-submit worker. |
 | Reconciliation | `ReconciliationRun`, `ReconciliationItem`, and settlement models exist, but there is no live reconciliation worker or route. |
@@ -198,6 +214,12 @@ pnpm --filter web test
 pnpm --filter api exec jest --config jest.config.js --runInBand
 pnpm build
 
+# Local demo lifecycle (see docs/DEMO-STABILITY.md)
+pnpm demo:start -- -Tunnel none
+pnpm demo:smoke
+pnpm demo:backup
+pnpm demo:stop
+
 # Live check
 Invoke-RestMethod https://sanad-edtech.vercel.app/api/health
 ```
@@ -217,5 +239,6 @@ Invoke-RestMethod https://sanad-edtech.vercel.app/api/health
 | `docs/VIDEO_PROTECTION.md` | Video protection specification and current limits |
 | `docs/DEMO.md` | Demo runbook |
 | `docs/DEMO-SCRIPT.md` | Honest demo script |
+| `docs/DEMO-STABILITY.md` | Stable tunnel, watchdog, smoke, backup, and autostart runbook |
 | `docs/AUDIT-2026-10-16.md` | Historical audit, preserved as a dated snapshot |
 | `docs/GOVERNANCE.md` | Repository workflow and gates |
