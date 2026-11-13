@@ -1,0 +1,189 @@
+/* -- 18. SYSTEM PAGES: 404 / ERROR / LOADING -- */
+.system-shell {
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: clamp(20px, 5vw, 64px);
+  background:
+    radial-gradient(circle at 12% 12%, rgba(4, 120, 87, 0.18), transparent 34%),
+    radial-gradient(circle at 88% 88%, rgba(4, 120, 87, 0.08), transparent 36%),
+    #0b0d10;
+  color: #f4f4f6;
+}
+
+.system-card {
+  width: min(680px, 100%);
+  padding: clamp(28px, 6vw, 56px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 24px;
+  background: rgba(255, 255, 255, 0.045);
+  box-shadow: 0 30px 90px -45px rgba(0, 0, 0, 0.9);
+  text-align: start;
+}
+
+.system-eyebrow {
+  margin: 0 0 14px;
+  color: #34d399;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
+.system-title {
+  margin: 0;
+  font-size: clamp(28px, 5vw, 44px);
+  font-weight: 800;
+  line-height: 1.25;
+}
+
+.system-text {
+  margin: 18px 0 0;
+  color: rgba(244, 244, 246, 0.72);
+  font-size: 16px;
+  line-height: 1.9;
+}
+
+.system-code {
+  display: inline-block;
+  margin: 18px 0 0;
+  padding: 6px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  color: rgba(244, 244, 246, 0.6);
+  font-family: "Space Grotesk", monospace;
+  font-size: 12px;
+}
+
+.system-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 28px;
+}
+
+.system-primary,
+.system-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 0 20px;
+  border-radius: 12px;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  text-decoration: none;
+  cursor: pointer;
+  transition:
+    background var(--motion-fast) var(--ease-standard),
+    border-color var(--motion-fast) var(--ease-standard),
+    color var(--motion-fast) var(--ease-standard);
+}
+
+.system-primary {
+  border: 1px solid #047857;
+  background: #047857;
+  color: #ffffff;
+}
+
+.system-primary:hover {
+  border-color: #065f46;
+  background: #065f46;
+}
+
+.system-secondary {
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: transparent;
+  color: rgba(244, 244, 246, 0.86);
+}
+
+.system-secondary:hover {
+  border-color: rgba(255, 255, 255, 0.34);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.system-loading-card {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  max-width: 420px;
+}
+
+.system-loading-card .system-text {
+  margin: 0;
+}
+
+.system-spinner {
+  width: 24px;
+  height: 24px;
+  flex: 0 0 24px;
+  border: 2px solid rgba(52, 211, 153, 0.25);
+  border-top-color: #34d399;
+  border-radius: 999px;
+  animation: system-spin 0.8s linear infinite;
+}
+
+@keyframes system-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+html[data-theme="light"] .system-shell {
+  background:
+    radial-gradient(circle at 12% 12%, rgba(4, 120, 87, 0.09), transparent 34%),
+    radial-gradient(circle at 88% 88%, rgba(4, 120, 87, 0.05), transparent 36%),
+    #f7f4eb;
+  color: #0b0d10;
+}
+
+html[data-theme="light"] .system-card {
+  border-color: #e4e2db;
+  background: #ffffff;
+  box-shadow: 0 30px 80px -50px rgba(42, 47, 55, 0.35);
+}
+
+html[data-theme="light"] .system-eyebrow {
+  color: #047857;
+}
+
+html[data-theme="light"] .system-text {
+  color: #5b6270;
+}
+
+html[data-theme="light"] .system-code {
+  border-color: #e4e2db;
+  color: #5b6270;
+}
+
+html[data-theme="light"] .system-secondary {
+  border-color: #d8d3c7;
+  color: #14201b;
+}
+
+html[data-theme="light"] .system-secondary:hover {
+  border-color: #b8b0a0;
+  background: #f4efe3;
+}
+
+html[data-theme="light"] .system-spinner {
+  border-color: rgba(4, 120, 87, 0.2);
+  border-top-color: #047857;
+}
+
+@media (max-width: 520px) {
+  .system-actions {
+    flex-direction: column;
+  }
+
+  .system-primary,
+  .system-secondary {
+    width: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .system-spinner {
+    animation-duration: 1.8s;
+  }
+}
