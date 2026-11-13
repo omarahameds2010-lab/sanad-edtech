@@ -16,6 +16,12 @@
     "clean": "turbo run clean && rm -rf node_modules",
     "export:openapi": "ts-node -r tsconfig-paths/register apps/api/scripts/export-openapi.ts",
     "demo:reset": "pnpm --filter api seed:path2",
+    "demo:start": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/demo/start.ps1",
+    "demo:start:watch": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/demo/start.ps1 -Watch",
+    "demo:stop": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/demo/stop.ps1",
+    "demo:smoke": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/demo/smoke.ps1",
+    "demo:backup": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/demo/backup.ps1",
+    "demo:autostart": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/demo/install-autostart.ps1",
     "prepare": "husky",
     "precommit:check": "pnpm --filter api exec tsc --noEmit -p tsconfig.json && pnpm --filter api run build"
   },

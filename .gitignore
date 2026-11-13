@@ -83,3 +83,6 @@ theft.ps1
 checkevents.js
 checkevents.cjs
 diag-*.ps1
+
+# Local demo database backups (contain demo data; never commit)
+backups/
