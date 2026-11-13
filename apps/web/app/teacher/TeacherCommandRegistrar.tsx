@@ -5,7 +5,6 @@ import {
   useCommandPalette,
   CommandAction,
 } from "@/app/hooks/useCommandPalette";
-import { useRouter } from "next/navigation";
 
 const teacherActions: CommandAction[] = [
   {
@@ -16,25 +15,11 @@ const teacherActions: CommandAction[] = [
     perform: () => window.location.assign("/teacher/courses/new"),
   },
   {
-    id: "new-lesson",
-    title: "أنشئ درس جديد",
-    category: "إنشاء",
-    keywords: ["lesson", "create"],
-    perform: () => window.location.assign("/teacher/lessons/new"),
-  },
-  {
-    id: "new-assignment",
-    title: "أنشئ واجب جديد",
-    category: "إنشاء",
-    keywords: ["assignment", "create"],
-    perform: () => window.location.assign("/teacher/assignments/new"),
-  },
-  {
-    id: "new-exam",
-    title: "أنشئ اختبار جديد",
-    category: "إنشاء",
-    keywords: ["exam", "create"],
-    perform: () => window.location.assign("/teacher/exams/new"),
+    id: "go-publish",
+    title: "افتح مساحة النشر",
+    category: "تنقل",
+    keywords: ["go", "publish", "release"],
+    perform: () => window.location.assign("/teacher/publish"),
   },
   {
     id: "go-courses",
@@ -65,15 +50,15 @@ const teacherActions: CommandAction[] = [
     perform: () => window.location.assign("/teacher/exams"),
   },
   {
-    id: "go-analytics",
-    title: "افتح التحليلات",
+    id: "go-payments",
+    title: "افتح المدفوعات",
     category: "تنقل",
-    keywords: ["go", "analytics", "stats"],
-    perform: () => window.location.assign("/teacher/analytics"),
+    keywords: ["go", "payments", "orders"],
+    perform: () => window.location.assign("/teacher/payments"),
   },
   {
     id: "go-dashboard",
-    title: " افتح لوحة التحكم",
+    title: "افتح لوحة التحكم",
     category: "تنقل",
     keywords: ["go", "dashboard", "home"],
     perform: () => window.location.assign("/teacher"),

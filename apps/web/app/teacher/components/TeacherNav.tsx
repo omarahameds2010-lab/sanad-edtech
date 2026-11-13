@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { useEffect, useRef, useState, type ComponentType } from "react";
 import {
-  AnalyticsIcon,
   AssignmentsIcon,
   CloseIcon,
   CoursesIcon,
@@ -33,12 +32,26 @@ type NavItem = {
 export const teacherNavItems: NavItem[] = [
   { href: "/teacher", label: "نظرة عامة", Icon: OverviewIcon, mobile: true },
   { href: "/teacher/publish", label: "النشر", Icon: PublishIcon },
-  { href: "/teacher/courses", label: "الكورسات", Icon: CoursesIcon, mobile: true },
-  { href: "/teacher/students", label: "الطلاب", Icon: StudentsIcon, mobile: true },
+  {
+    href: "/teacher/courses",
+    label: "الكورسات",
+    Icon: CoursesIcon,
+    mobile: true,
+  },
+  {
+    href: "/teacher/students",
+    label: "الطلاب",
+    Icon: StudentsIcon,
+    mobile: true,
+  },
   { href: "/teacher/assignments", label: "الواجبات", Icon: AssignmentsIcon },
-  { href: "/teacher/exams", label: "الاختبارات", Icon: ExamsIcon, mobile: true },
+  {
+    href: "/teacher/exams",
+    label: "الاختبارات",
+    Icon: ExamsIcon,
+    mobile: true,
+  },
   { href: "/teacher/payments", label: "المدفوعات", Icon: PaymentsIcon },
-  { href: "/teacher/analytics", label: "التحليلات", Icon: AnalyticsIcon },
 ];
 
 export function isTeacherNavActive(pathname: string, href: string): boolean {
