@@ -19,7 +19,7 @@ const PRODUCTION_API_ORIGIN = "https://sanad-edtech-production.up.railway.app";
 // API_PROXY_TARGET env var is being fixed, route production /api/* traffic to
 // the active Cloudflare quick tunnel. Revert this after the env var is verified.
 const DEMO_TUNNEL_ORIGIN =
-  "https://republican-anyone-telecommunications-pastor.trycloudflare.com";
+  "https://timer-surprised-governing-prize.trycloudflare.com";
 
 const apiProxyTarget = (
   process.env.VERCEL
