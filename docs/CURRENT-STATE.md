@@ -12,7 +12,7 @@
 | Web runtime code | `1c09fe0` — Sprint 1 demo hardening; Vercel deployment status SUCCESS |
 | API code | `5ac122d` — unchanged; Sprint 1 contains no API code or migration change |
 | API runtime | Local compiled NestJS API on `:3002`; start with `pnpm demo:start` |
-| API public origin | <https://timer-surprised-governing-prize.trycloudflare.com> — Cloudflare quick tunnel; the URL changes on restart until a stable ngrok domain is configured |
+| API public origin | <https://worcester-lbs-skins-labels.trycloudflare.com> — Cloudflare quick tunnel; the URL changes on restart until a stable ngrok domain is configured |
 | Web | <https://sanad-edtech.vercel.app> |
 | API through the web domain | <https://sanad-edtech.vercel.app/api/health> (Vercel rewrite to the current tunnel) |
 | Health check | `/api/health` → **200** `{"status":"ok","database":"up"}` |
