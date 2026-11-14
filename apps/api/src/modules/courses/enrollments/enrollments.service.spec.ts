@@ -2,6 +2,7 @@ import {
   NotFoundException,
   BadRequestException,
   ConflictException,
+  HttpException,
 } from "@nestjs/common";
 import { EnrollmentsService } from "./enrollments.service";
 
@@ -25,6 +26,7 @@ describe("EnrollmentsService", () => {
     };
     entitlements = {
       grantCourseEntitlement: jest.fn().mockResolvedValue([]),
+      checkAccess: jest.fn(),
     };
     service = new EnrollmentsService(prisma, entitlements);
   });
@@ -62,6 +64,7 @@ describe("EnrollmentsService", () => {
       prisma.course.findFirst.mockResolvedValue({
         id: "c1",
         status: "PUBLISHED",
+        price: 0,
       });
       prisma.enrollment.findFirst.mockResolvedValue(null);
       prisma.enrollment.create.mockResolvedValue({
@@ -77,6 +80,7 @@ describe("EnrollmentsService", () => {
             status: "ACTIVE",
             userId,
             courseId: "c1",
+            source: "student",
           }),
         }),
       );
@@ -87,6 +91,72 @@ describe("EnrollmentsService", () => {
         "c1",
         "admin_grant",
       );
+      expect(entitlements.checkAccess).not.toHaveBeenCalled();
+    });
+
+    it("rejects a paid course with 402 PAYMENT_REQUIRED before creating an enrollment", async () => {
+      prisma.course.findFirst.mockResolvedValue({
+        id: "c1",
+        status: "PUBLISHED",
+        price: "199.00",
+      });
+      prisma.enrollment.findFirst.mockResolvedValue(null);
+      entitlements.checkAccess.mockResolvedValue({
+        allowed: false,
+        reason: "NO_ENTITLEMENT",
+      });
+
+      await expect(service.enroll(tenantId, userId, "c1")).rejects.toThrow(
+        HttpException,
+      );
+
+      try {
+        await service.enroll(tenantId, userId, "c1");
+      } catch (error) {
+        expect((error as HttpException).getStatus()).toBe(402);
+        expect((error as HttpException).getResponse()).toMatchObject({
+          code: "PAYMENT_REQUIRED",
+        });
+      }
+
+      expect(prisma.enrollment.create).not.toHaveBeenCalled();
+      expect(entitlements.grantCourseEntitlement).not.toHaveBeenCalled();
+    });
+
+    it("enrolls a paid buyer from the existing entitlement without minting admin_grant", async () => {
+      prisma.course.findFirst.mockResolvedValue({
+        id: "c1",
+        status: "PUBLISHED",
+        price: "199.00",
+      });
+      prisma.enrollment.findFirst.mockResolvedValue(null);
+      entitlements.checkAccess.mockResolvedValue({
+        allowed: true,
+        entitlement: { source: "voucher" },
+      });
+      prisma.enrollment.create.mockResolvedValue({
+        id: "e1",
+        status: "ACTIVE",
+        source: "voucher",
+      });
+
+      const result = await service.enroll(tenantId, userId, "c1");
+
+      expect(entitlements.checkAccess).toHaveBeenCalledWith(
+        userId,
+        "course",
+        "c1",
+      );
+      expect(prisma.enrollment.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            source: "voucher",
+            status: "ACTIVE",
+          }),
+        }),
+      );
+      expect(entitlements.grantCourseEntitlement).not.toHaveBeenCalled();
+      expect(result.status).toBe("ACTIVE");
     });
   });
 

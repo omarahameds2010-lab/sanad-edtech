@@ -3,6 +3,8 @@ import {
   NotFoundException,
   BadRequestException,
   ConflictException,
+  HttpException,
+  HttpStatus,
 } from "@nestjs/common";
 import { PrismaService } from "../../tenants/prisma.service";
 import { EntitlementsService } from "../../entitlements/entitlements.service";
@@ -32,25 +34,58 @@ export class EnrollmentsService {
       throw new ConflictException("Already enrolled in this course");
     }
 
+    // Paid courses are access-controlled by an ACTIVE course entitlement.
+    // Without this gate the public course page could enroll a student for
+    // free by calling this endpoint directly. Checkout grants the entitlement
+    // first, so a paid buyer still lands here exactly once (or hits the
+    // existing-enrollment conflict above).
+    const isPaid = Number(course.price) > 0;
+    let enrollmentSource = "student";
+
+    if (isPaid) {
+      const access = await this.entitlementsService.checkAccess(
+        userId,
+        "course",
+        courseId,
+      );
+
+      if (!access.allowed) {
+        throw new HttpException(
+          {
+            statusCode: HttpStatus.PAYMENT_REQUIRED,
+            code: "PAYMENT_REQUIRED",
+            message: "This course requires a completed purchase",
+          },
+          HttpStatus.PAYMENT_REQUIRED,
+        );
+      }
+
+      enrollmentSource = access.entitlement?.source ?? "purchase";
+    }
+
     const enrollment = await this.prisma.enrollment.create({
       data: {
         tenantId,
         userId,
         courseId,
         status: "ACTIVE",
-        source: "student",
+        source: enrollmentSource,
         startsAt: new Date(),
       },
     });
 
-    // Direct enrollment must unlock the loop (lessons/exams/assignments),
+    // Free direct enrollment must unlock the loop (lessons/exams/assignments),
     // mirroring the purchase flow — otherwise guards reject everything.
-    await this.entitlementsService.grantCourseEntitlement(
-      tenantId,
-      userId,
-      courseId,
-      "admin_grant",
-    );
+    // Paid enrollment already has that entitlement from checkout; granting an
+    // admin_grant here would be a second, misleading source of access.
+    if (!isPaid) {
+      await this.entitlementsService.grantCourseEntitlement(
+        tenantId,
+        userId,
+        courseId,
+        "admin_grant",
+      );
+    }
 
     return enrollment;
   }

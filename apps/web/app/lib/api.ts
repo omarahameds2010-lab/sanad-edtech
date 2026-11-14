@@ -419,6 +419,54 @@ export interface OrderListResult {
   totalPages: number;
 }
 
+export interface CreateOrderInput {
+  items: Array<{
+    resourceType: string;
+    resourceId: string;
+    name: string;
+    quantity: number;
+    /** Minor units (piastres). The API verifies this against its own price. */
+    unitPriceMinor: number | string;
+    metadata?: Record<string, unknown>;
+  }>;
+  currency?: string;
+  metadata?: Record<string, unknown>;
+}
+
+export interface CreateOrderResult {
+  order: {
+    orderId: string;
+    /** BigInt leaves the API as a digit string. */
+    totalMinor: string;
+  };
+}
+
+export interface CreatePaymentIntentInput {
+  orderId: string;
+  paymentMethod: string;
+  requestedProvider?: string;
+  returnUrl?: string;
+  webhookUrl?: string;
+  metadata?: Record<string, unknown>;
+  idempotencyKey: string;
+}
+
+export interface PaymentIntentResult {
+  success: boolean;
+  paymentIntentId?: string;
+  paymentId?: string;
+  providerPaymentId?: string;
+  providerTransactionId?: string;
+  redirectUrl?: string;
+  clientToken?: string;
+  errorCode?: string;
+  errorMessage?: string;
+}
+
+export interface CreatePaymentIntentResult {
+  paymentIntent: PaymentIntentResult;
+}
+
 export interface CurrentTenant {
   id: string;
   name: string;
@@ -1098,6 +1146,20 @@ export const api = {
 
   listOrders: (token: string) =>
     apiFetch<OrderListResult>("/api/payments/orders", { token }),
+
+  createOrder: (token: string, input: CreateOrderInput) =>
+    apiFetch<CreateOrderResult>("/api/payments/orders", {
+      token,
+      method: "POST",
+      body: input,
+    }),
+
+  createPaymentIntent: (token: string, input: CreatePaymentIntentInput) =>
+    apiFetch<CreatePaymentIntentResult>("/api/payments/intents", {
+      token,
+      method: "POST",
+      body: input,
+    }),
 
   getCurrentTenant: (token: string) =>
     apiFetch<CurrentTenant>("/api/tenants/current", { token }),

@@ -1,6 +1,6 @@
-# Current State — 13 November 2026
+# Current State — 14 November 2026
 
-> **This is the canonical snapshot for the repository.** If another document disagrees with this file, this file wins. The live deployment was checked on 13 November 2026 after the Sprint 1 demo-hardening release.
+> **This is the canonical snapshot for the repository.** If another document disagrees with this file, this file wins. The live deployment was checked on 14 November 2026 after the Sprint 2 paid-checkout release.
 >
 > Historical reports keep their original date and evidence. They are not silently rewritten; they carry a banner pointing here.
 
@@ -9,20 +9,22 @@
 | Item | Value |
 | --- | --- |
 | Production branch | `main` (GitHub's default branch is `master`; Vercel follows `main`) |
-| Web runtime code | `1c09fe0` — Sprint 1 demo hardening; Vercel deployment status SUCCESS |
-| API code | `5ac122d` — unchanged; Sprint 1 contains no API code or migration change |
+| Web runtime code | Sprint 2 paid checkout — 14 November 2026 |
+| API code | Sprint 2 paid checkout — 14 November 2026; local compiled API, no schema or migration change |
 | API runtime | Local compiled NestJS API on `:3002`; start with `pnpm demo:start` |
 | API public origin | <https://worcester-lbs-skins-labels.trycloudflare.com> — Cloudflare quick tunnel; the URL changes on restart until a stable ngrok domain is configured |
 | Web | <https://sanad-edtech.vercel.app> |
 | API through the web domain | <https://sanad-edtech.vercel.app/api/health> (Vercel rewrite to the current tunnel) |
 | Health check | `/api/health` → **200** `{"status":"ok","database":"up"}` |
 | Login page | `/login` → **200** |
-| Database | Local Docker PostgreSQL `learning_platform`; **8/8** Prisma migrations, 3 courses, 0 submissions at verification |
+| Database | Local Docker PostgreSQL `learning_platform`; **8/8** Prisma migrations, 3 published courses (one paid: `arabic-3-prep`, 199 EGP), 1 enrollment, 0 orders/payments/voucher redemptions at final verification |
 | Demo tenant | `sanad-demo` |
 
 The Railway API endpoint (`https://sanad-edtech-production.up.railway.app`) currently returns **404 `Application not found`**; treat it as retired. The current demo web app is proxied to the laptop tunnel. The live student dashboard shows 0 submissions, matching the local Docker database (0 rows), not the Railway demo state (3 submissions). Railway's GitHub-linked service also did **not** auto-deploy the 28 October push; do not assume a push to `main` redeploys that API until the integration is fixed.
 
 The production demo seed contains **3 published Arabic prep courses**, one exam and one assignment. The student curriculum screen shows the real task counts from the API; do not hardcode the demo's current numbers into marketing copy.
+
+Sprint 2 makes `arabic-3-prep` a paid course (**199.00 EGP**) and adds the demo voucher **`SANAD-2026`**, scoped to that course. `arabic-1-prep` remains free and enrolled for the 90-second judge path. The paid data can be reapplied with `pnpm demo:paid`; the demo student is left unenrolled from the paid course so checkout can be demonstrated live.
 
 ### Demo accounts
 
@@ -33,17 +35,19 @@ These are seeded demo accounts, not production customer accounts.
 | Teacher | `01000000001` | `Joker-Arabic#2026` |
 | Student | `01000000002` | `Student123!` |
 
-The demo assignment was set to `maxAttempts = 2` for the production retake smoke. The demo student now has two submitted attempts (1 and 2); a third start returns `400`. This is demo data, not a guarantee of the generic seed.
+The demo assignment was set to `maxAttempts = 2` for the production retake smoke. The Railway production demo had two submitted attempts (1 and 2); the current local demo database has **0 submissions**. This is demo data, not a guarantee of the generic seed.
 
 ## Verification evidence
 
 | Check | Result |
 | --- | --- |
-| API unit suite on production code (`5ac122d`) | **357 / 357 passed**, 35 suites, run 13 November 2026 (`pnpm --filter api exec jest --config jest.config.js --runInBand`) |
-| Web unit suite on `1c09fe0` | **150 / 150 passed**, 10 files, run 13 November 2026 (`pnpm --filter web test`) |
-| Monorepo build on `1c09fe0` | **4/4 tasks successful** (`pnpm build`) |
-| Live judge path | `/demo` **200**; one-click teacher and student access reached `/teacher` and `/student`; demo banner present; teacher navigation has no analytics link; `/teacher/analytics` redirects to `/teacher`; an unknown URL renders the branded Arabic 404 |
-| Local database | **8/8** migrations, 3 courses, 0 submissions (`learning-platform-db`) |
+| API unit suite on Sprint 2 code | **359 / 359 passed**, 35 suites, run 14 November 2026 (`pnpm --filter api exec jest --config jest.config.js --runInBand`) |
+| Web unit suite on Sprint 2 code | **158 / 158 passed**, 12 files, run 14 November 2026 (`pnpm --filter web test`) |
+| Monorepo build on Sprint 2 code | **4/4 tasks successful** (`pnpm build`) |
+| Paid checkout HTTP smoke | **passed**: paid direct enroll **402 `PAYMENT_REQUIRED`**; invalid voucher **400 `VOUCHER_NOT_FOUND`**; valid voucher **201**, `success: true`, enrollment `source=voucher`, replay stays one redemption; temporary user and rows removed |
+| Paid checkout browser QA | **passed locally**: paid CTA → `/checkout/arabic-3-prep`; voucher `SANAD-2026` → “تم تفعيل الكورس”; student courses showed 2 enrollments; test transaction removed so the demo remains unenrolled for the live demo |
+| Live judge path | `/demo` **200**; one-click teacher and student access reached `/teacher` and `/student`; demo banner present; teacher navigation has no analytics link; `/teacher/analytics` redirects to `/teacher`; an unknown URL renders the branded Arabic 404 (Sprint 1 live check; Sprint 2 live recheck follows the deployment) |
+| Local database | **8/8** migrations, 3 published courses, 1 free enrollment, 0 submissions, 0 orders/payments/voucher redemptions after cleanup (`learning-platform-db`) |
 | Production migration chain | **8/8**; `prisma migrate status` reports “Database schema is up to date!” |
 | Migration #8 schema checks | `attemptNumber` NOT NULL default 1; `startedAt` NOT NULL default CURRENT_TIMESTAMP; `submittedAt` nullable; unique key `(assignmentId, studentId, attemptNumber)`; `SubmissionStatus` includes `IN_PROGRESS` |
 | Migration backfill | Existing production row preserved as attempt #1 with `startedAt = submittedAt`; no null content |
@@ -67,6 +71,18 @@ Sprint 1 makes the judge path survive a laptop reboot without changing the Verce
 - Added branded Arabic `not-found.tsx`, `error.tsx`, and `loading.tsx` with dark/light styles in `apps/web/app/system-pages.css`.
 - Verified locally: start/stop on an isolated `:3099` API, public smoke **2/2**, backup dump **0.25 MB**, autostart install/remove, browser QA of student and teacher one-click access, redirects, and the 404 in dark/light themes. The live deployment then verified `/demo`, both one-click logins, the teacher dashboard, the analytics redirect, and the branded 404.
 - Remaining: install ngrok, claim a free static domain, set its authtoken locally, start with `pnpm demo:start -- -Tunnel ngrok -NgrokDomain <domain> -Watch`, set Vercel Production `API_PROXY_TARGET=https://<domain>`, redeploy once, and verify before removing the hardcoded fallback. Do not install autostart before the stable domain exists.
+
+## Sprint 2 paid checkout — 2026-11-14
+
+Sprint 2 closes the free-enrollment hole for paid courses and adds the student-facing checkout path. There is no schema or migration change.
+
+- **API guard:** `EnrollmentsService.enroll` now checks the course price. A paid course without an ACTIVE course entitlement returns **`402 PAYMENT_REQUIRED`** with code `PAYMENT_REQUIRED`; a paid buyer reuses the entitlement source (`purchase` or `voucher`) and does not mint a second `admin_grant`. Free courses keep the existing `admin_grant` behavior.
+- **Enrollment on settlement:** payment settlement and voucher redemption call the shared `ensureCourseEnrollment` helper inside their existing transactions. Paid students therefore get an enrollment row (`source: "purchase"` or `source: "voucher"`) in the same transaction as the entitlement and ledger. The helper is an idempotent upsert on `(userId, courseId)`, so webhook retries and voucher crash-resumes do not duplicate rows.
+- **Structured voucher errors:** rejected vouchers now return a `{ code, message }` `BadRequestException`, allowing the web client to show a specific Arabic message instead of a raw English string.
+- **Web checkout:** paid courses route to `/checkout/[slug]`; free courses keep the existing direct-enroll button. The checkout page validates the voucher server-side, creates the order, then creates a `VOUCHER` payment intent with a stable retry key. It handles success, already-enrolled, free, unauthenticated, loading, and error states.
+- **Demo data:** `arabic-3-prep` is **199.00 EGP**; the course-scoped voucher is **`SANAD-2026`**. Apply it with `pnpm demo:paid`. `arabic-1-prep` remains free and enrolled for the 90-second path.
+- **Local proof:** API **359/359**, web **158/158**, API/web `tsc --noEmit` clean, root build **4/4**, HTTP paid-checkout smoke passed, and browser QA reached “تم تفعيل الكورس” then showed the paid course in the student's course list. The test purchase was removed afterward; the demo database is back to 1 enrollment, 0 orders, 0 payments, and an unused voucher.
+- **Still open:** the checkout page is voucher-only for the demo. A real Paymob/Fawry card sandbox charge and refund remain on the P2 list, as does the stable tunnel/autostart work from Sprint 1.
 
 ## Stack and repository facts
 
@@ -99,6 +115,8 @@ The repository does **not** have a root `tsconfig.base.json` or a root `.env.exa
 - Dark theme by default and an optional Academic Light Mode (“Heritage Manuscript”) across the student surfaces, persisted under `sanad:theme` and applied before paint.
 - Student Command Center on `/student`, with every displayed number derived from server responses.
 - Paymob/Fawry webhook verification with raw payloads, replay/deduplication, atomic settlement, ledger entries, entitlements, and refund settlement.
+- Server-side paid-course guard (`402 PAYMENT_REQUIRED`) plus atomic paid enrollment on payment/voucher settlement.
+- Voucher checkout at `/checkout/[slug]` with Arabic error states, already-enrolled/free handling, and a stable payment-intent retry key.
 - Admin refund flow with idempotency, provider rejection handling, ledger reversal, and surgical entitlement revocation.
 - Bunny Stream upload/signing code and video-protection primitives (signed playback token, watermark engine, playback sessions).
 - Unlisted YouTube attachment for lessons, which is the path used by the current demo content.

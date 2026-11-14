@@ -6,6 +6,7 @@ import {
 } from "@nestjs/common";
 import { PrismaService } from "../../../tenants/prisma.service";
 import { applyTenantContext } from "../../../../common/prisma/tenant-context";
+import { ensureCourseEnrollment } from "../../../../common/enrollments/ensure-course-enrollment";
 import { EntitlementsService } from "../../../entitlements/entitlements.service";
 import { OutboxService } from "../../../outbox/outbox.service";
 import {
@@ -139,6 +140,16 @@ export class VoucherProvider implements PaymentProvider {
 
       let entitlements: any[] = [];
       if (voucher.courseId) {
+        // A redeemed course voucher is a purchase-equivalent: write the
+        // enrollment in the same transaction as the entitlement so the
+        // student dashboard never misses a course they can already open.
+        await ensureCourseEnrollment(tx, {
+          tenantId,
+          userId,
+          courseId: voucher.courseId,
+          source: "voucher",
+        });
+
         entitlements = await this.entitlementsService.grantCourseEntitlement(
           tenantId,
           userId,

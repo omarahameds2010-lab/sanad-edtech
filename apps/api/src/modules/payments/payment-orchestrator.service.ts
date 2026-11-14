@@ -9,6 +9,7 @@ import {
 } from "@nestjs/common";
 import { PrismaService } from "../tenants/prisma.service";
 import { applyTenantContext } from "../../common/prisma/tenant-context";
+import { ensureCourseEnrollment } from "../../common/enrollments/ensure-course-enrollment";
 import { ProviderRegistryService } from "./providers/provider-registry.service";
 import { ProviderRouterService } from "./routing/provider-router.service";
 import { VoucherProvider } from "./providers/voucher/voucher.provider";
@@ -541,7 +542,10 @@ export class PaymentOrchestratorService {
       if (intent.idempotencyKey) {
         await this.idempotency.markFailed(tenantId, intent.idempotencyKey);
       }
-      throw new BadRequestException(result.errorMessage);
+      throw new BadRequestException({
+        code: result.errorCode ?? "VOUCHER_REJECTED",
+        message: result.errorMessage ?? "Voucher rejected",
+      });
     }
 
     // Create — or reuse — the payment record for this voucher checkout. The
@@ -736,6 +740,17 @@ export class PaymentOrchestratorService {
 
       for (const item of order!.items) {
         if (item.resourceType === "course") {
+          // Enrollment is what the student dashboard and course page read;
+          // entitlements alone would grant access to a course the student
+          // never sees. Both writes share this transaction, so a crash can
+          // never leave a paid student with only half the result.
+          await ensureCourseEnrollment(tx, {
+            tenantId,
+            userId,
+            courseId: item.resourceId,
+            source: "purchase",
+          });
+
           await this.entitlementsService.grantCourseEntitlement(
             tenantId,
             userId,

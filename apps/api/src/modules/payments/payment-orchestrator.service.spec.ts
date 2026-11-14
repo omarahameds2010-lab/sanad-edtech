@@ -176,6 +176,7 @@ describe("PaymentOrchestratorService (bundle A)", () => {
         }),
       },
       paymentIntent: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
+      enrollment: { upsert: jest.fn().mockResolvedValue({}) },
     };
     prisma.$transaction.mockImplementation(async (cb: any) => cb(tx));
     return tx;
@@ -444,6 +445,17 @@ describe("PaymentOrchestratorService (bundle A)", () => {
         "c1",
         expect.objectContaining({ orderId: "o1" }),
       );
+      expect(tx.enrollment.upsert).toHaveBeenCalledWith({
+        where: { userId_courseId: { userId, courseId: "c1" } },
+        create: expect.objectContaining({
+          tenantId,
+          userId,
+          courseId: "c1",
+          status: "ACTIVE",
+          source: "purchase",
+        }),
+        update: { status: "ACTIVE" },
+      });
       expect(entitlementsService.grantCourseEntitlement).toHaveBeenCalled();
       expect(outbox.publish).toHaveBeenCalled();
       expect(tx.paymentIntent.updateMany).toHaveBeenCalled();

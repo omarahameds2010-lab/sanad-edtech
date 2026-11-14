@@ -312,6 +312,15 @@ export default function PublicCoursePage({
     return Math.round(seconds / 60);
   }, [data]);
 
+  function goToCheckout() {
+    if (!data) return;
+    if (!token) {
+      router.push("/login");
+      return;
+    }
+    router.push(`/checkout/${data.course.slug}`);
+  }
+
   async function handleEnroll() {
     if (!token) {
       router.push("/login");
@@ -529,7 +538,7 @@ export default function PublicCoursePage({
       <button
         type="button"
         className={enrolled ? "stage-cta stage-cta-done" : "stage-cta"}
-        onClick={() => void handleEnroll()}
+        onClick={() => void (isFree ? handleEnroll() : goToCheckout())}
         onMouseMove={onCtaMove}
         onMouseLeave={onCtaLeave}
         disabled={enrolling || enrolled}
@@ -539,7 +548,11 @@ export default function PublicCoursePage({
         ) : enrolled ? (
           "أنت مسجل بالفعل ✓"
         ) : token ? (
-          "سجّل الآن"
+          isFree ? (
+            "سجّل الآن"
+          ) : (
+            "اشترِ الكورس"
+          )
         ) : (
           "سجل الدخول للتسجيل"
         )}

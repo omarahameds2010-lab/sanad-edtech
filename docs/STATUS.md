@@ -1,4 +1,4 @@
-# Status — 28 October 2026
+# Status — 14 November 2026
 
 > Canonical detail lives in [`CURRENT-STATE.md`](CURRENT-STATE.md). This page is the short dashboard: what is live, what is proven, and what is still missing.
 
@@ -7,15 +7,16 @@
 | Item | Value |
 | --- | --- |
 | Production branch | `main` |
-| Web runtime code | `cd03fb0` — web-only SANAD grading-selector commit on top of `5ac122d`; later docs-only commits do not change it |
-| API deployment | `5ac122d` — `railway up` deployment `16a33f07-f1dd-404f-b110-ba4497ac7408`, SUCCESS |
-| Hardening / retakes | **Deployed** — rate limiting, lock enforcement, authoring-read fixes, and assignment retakes are live |
+| Web runtime code | Sprint 2 paid checkout — 14 November 2026 |
+| API runtime | Local compiled NestJS API on `:3002`; no schema or migration change in Sprint 2 |
+| Hardening / retakes | **Live** — rate limiting, lock enforcement, authoring-read fixes, and assignment retakes |
+| Sprint 2 paid checkout | **Implemented and locally verified** — `402` paid-course guard, atomic enrollment, voucher checkout |
 | Web | <https://sanad-edtech.vercel.app> |
-| API | <https://sanad-edtech-production.up.railway.app> |
+| API public origin | <https://worcester-lbs-skins-labels.trycloudflare.com> — quick tunnel; changes on restart |
 | Health | `/api/health` → **200**, database **up** |
 | Login page | **200** |
 | Demo tenant | `sanad-demo` |
-| Migrations | **8/8** applied on Railway PostgreSQL |
+| Migrations | **8/8** applied on the local Docker PostgreSQL |
 | Database models | 43 |
 | RLS policies | 138 across 43 application tables |
 | RLS runtime enforcement | **Not active** — runtime still uses owner/superuser credentials |
@@ -24,13 +25,14 @@
 
 | Check | Result | Command |
 | --- | --- | --- |
-| API tests on production code (`5ac122d`) | **357/357**, 35 suites | `pnpm --filter api exec jest --config jest.config.js --runInBand` |
-| Web tests on `cd03fb0` | **147/147**, 10 files | `pnpm --filter web test` |
-| Monorepo build on `cd03fb0` | **4/4** successful | `pnpm build` |
-| Production migration chain | **8/8**; schema up to date | `prisma migrate status` against Railway |
+| API tests on Sprint 2 code | **359/359**, 35 suites | `pnpm --filter api exec jest --config jest.config.js --runInBand` |
+| Web tests on Sprint 2 code | **158/158**, 12 files | `pnpm --filter web test` |
+| Monorepo build | **4/4** successful | `pnpm build` |
+| Paid checkout HTTP smoke | **passed**: paid direct enroll 402, invalid voucher 400, valid voucher 201, enrollment `source=voucher`, replay one redemption | Local HTTP smoke, 14 Nov 2026 |
+| Paid checkout browser QA | **passed**: paid CTA → checkout → `SANAD-2026` → “تم تفعيل الكورس”; cleanup restored the demo state | Local browser, 14 Nov 2026 |
+| Local migration chain | **8/8**; schema up to date | `prisma migrate status` against Docker |
 | Backup/restore proof | Custom dump + globals restored into local PostgreSQL 18: 44 tables, 3 courses, 1 submission, 7 migrations at backup time | Docker `pg_dump` / `pg_restore` |
-| Production retake smoke | **31/31**: concurrent start 201+409, attempt 1 submit, attempt 2 submit, third 400, teacher queue excludes active, health 200 | Node script through the production web domain |
-| Production lock-card QA | «الواجب مقفل» + «لفتح هذا الواجب، سلّم الواجب السابق أولًا.» in dark and light, no overflow; lesson restored | Browser against production |
+| Production retake smoke (historical) | **31/31**: concurrent start 201+409, attempt 1 submit, attempt 2 submit, third 400, teacher queue excludes active, health 200 | Node script through the production web domain |
 | Live health | **200** / database up | `Invoke-RestMethod https://sanad-edtech.vercel.app/api/health` |
 | Historical branch evidence | API 344/344 and 353/353; web 145/145; local retake/concurrency/lock QA | Pre-merge local runs, 26–27 Oct 2026 |
 
@@ -48,11 +50,13 @@ Older counts (86, 179, 229, 276, 307, 311, 344, 353, 393) belong to historical s
 - Student Command Center with server-derived numbers.
 - Dark default + optional Academic Light Mode; pre-paint theme restore.
 - Paymob/Fawry/voucher payments, signed webhooks, ledger, entitlements, idempotency, refunds.
+- Server-side paid-course guard (`402 PAYMENT_REQUIRED`) and atomic enrollment on payment/voucher settlement.
+- Voucher checkout page with Arabic error states and a stable payment-intent retry key.
 - Bunny Stream provider code and video-protection primitives; unlisted YouTube demo path.
 
-## Deployed 28 October 2026
+## Deployed 28 October 2026 (historical)
 
-The hardening and assignment-retakes branches are merged and live. Production now includes:
+The hardening and assignment-retakes branches were merged and live on the then-production Railway API. That deployment included:
 
 - global per-IP rate limiting (120/min per route; login 10/min, register 5/min, refresh 30/min), with health/readiness and payment webhooks exempt;
 - in-memory throttler storage and forwarded-IP keying;

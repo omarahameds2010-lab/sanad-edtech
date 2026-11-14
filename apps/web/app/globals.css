@@ -4298,6 +4298,311 @@ textarea.sc-input {
 }
 
 /* ======================================================================
+   CHECKOUT — same paper & ink register as the public course stage
+   ====================================================================== */
+
+.checkout-grid {
+  display: grid;
+  grid-template-columns: 7fr 5fr;
+  column-gap: 64px;
+  align-items: start;
+}
+.checkout-main {
+  min-width: 0;
+}
+.checkout-title {
+  margin: 10px 0 14px;
+  font-size: clamp(40px, 5.2vw, 68px);
+  font-weight: 800;
+  line-height: 1.02;
+  letter-spacing: -0.03em;
+  color: var(--ink-950);
+}
+.checkout-sub {
+  max-width: 54ch;
+  margin: 0 0 30px;
+  font-size: 16px;
+  line-height: 1.9;
+  color: var(--ink-500);
+}
+.checkout-card {
+  padding: 30px;
+  border: 1px solid rgba(11, 13, 16, 0.1);
+  border-radius: 22px;
+  background: rgba(250, 247, 242, 0.74);
+  box-shadow: 0 24px 60px -32px rgba(11, 13, 16, 0.28);
+}
+.checkout-label {
+  display: block;
+  margin-bottom: 10px;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--ink-700);
+}
+.checkout-input-wrap {
+  position: relative;
+}
+.checkout-input {
+  width: 100%;
+  height: 58px;
+  padding: 0 52px 0 18px;
+  border: 1.5px solid var(--ink-300);
+  border-radius: 14px;
+  background: #ffffff;
+  color: var(--ink-950);
+  font: inherit;
+  font-size: 16px;
+  letter-spacing: 0.04em;
+  transition:
+    border-color 180ms ease,
+    box-shadow 180ms ease;
+}
+.checkout-input::placeholder {
+  color: var(--ink-300);
+  letter-spacing: 0.08em;
+}
+.checkout-input:focus {
+  outline: none;
+  border-color: var(--color-action);
+  box-shadow: 0 0 0 4px rgba(4, 120, 87, 0.12);
+}
+.checkout-input:disabled {
+  opacity: 0.7;
+}
+.checkout-input-icon {
+  position: absolute;
+  top: 50%;
+  inset-inline-end: 17px;
+  width: 22px;
+  height: 22px;
+  color: var(--color-action-strong);
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+.checkout-input-icon svg,
+.checkout-summary-note-icon svg,
+.checkout-state-icon svg {
+  width: 100%;
+  height: 100%;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+}
+.checkout-submit {
+  margin-top: 20px;
+  text-decoration: none;
+}
+.checkout-fineprint {
+  margin: 16px 0 0;
+  font-size: 12px;
+  line-height: 1.8;
+  color: var(--ink-500);
+}
+.checkout-error {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 16px;
+  padding: 14px 16px;
+  border: 1px solid rgba(185, 28, 28, 0.22);
+  border-radius: 12px;
+  background: rgba(185, 28, 28, 0.06);
+  color: #8f1d1d;
+  font-size: 14px;
+  line-height: 1.7;
+}
+.checkout-error-reset {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: 700;
+  text-decoration: underline;
+  cursor: pointer;
+}
+.checkout-summary {
+  position: sticky;
+  top: 96px;
+}
+.checkout-summary-card {
+  padding: 28px;
+  border: 1px solid rgba(11, 13, 16, 0.1);
+  border-radius: 22px;
+  background: rgba(250, 247, 242, 0.72);
+  box-shadow: 0 24px 60px -36px rgba(11, 13, 16, 0.3);
+}
+.checkout-summary-eyebrow {
+  margin: 0 0 8px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--color-action-strong);
+}
+.checkout-summary-title {
+  margin: 0 0 6px;
+  font-size: 24px;
+  font-weight: 800;
+  line-height: 1.35;
+  color: var(--ink-950);
+}
+.checkout-summary-teacher {
+  margin: 0 0 20px;
+  font-size: 13px;
+  color: var(--ink-500);
+}
+.checkout-summary-rows {
+  border-top: 1px solid rgba(11, 13, 16, 0.08);
+}
+.checkout-summary-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 13px 0;
+  border-bottom: 1px solid rgba(11, 13, 16, 0.08);
+  font-size: 14px;
+  color: var(--ink-500);
+}
+.checkout-summary-row > :last-child {
+  color: var(--ink-950);
+  font-weight: 600;
+}
+.checkout-total-row {
+  padding-top: 18px;
+  padding-bottom: 4px;
+  border-bottom: 0;
+  font-size: 15px;
+}
+.checkout-total {
+  font-size: 30px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+}
+.checkout-total small {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0;
+  color: var(--ink-500);
+}
+.checkout-summary-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  margin: 20px 0 18px;
+  padding: 13px 14px;
+  border-radius: 12px;
+  background: rgba(4, 120, 87, 0.07);
+  color: var(--color-action-strong);
+  font-size: 12px;
+  line-height: 1.7;
+}
+.checkout-summary-note-icon {
+  flex: 0 0 18px;
+  width: 18px;
+  height: 18px;
+  margin-top: 1px;
+}
+.checkout-back {
+  display: inline-block;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink-500);
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+  transition:
+    color 180ms ease,
+    border-color 180ms ease;
+}
+.checkout-back:hover {
+  color: var(--ink-950);
+  border-color: var(--ink-300);
+}
+.checkout-state {
+  max-width: 680px;
+  margin: 8vh auto 0;
+  padding: 48px;
+  border: 1px solid rgba(11, 13, 16, 0.1);
+  border-radius: 24px;
+  background: rgba(250, 247, 242, 0.78);
+  box-shadow: 0 24px 60px -36px rgba(11, 13, 16, 0.28);
+  text-align: center;
+}
+.checkout-state h1 {
+  margin: 0 0 12px;
+  font-size: clamp(30px, 4vw, 44px);
+  font-weight: 800;
+  line-height: 1.15;
+  letter-spacing: -0.03em;
+  color: var(--ink-950);
+}
+.checkout-state p {
+  max-width: 48ch;
+  margin: 0 auto 12px;
+  font-size: 15px;
+  line-height: 1.9;
+  color: var(--ink-500);
+}
+.checkout-state-icon {
+  display: inline-flex;
+  width: 56px;
+  height: 56px;
+  margin-bottom: 18px;
+  padding: 13px;
+  border-radius: 50%;
+  background: rgba(4, 120, 87, 0.1);
+  color: var(--color-action-strong);
+}
+.checkout-state-cta {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  max-width: 320px;
+  margin: 24px auto 14px;
+  text-decoration: none;
+}
+.checkout-state .stage-btn-ghost {
+  display: inline-block;
+}
+.checkout-wait {
+  color: var(--ink-500);
+}
+.checkout-sk-card {
+  height: 300px;
+  margin-top: 28px;
+  border-radius: 22px;
+}
+.checkout-sk-summary {
+  height: 360px;
+  border-radius: 22px;
+}
+
+@media (max-width: 900px) {
+  .checkout-grid {
+    grid-template-columns: 1fr;
+    row-gap: 28px;
+  }
+  .checkout-summary {
+    position: static;
+  }
+  .checkout-card,
+  .checkout-summary-card {
+    padding: 22px;
+  }
+  .checkout-title {
+    font-size: 40px;
+  }
+  .checkout-state {
+    margin-top: 4vh;
+    padding: 32px 22px;
+  }
+}
+
+/* ======================================================================
    EDITORIAL COURSE CARD — “غلاف الكتاب” course cards
    (platform page + catalog · paper & ink · emerald accent only)
    ====================================================================== */

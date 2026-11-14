@@ -46,6 +46,7 @@ describe("VoucherProvider.redeemVoucher — crash-resume ordering (bundle C)", (
           ...data,
         })),
       },
+      enrollment: { upsert: jest.fn().mockResolvedValue({}) },
     };
 
     prisma = {
@@ -172,6 +173,17 @@ describe("VoucherProvider.redeemVoucher — crash-resume ordering (bundle C)", (
         }),
       }),
     );
+    expect(tx.enrollment.upsert).toHaveBeenCalledWith({
+      where: { userId_courseId: { userId, courseId } },
+      create: expect.objectContaining({
+        tenantId,
+        userId,
+        courseId,
+        status: "ACTIVE",
+        source: "voucher",
+      }),
+      update: { status: "ACTIVE" },
+    });
     expect(entitlementsService.grantCourseEntitlement).toHaveBeenCalledWith(
       tenantId,
       userId,

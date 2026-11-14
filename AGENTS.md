@@ -21,22 +21,24 @@
 | CI/CD       | GitHub Actions workflow exists; local tests/build are the release evidence                                                                                                                     |
 | Infra       | Docker + Terraform (later)                                                                                                                                                                   |
 
-## Current verified release — 2026-11-13
+## Current verified release — 2026-11-14
 
 > Canonical document: `docs/CURRENT-STATE.md`. This is the state to use for answers and documentation. Older entries below are an audit trail.
 
-- Web runtime code is `1c09fe0` (Sprint 1 demo hardening; Vercel deployment SUCCESS); later docs-only commits may be newer on `main`. Web is live at `https://sanad-edtech.vercel.app`; API code is unchanged at `5ac122d`, but the current demo API is the local compiled NestJS API on `:3002` exposed through the Cloudflare quick tunnel `https://worcester-lbs-skins-labels.trycloudflare.com`. The Railway API endpoint currently returns **404 `Application not found`**; treat it as retired.
+- Web runtime code is the Sprint 2 paid-checkout release; later docs-only commits may be newer on `main`. Web is live at `https://sanad-edtech.vercel.app`; the current demo API is the local compiled NestJS API on `:3002` exposed through the Cloudflare quick tunnel `https://worcester-lbs-skins-labels.trycloudflare.com`. The Railway API endpoint returns **404 `Application not found`**; treat it as retired.
 - `/api/health` through the web domain is **200** with database **up**. `/demo` is **200**; one-click student and teacher access, the demo banner, the analytics-to-dashboard redirect, and the branded Arabic 404 were verified live.
-- The live student state matches the local Docker database (3 courses, 0 submissions), not the Railway demo state (3 submissions). The local database has **8/8** migrations.
-- Tests: **357/357 API** (35 suites), **150/150 web** (10 files), build **4/4**.
-- Sprint 1 added `scripts/demo/start.ps1`, `stop.ps1`, `smoke.ps1`, `backup.ps1`, and `install-autostart.ps1`, exposed as `pnpm demo:*`; the runbook is `docs/DEMO-STABILITY.md`. `apps/web/next.config.mjs` resolves `API_PROXY_TARGET` / `DEMO_TUNNEL_ORIGIN`, strips invisible Unicode marks, and logs the build target. The temporary quick-tunnel fallback remains until a stable domain is verified.
+- The local Docker database has **8/8** migrations and 3 published courses. Sprint 2 makes `arabic-3-prep` **199.00 EGP** with course-scoped voucher **`SANAD-2026`**; `arabic-1-prep` remains free and enrolled for the 90-second path. Final demo state: 2 users, 1 enrollment, 0 orders/payments/redemptions; the paid course is intentionally unenrolled so checkout can be demonstrated.
+- Tests: **359/359 API** (35 suites), **158/158 web** (12 files), build **4/4**.
+- Sprint 2 shipped: a server-side **`402 PAYMENT_REQUIRED`** guard for paid direct enrollment; shared idempotent enrollment writes (`source: purchase` / `voucher`) inside payment and voucher transactions; structured voucher error codes; the `/checkout/[slug]` voucher page; and paid-course CTAs. No schema or migration changed.
+- Demo tooling: `pnpm demo:paid` reapplies the paid course + voucher via `scripts/demo/seed-paid.ps1`; `docs/DEMO-STABILITY.md` has the runbook. The 90-second student path still starts from `/demo` and the free course.
+- Sprint 1 remains: `scripts/demo/start.ps1`, `stop.ps1`, `smoke.ps1`, `backup.ps1`, and `install-autostart.ps1`, exposed as `pnpm demo:*`; `apps/web/next.config.mjs` resolves `API_PROXY_TARGET` / `DEMO_TUNNEL_ORIGIN`, strips invisible Unicode marks, and logs the build target. The temporary quick-tunnel fallback remains until a stable domain is verified.
 - Mock teacher screens are gone: analytics redirects to `/teacher`; course builder/preview/publish redirect to the real course workspace; analytics was removed from the teacher nav; dead creation commands were replaced. Root `not-found.tsx`, `error.tsx`, and `loading.tsx` render branded dark/light system pages.
-- Open demo-stability work: claim a free ngrok static domain, set its authtoken locally, start with `pnpm demo:start -- -Tunnel ngrok -NgrokDomain <domain> -Watch`, set Vercel Production `API_PROXY_TARGET=https://<domain>`, redeploy once, verify, then remove the hardcoded fallback. Do not install autostart before the stable domain exists.
-- No API schema, migration, RLS, outbox, Bull, video-webhook, or payment behavior changed in Sprint 1. Those known gaps remain as documented below.
+- Open: stable ngrok domain + autostart (same plan as Sprint 1); voucher-only checkout for the demo, with a real Paymob/Fawry sandbox charge and refund still P2; RLS runtime, outbox dispatcher, video webhook, Bull processors, and other known gaps below remain open.
+- No API schema, migration, RLS, outbox, Bull, video-webhook, or payment-provider behavior changed in Sprint 2. The payment logic change is enrollment/settlement wiring only.
 
 ## Previous verified release — 2026-10-28
 
-> Historical state. Superseded by the 2026-11-13 block above; the details are kept as an audit trail.
+> Historical state. Superseded by the 2026-11-14 block above; the details are kept as an audit trail.
 
 - Production branch `main`. Web runtime code `cd03fb0` (web-only SANAD grading selector on top of `5ac122d`; Vercel auto-deploy; later docs-only commits do not change runtime code). API deployment `5ac122d` via manual `railway up` (deployment `16a33f07-f1dd-404f-b110-ba4497ac7408`, status SUCCESS). Web `https://sanad-edtech.vercel.app`; API `https://sanad-edtech-production.up.railway.app`.
 - `/api/health` = **200**, database **up**; `sanad-demo` has 3 published Arabic prep courses + exam/assignment. The demo assignment is now `maxAttempts=2`; the demo student has submitted attempts 1 and 2 from the production smoke.
