@@ -25,7 +25,7 @@
 
 > Canonical document: `docs/CURRENT-STATE.md`. This is the state to use for answers and documentation. Older entries below are an audit trail.
 
-- `main` is at `1c09fe0` (Sprint 1 demo hardening; Vercel deployment SUCCESS). Web is live at `https://sanad-edtech.vercel.app`; API code is unchanged at `5ac122d`, but the current demo API is the local compiled NestJS API on `:3002` exposed through the Cloudflare quick tunnel `https://timer-surprised-governing-prize.trycloudflare.com`. The Railway API remains a separate historical deployment.
+- Web runtime code is `1c09fe0` (Sprint 1 demo hardening; Vercel deployment SUCCESS); later docs-only commits may be newer on `main`. Web is live at `https://sanad-edtech.vercel.app`; API code is unchanged at `5ac122d`, but the current demo API is the local compiled NestJS API on `:3002` exposed through the Cloudflare quick tunnel `https://timer-surprised-governing-prize.trycloudflare.com`. The Railway API endpoint currently returns **404 `Application not found`**; treat it as retired.
 - `/api/health` through the web domain is **200** with database **up**. `/demo` is **200**; one-click student and teacher access, the demo banner, the analytics-to-dashboard redirect, and the branded Arabic 404 were verified live.
 - The live student state matches the local Docker database (3 courses, 0 submissions), not the Railway demo state (3 submissions). The local database has **8/8** migrations.
 - Tests: **357/357 API** (35 suites), **150/150 web** (10 files), build **4/4**.
