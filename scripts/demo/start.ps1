@@ -171,9 +171,16 @@ function Test-ProcessRunning([int]$ProcessId) {
 }
 
 function Test-ApiHealth {
-  $body = curl.exe -sS --max-time 5 "http://localhost:$ApiPort/api/health" 2>$null
-  if ($LASTEXITCODE -ne 0) { return $false }
-  return ($body -match '"status"\s*:\s*"ok"')
+  # Do not use curl.exe here: under $ErrorActionPreference = "Stop", a
+  # connection-refused native stderr line becomes a terminating error and the
+  # startup loop aborts before the API has a chance to bind. Invoke-WebRequest
+  # with an explicit try/catch keeps the wait loop alive.
+  try {
+    $response = Invoke-WebRequest -Uri "http://localhost:$ApiPort/api/health" -UseBasicParsing -TimeoutSec 5 -ErrorAction Stop
+    return ($response.StatusCode -eq 200 -and $response.Content -match '"status"\s*:\s*"ok"')
+  } catch {
+    return $false
+  }
 }
 
 function Wait-ApiHealthy([int]$Attempts = 30) {
