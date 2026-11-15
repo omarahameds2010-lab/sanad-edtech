@@ -60,6 +60,7 @@ $allowedOrigins = "$WebOrigin,http://localhost:3001,http://127.0.0.1:3001"
 $script:ApiPid = 0
 $script:TunnelPid = 0
 $script:PublicUrl = $null
+$script:SyncPending = $false
 
 function Write-Step([string]$Message) {
   Write-Host "[demo] $Message" -ForegroundColor Cyan
@@ -472,18 +473,24 @@ function Show-DemoSummary {
 }
 
 function Sync-VercelFallback {
-  if (-not $SyncFallback) { return }
+  if (-not $SyncFallback) {
+    $script:SyncPending = $false
+    return
+  }
   if ($Tunnel -ne "cloudflared") {
+    $script:SyncPending = $false
     Write-SyncLog "Skipped: only quick-tunnel URLs need fallback sync."
     return
   }
   if (-not $script:PublicUrl) {
-    Write-SyncLog "Skipped: no public URL."
+    $script:SyncPending = $true
+    Write-SyncLog "Skipped: no public URL yet; will retry."
     return
   }
 
   $configPath = Join-Path $repoRoot "apps\web\next.config.mjs"
   if (-not (Test-Path $configPath)) {
+    $script:SyncPending = $false
     Write-SyncLog "Skipped: apps/web/next.config.mjs was not found."
     return
   }
@@ -492,10 +499,12 @@ function Sync-VercelFallback {
   $pattern = '(?s)(const FALLBACK_DEMO_TUNNEL_ORIGIN\s*=\s*\r?\n\s*")[^"]+(")'
   $match = [regex]::Match($content, $pattern)
   if (-not $match.Success) {
+    $script:SyncPending = $false
     Write-SyncLog "Skipped: fallback marker was not found."
     return
   }
   if (($match.Groups[1].Value + $script:PublicUrl + $match.Groups[2].Value) -eq $match.Value) {
+    $script:SyncPending = $false
     Write-SyncLog "Fallback already points at $($script:PublicUrl)."
     return
   }
@@ -505,24 +514,28 @@ function Sync-VercelFallback {
   $branchResult = Invoke-GitCapture @("rev-parse", "--abbrev-ref", "HEAD")
   $branch = if ($branchResult.Output.Count -gt 0) { ([string]$branchResult.Output[0]).Trim() } else { "" }
   if ($branchResult.ExitCode -ne 0 -or $branch -ne "main") {
+    $script:SyncPending = $false
     Write-SyncLog "Skipped: repository is not on main (git exit $($branchResult.ExitCode), branch '$branch')."
     return
   }
 
   $statusResult = Invoke-GitCapture @("status", "--porcelain")
   if ($statusResult.ExitCode -ne 0) {
-    Write-SyncLog "Skipped: git status failed (exit $($statusResult.ExitCode))."
+    $script:SyncPending = $true
+    Write-SyncLog "Skipped: git status failed (exit $($statusResult.ExitCode)); will retry."
     return
   }
   $unrelated = @($statusResult.Output | Where-Object { $_ -notmatch '^\?\?' })
   if ($unrelated.Count -gt 0) {
+    $script:SyncPending = $false
     Write-SyncLog "Skipped: working tree has tracked changes; commit or stash them first."
     return
   }
 
   $fetchResult = Invoke-GitCapture @("fetch", "origin", "main", "--quiet")
   if ($fetchResult.ExitCode -ne 0) {
-    Write-SyncLog "Skipped: git fetch failed (exit $($fetchResult.ExitCode))."
+    $script:SyncPending = $true
+    Write-SyncLog "Skipped: git fetch failed (exit $($fetchResult.ExitCode)); will retry."
     return
   }
   $headResult = Invoke-GitCapture @("rev-parse", "HEAD")
@@ -530,6 +543,7 @@ function Sync-VercelFallback {
   $head = if ($headResult.Output.Count -gt 0) { ([string]$headResult.Output[0]).Trim() } else { "" }
   $remote = if ($remoteResult.Output.Count -gt 0) { ([string]$remoteResult.Output[0]).Trim() } else { "" }
   if (-not $head -or -not $remote -or $head -ne $remote) {
+    $script:SyncPending = $false
     Write-SyncLog "Skipped: local main is not identical to origin/main."
     return
   }
@@ -542,21 +556,25 @@ function Sync-VercelFallback {
 
   $addResult = Invoke-GitCapture @("add", "--", "apps/web/next.config.mjs")
   if ($addResult.ExitCode -ne 0) {
-    Write-SyncLog "git add failed (exit $($addResult.ExitCode)): $($addResult.Output -join ' ')"
+    $script:SyncPending = $true
+    Write-SyncLog "git add failed (exit $($addResult.ExitCode)); will retry: $($addResult.Output -join ' ')"
     return
   }
   $message = "chore: sync demo tunnel fallback"
   $body = "Automated by scripts/demo/start.ps1 because the Cloudflare quick tunnel changed to $($script:PublicUrl)."
   $commitResult = Invoke-GitCapture @("commit", "-m", $message, "-m", $body)
   if ($commitResult.ExitCode -ne 0) {
-    Write-SyncLog "git commit failed (exit $($commitResult.ExitCode)): $($commitResult.Output -join ' ')"
+    $script:SyncPending = $true
+    Write-SyncLog "git commit failed (exit $($commitResult.ExitCode)); will retry: $($commitResult.Output -join ' ')"
     return
   }
   $pushResult = Invoke-GitCapture @("push", "origin", "main")
   if ($pushResult.ExitCode -ne 0) {
-    Write-SyncLog "Commit created but git push failed (exit $($pushResult.ExitCode)): $($pushResult.Output -join ' ')"
+    $script:SyncPending = $true
+    Write-SyncLog "Commit created but git push failed (exit $($pushResult.ExitCode)); will retry: $($pushResult.Output -join ' ')"
     return
   }
+  $script:SyncPending = $false
   Write-SyncLog "Pushed the fallback update; Vercel will redeploy automatically."
 }
 
@@ -578,11 +596,16 @@ function Watch-Demo {
         if ($script:PublicUrl -ne $previousUrl) {
           Write-DemoWarning "Tunnel URL changed: $previousUrl -> $($script:PublicUrl)"
           if ($SyncFallback) {
+            $script:SyncPending = $true
             Sync-VercelFallback
           } else {
             Write-DemoWarning "Update Vercel API_PROXY_TARGET and redeploy, or use a stable ngrok domain."
           }
         }
+      }
+
+      if ($SyncFallback -and $Tunnel -eq "cloudflared" -and $script:SyncPending) {
+        Sync-VercelFallback
       }
 
       Write-DemoState
@@ -604,6 +627,7 @@ try {
 
   Write-Step "Starting tunnel ($Tunnel)..."
   Start-Tunnel
+  $script:SyncPending = $true
   Sync-VercelFallback
   Write-DemoState
   Show-DemoSummary
