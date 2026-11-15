@@ -34,6 +34,7 @@
 | Live judge path | **passed 15 Nov 2026**: `/demo`, one-click student/teacher, demo banner, analytics-to-dashboard redirect, checkout **200**, direct paid enroll **402** | Browser + HTTP through the web domain |
 | Live authenticated smoke | **8/8 passed** 15 Nov 2026: health, public catalog, teacher login/tenant/courses, student login/assignments/enrollments | `pnpm demo:smoke -- -BaseUrl https://sanad-edtech.vercel.app` |
 | Autostart + fallback sync | **passed 15 Nov 2026**: hidden watchdog restarted the tunnel, wrote the new fallback, committed `6c98134`, pushed, and live health returned **200** | Installed Startup entry + sync log |
+| Cold Docker recovery | **passed 15 Nov 2026**: stopped Docker Desktop → health **503** → watchdog restarted Docker/PostgreSQL/API → health **200** in about 40 seconds | Hidden watchdog, no manual step |
 | Local migration chain | **8/8**; schema up to date | `prisma migrate status` against Docker |
 | Backup/restore proof | Custom dump + globals restored into local PostgreSQL 18: 44 tables, 3 courses, 1 submission, 7 migrations at backup time | Docker `pg_dump` / `pg_restore` |
 | Production retake smoke (historical) | **31/31**: concurrent start 201+409, attempt 1 submit, attempt 2 submit, third 400, teacher queue excludes active, health 200 | Node script through the production web domain |

@@ -161,6 +161,8 @@ pnpm demo:autostart -- -Tunnel cloudflared -SyncFallback -StartNow
 
 > الـStartup entry بيشتغل عند تسجيل دخول Windows، مش قبل كده. لو اللابتوب واقف على شاشة القفل بعد الـReboot، الديمو مش هيرجع لحد ما تسجل دخول.
 
+> تم اختبار Cold Start جزئياً: إيقاف Docker Desktop يدوياً خلى `/api/health` يرجع 503، والـWatchdog شغّل Docker وPostgreSQL والـAPI تاني، والموقع رجع **200** في حوالي 40 ثانية. لكن Reboot كامل + Logon لسه متجربش.
+
 > ده الحل المؤقت. متستخدمهوش كبديل نهائي لو تقدر تظبط ngrok static domain.
 
 ### بعد ngrok — الرابط الثابت
