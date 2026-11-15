@@ -101,56 +101,79 @@ curl.exe -s https://sanad-edtech.vercel.app/api/health
 > `API_PROXY_TARGET` هو المتغير الصحيح. لا تستخدم `NEXT_PUBLIC_API_URL`.
 > الكود يدعم أيضاً `DEMO_TUNNEL_ORIGIN` كـFallback، لكن `API_PROXY_TARGET` هو الأولوية.
 
-## 4) إزالة الـHardcoded Fallback
+## 4) الـTunnel السريع والـFallback
 
-حالياً `apps/web/next.config.mjs` فيه Fallback مؤقت للـTunnel الحالي عشان الموقع الحي ما يقعش:
+الوضع الحالي مؤقت: الـAutostart مثبت على Cloudflare quick tunnel مع `-SyncFallback`. الرابط الحالي:
 
 ```text
-https://triangle-games-doug-requires.trycloudflare.com
+https://rich-pursuit-martin-car.trycloudflare.com
 ```
 
-لو الـQuick Tunnel اتغير (بعد Reboot أو إعادة تشغيل cloudflared):
+عند كل تغيير في رابط الـQuick Tunnel:
+
+1. `start.ps1` يحدّث `FALLBACK_DEMO_TUNNEL_ORIGIN` في `apps/web/next.config.mjs`.
+2. يعمل Commit للملف ده فقط، وبس لو الفرع `main` نظيف ومتزامن مع `origin/main`.
+3. يعمل Push؛ Vercel بيعمل Redeploy تلقائي.
+4. الـWatchdog بيعيد محاولة `git fetch` / `git push` لو النت مش جاهز وقت الـLogon.
+
+اللوج:
+
+```text
+%TEMP%\sanad-local\vercel-sync.log
+```
+
+> ده Bridge مؤقت: لسه فيه Vercel Redeploy ووقت قصير بعد الـReboot. الحل النهائي هو ngrok static domain عشان الرابط ما يتغيرش أصلاً.
+
+لو عايز تعملها يدوياً بدل الـSync:
 
 1. شغّل `pnpm demo:start -- -Tunnel cloudflared` وسجّل الرابط الجديد من `%TEMP%\sanad-local\tunnel.url`.
 2. حدّث `FALLBACK_DEMO_TUNNEL_ORIGIN` في `apps/web/next.config.mjs`.
 3. شغّل `pnpm --filter web build` وتأكد إن البناء يطبع الرابط الجديد.
 4. اعمل Commit/Push؛ Vercel هيعمل Redeploy تلقائي، وبعدها اتأكد من `/api/health` عبر الدومين.
 
-ده حل مؤقت. لو `API_PROXY_TARGET` متظبط في Vercel، غيّره للرابط الجديد بدل تعديل الكود. الهدف النهائي يفضل ngrok static domain عشان الرابط ما يتغيرش.
-
-بعد ما تتأكد إن:
-
-- `API_PROXY_TARGET` وصل فعلاً لبناء Vercel.
-- `/api/health` عبر الدومين `200`.
-- تسجيل الدخول شغال.
-
-نشيل الـFallback في Commit منفصل. الكود بيطبع وقت البناء:
+لو `API_PROXY_TARGET` متظبط في Vercel، غيّره للرابط الجديد بدل تعديل الكود. الكود بيطبع وقت البناء:
 
 ```text
 [next.config] API proxy target: ...
 ```
 
-راجع اللوج في Vercel build وتأكد إنه الدومين الثابت، مش القديم.
+بعد ngrok static domain:
+
+- شغّل بـ `-Tunnel ngrok -NgrokDomain <domain>`.
+- اضبط `API_PROXY_TARGET=https://<domain>` في Vercel Production.
+- اعمل Redeploy وتحقق من `/api/health` وتسجيل الدخول.
+- أعد تثبيت الـAutostart بدون `-SyncFallback`.
 
 ## 5) التشغيل التلقائي بعد الـReboot
 
+### الوضع المؤقت الحالي — Quick Tunnel + Fallback Sync
+
 ```powershell
-pnpm demo:autostart -- -Tunnel ngrok -NgrokDomain sanad-demo.ngrok.app -StartNow
+pnpm demo:autostart -- -Tunnel cloudflared -SyncFallback -StartNow
 ```
 
 السكربت يضيف `SANAD-Demo.cmd` في Startup Folder الخاص بالمستخدم.
 عند كل Logon:
 
-- يبدأ `start.ps1 -Watch` مخفي.
-- الـWatchdog يعيد تشغيل أي جزء وقع.
+- يبدأ `start.ps1 -Tunnel cloudflared -Watch -SyncFallback` مخفي.
+- الـWatchdog يعيد تشغيل الـAPI والـTunnel لو وقعوا.
+- لو الرابط اتغير، يحدّث الـFallback ويعمل Commit/Push عشان Vercel يعمل Redeploy.
+
+> ده الحل المؤقت. متستخدمهوش كبديل نهائي لو تقدر تظبط ngrok static domain.
+
+### بعد ngrok — الرابط الثابت
+
+```powershell
+pnpm demo:autostart -- -Tunnel ngrok -NgrokDomain sanad-demo.ngrok.app -StartNow
+```
+
+هنا الرابط ثابت، ومش محتاج `-SyncFallback`.
 
 لإزالة التشغيل التلقائي:
 
 ```powershell
 pnpm demo:autostart -- -Remove
 ```
-
-> لو الدومين الثابت مش متظبط، التشغيل التلقائي هيعيد تشغيل Tunnel برابط جديد، والموقع هيفضل مكسور لحد ما Vercel يتحدث. متستخدمهوش قبل تثبيت الدومين.
 
 ## 6) Smoke Test
 
@@ -248,6 +271,8 @@ pnpm demo:paid
 | ---------------------- | ------------------------------------------------- | --------------------------------------------------- |
 | `404` على `/api/*`     | `API_PROXY_TARGET` غلط أو Vercel لم يعمل Redeploy | صحّح المتغير، أعد النشر، راجع Build Log             |
 | `502 Bad Gateway`      | الـQuick Tunnel اتغير أو الـAPI وقع               | راجع `tunnel.url` واللوج، شغّل `start.ps1`، حدّث الـFallback أو `API_PROXY_TARGET` وأعد النشر |
+| الـFallback مش بيتحدث تلقائياً | Sync متخطي: فرع مش `main`، شغل متغير، أو نت/صلاحيات Git | راجع `%TEMP%\sanad-local\vercel-sync.log`، نظّف الـWorking Tree، وتأكد إن `main` متزامن مع `origin/main` |
+| الموقع واقع دقائق بعد الـReboot | Quick Tunnel + Vercel Redeploy | ده متوقع في الوضع المؤقت؛ استخدم ngrok static domain للرابط الثابت |
 | `pnpm demo:start` يفضل ماسك التيرمنال بعد الملخص | الـAPI والـTunnel عمليات طويلة العمر | ده متوقع؛ استخدم `-Watch` أو شغّله مخفي عبر Autostart، ومتقفلش العملية بالغلط |
 | `Tenant not found`     | الـHost header أو `tenant_domains` ناقص           | شغّل السكربت، وتأكد من `PROD_TENANT_DOMAINS`        |
 | `403 ORIGIN_REJECTED`  | `ALLOWED_ORIGINS` لا يحتوي دومين Vercel           | راجع `start.ps1` أو أعد تشغيله                      |
@@ -261,5 +286,6 @@ pnpm demo:paid
 - الـTunnel يفتح الـAPI على الإنترنت. للديمو فقط.
 - لا تضع بيانات طلاب حقيقيين على اللابتوب.
 - لا ترفع `.env.local` أو `ngrok` token أو Backup إلى Git.
+- الـ`-SyncFallback` بيعمل Commit للملف `apps/web/next.config.mjs` فقط، وبس على `main` نظيف ومتزامن مع `origin/main`. لو فيه تغييرات تانية، بيتخطى ويكتب السبب في اللوج.
 - أوقف الـTunnel بعد انتهاء العرض لو مش محتاجه.
 - لو الـAPI اتفتح على الإنترنت، راجع Rate Limits و`ALLOWED_ORIGINS` قبل أي استخدام حقيقي.

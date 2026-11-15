@@ -9,10 +9,11 @@
 | Item | Value |
 | --- | --- |
 | Production branch | `main` (GitHub's default branch is `master`; Vercel follows `main`) |
-| Web runtime code | Sprint 2 paid checkout (`aa4d2bc`) + tunnel fallback refresh (`22a5a44`) — 14–15 November 2026 |
+| Web runtime code | Sprint 2 paid checkout (`aa4d2bc`) + tunnel fallback sync (`6c98134`, config only) — 14–15 November 2026 |
 | API code | Sprint 2 paid checkout (`aa4d2bc`) — 14 November 2026; local compiled API, no schema or migration change |
 | API runtime | Local compiled NestJS API on `:3002`; start with `pnpm demo:start` |
-| API public origin | <https://triangle-games-doug-requires.trycloudflare.com> — Cloudflare quick tunnel; the URL changes on restart until a stable ngrok domain is configured |
+| Demo launcher | `scripts/demo/start.ps1` at `75ab061`; Windows Startup entry installed with `-Tunnel cloudflared -Watch -SyncFallback` |
+| API public origin | <https://rich-pursuit-martin-car.trycloudflare.com> — Cloudflare quick tunnel; the URL changes on restart until a stable ngrok domain is configured |
 | Web | <https://sanad-edtech.vercel.app> |
 | API through the web domain | <https://sanad-edtech.vercel.app/api/health> (Vercel rewrite to the current tunnel) |
 | Health check | `/api/health` → **200** `{"status":"ok","database":"up"}` (15 November 2026) |
@@ -20,7 +21,7 @@
 | Database | Local Docker PostgreSQL `learning_platform`; **8/8** Prisma migrations, 3 published courses (one paid: `arabic-3-prep`, 199 EGP), 1 enrollment, 0 orders/payments/voucher redemptions at final verification |
 | Demo tenant | `sanad-demo` |
 
-The quick tunnel was restarted on 15 November 2026 after the local API and tunnel processes stopped. The fallback in `apps/web/next.config.mjs` was refreshed to the new URL in `22a5a44`, Vercel redeployed, and `/api/health`, `/demo`, the paid checkout page, one-click student/teacher access, and the analytics redirect were re-verified. This is still a temporary URL; the stable ngrok-domain work from Sprint 1 is not done.
+The quick tunnel restarted during the 15 November 2026 autostart test. The launcher obtained `https://rich-pursuit-martin-car.trycloudflare.com`, updated the fallback in `6c98134`, and pushed; Vercel redeployed and `/api/health` returned **200**. A Windows Startup entry now runs the launcher hidden at logon with `-Watch -SyncFallback`, and the watchdog retries `git fetch`/`git push` if the network is not ready. This is still a temporary bridge: it causes a Vercel redeploy after a URL change, so a stable ngrok static domain remains the target.
 
 The Railway API endpoint (`https://sanad-edtech-production.up.railway.app`) currently returns **404 `Application not found`**; treat it as retired. The current demo web app is proxied to the laptop tunnel. The live student dashboard shows 0 submissions, matching the local Docker database (0 rows), not the Railway demo state (3 submissions). Railway's GitHub-linked service also did **not** auto-deploy the 28 October push; do not assume a push to `main` redeploys that API until the integration is fixed.
 
@@ -45,10 +46,11 @@ The demo assignment was set to `maxAttempts = 2` for the production retake smoke
 | --- | --- |
 | API unit suite on Sprint 2 code | **359 / 359 passed**, 35 suites, run 14 November 2026 (`pnpm --filter api exec jest --config jest.config.js --runInBand`) |
 | Web unit suite on Sprint 2 code | **158 / 158 passed**, 12 files, run 14 November 2026 (`pnpm --filter web test`) |
-| Monorepo build | **4/4 tasks successful** (`pnpm build`); re-run 15 November 2026 at `22a5a44` |
+| Monorepo build | **4/4 tasks successful** (`pnpm build`); re-run 15 November 2026 at `75ab061` |
 | Paid checkout HTTP smoke | **passed**: paid direct enroll **402 `PAYMENT_REQUIRED`**; invalid voucher **400 `VOUCHER_NOT_FOUND`**; valid voucher **201**, `success: true`, enrollment `source=voucher`, replay stays one redemption; temporary user and rows removed |
 | Paid checkout browser QA | **passed locally and live**: paid CTA → `/checkout/arabic-3-prep`; live voucher `SANAD-2026` created the order and intent (**201**) and showed “تم تفعيل الكورس”; the temporary purchase was removed so the demo remains unenrolled for checkout |
-| Live judge path | **passed 15 November 2026** after `22a5a44`: `/demo` **200**; one-click student and teacher access reached `/student` and `/teacher`; demo banner present; teacher navigation has no analytics link; `/teacher/analytics` redirects to `/teacher`; `/checkout/arabic-3-prep` **200**; direct paid enrollment **402 `PAYMENT_REQUIRED`**; `/api/health` **200** |
+| Live judge path | **passed 15 November 2026** after the fallback sync: `/demo` **200**; one-click student and teacher access reached `/student` and `/teacher`; demo banner present; teacher navigation has no analytics link; `/teacher/analytics` redirects to `/teacher`; `/checkout/arabic-3-prep` **200**; direct paid enrollment **402 `PAYMENT_REQUIRED`**; `/api/health` **200** |
+| Autostart + fallback sync | **passed 15 November 2026**: the installed hidden watchdog restarted the quick tunnel, wrote the new fallback, committed `6c98134`, pushed, and Vercel redeployed; the sync log recorded the change and live health returned **200**. `75ab061` adds a retry when the logon network is not ready. |
 | Local database | **8/8** migrations, 3 published courses, 1 free enrollment, 0 submissions, 0 orders/payments/voucher redemptions after cleanup (`learning-platform-db`) |
 | Production migration chain | **8/8**; `prisma migrate status` reports “Database schema is up to date!” |
 | Migration #8 schema checks | `attemptNumber` NOT NULL default 1; `startedAt` NOT NULL default CURRENT_TIMESTAMP; `submittedAt` nullable; unique key `(assignmentId, studentId, attemptNumber)`; `SubmissionStatus` includes `IN_PROGRESS` |
@@ -56,7 +58,7 @@ The demo assignment was set to `maxAttempts = 2` for the production retake smoke
 | Backup before migration | Custom-format dump + globals, restore-tested into a local PostgreSQL 18 container: **44 tables, 3 courses, 1 submission, 7 migrations** at backup time |
 | Production retake smoke | **31/31 checks passed**: metadata-only list, `maxAttempts=2`, concurrent start **201 + 409**, attempt 1 submit, attempt 2 start/submit, third attempt **400**, teacher queue excludes `IN_PROGRESS` and includes both submitted attempts, health **200** |
 | Production lock-card QA | Assignment lesson temporarily set to `LOCKED` with `ENTER_ASSIGNMENT`; the student page rendered «الواجب مقفل» and «لفتح هذا الواجب، سلّم الواجب السابق أولًا.» in dark and light themes with no horizontal overflow; the lesson was restored to `UNLOCKED`/`NONE` |
-| Live health | Web `/api/health` returns **200**, database **up**, through the refreshed laptop tunnel (`triangle-games-doug-requires.trycloudflare.com`); the direct Railway endpoint remains a separate historical deployment |
+| Live health | Web `/api/health` returns **200**, database **up**, through the current laptop tunnel (`rich-pursuit-martin-car.trycloudflare.com`); the direct Railway endpoint remains a separate historical deployment |
 | Fresh local chain (historical) | Local PostgreSQL 15: **8/8** migrations and `prisma migrate diff` no drift |
 | Pre-merge branch evidence (historical) | API **344/344** on `feat/security-quick-wins`; API **353/353**, web **145/145** on `feat/assignment-retakes`; local retake, concurrent-start, and lock-card QA |
 
@@ -68,12 +70,13 @@ Sprint 1 makes the judge path survive a laptop reboot without changing the Verce
 
 - Added `scripts/demo/start.ps1` (Docker, compiled API, tunnel, optional watchdog), `stop.ps1`, `smoke.ps1`, `backup.ps1`, and `install-autostart.ps1`, exposed as `pnpm demo:start`, `demo:start:watch`, `demo:stop`, `demo:smoke`, `demo:backup`, and `demo:autostart`.
 - `start.ps1` now probes API health with `Invoke-WebRequest` instead of `curl.exe`. The old probe could abort the retry loop because native stderr became a terminating error under `$ErrorActionPreference = "Stop"`, which made startup look failed even though the API was still binding. Verified on 15 November: the launcher reused the healthy API on `:3002` and started the new tunnel.
+- A Windows Startup entry is installed and runs the launcher hidden with `-Tunnel cloudflared -Watch -SyncFallback`. On a URL change, the launcher updates the fallback, commits only that file on clean `main`, and pushes so Vercel redeploys. The watchdog retries `git fetch`/`git push` when the logon network is not ready. This is a temporary bridge, not a stable URL.
 - Added the runbook in [`DEMO-STABILITY.md`](DEMO-STABILITY.md): stable ngrok domain setup, Cloudflare quick-tunnel fallback, watchdog, smoke, backup, autostart, and troubleshooting.
-- `apps/web/next.config.mjs` now resolves the API proxy from `API_PROXY_TARGET` or `DEMO_TUNNEL_ORIGIN`, strips invisible Unicode marks (LRM/RLM/ZWSP/BOM), validates the origin, and logs the target during the Vercel build. The temporary hardcoded quick-tunnel fallback remains until a stable domain is configured and verified.
+- `apps/web/next.config.mjs` resolves the API proxy from `API_PROXY_TARGET` or `DEMO_TUNNEL_ORIGIN`, strips invisible Unicode marks (LRM/RLM/ZWSP/BOM), validates the origin, and logs the target during the Vercel build. The quick-tunnel fallback is currently kept in sync by `-SyncFallback`; a stable domain remains the target.
 - Removed the four fabricated teacher screens: `/teacher/analytics` redirects to `/teacher`; course `builder`, `preview`, and `publish` redirect to the real course workspace. Analytics was removed from the teacher navigation and command palette, and dead creation commands were replaced with real publish/payments commands.
 - Added branded Arabic `not-found.tsx`, `error.tsx`, and `loading.tsx` with dark/light styles in `apps/web/app/system-pages.css`.
 - Verified locally: start/stop on an isolated `:3099` API, public smoke **2/2**, backup dump **0.25 MB**, autostart install/remove, browser QA of student and teacher one-click access, redirects, and the 404 in dark/light themes. The live deployment then verified `/demo`, both one-click logins, the teacher dashboard, the analytics redirect, and the branded 404.
-- Remaining: install ngrok, claim a free static domain, set its authtoken locally, start with `pnpm demo:start -- -Tunnel ngrok -NgrokDomain <domain> -Watch`, set Vercel Production `API_PROXY_TARGET=https://<domain>`, redeploy once, and verify before removing the hardcoded fallback. Do not install autostart before the stable domain exists.
+- Remaining: install ngrok, claim a free static domain, set its authtoken locally, start with `pnpm demo:start -- -Tunnel ngrok -NgrokDomain <domain> -Watch`, set Vercel Production `API_PROXY_TARGET=https://<domain>`, redeploy once, and verify before removing the quick-tunnel sync. The current autostart keeps the demo alive across a reboot but still redeploys Vercel when the quick-tunnel URL changes.
 
 ## Sprint 2 paid checkout — 2026-11-14
 
@@ -85,8 +88,8 @@ Sprint 2 closes the free-enrollment hole for paid courses and adds the student-f
 - **Web checkout:** paid courses route to `/checkout/[slug]`; free courses keep the existing direct-enroll button. The checkout page validates the voucher server-side, creates the order, then creates a `VOUCHER` payment intent with a stable retry key. It handles success, already-enrolled, free, unauthenticated, loading, and error states.
 - **Demo data:** `arabic-3-prep` is **199.00 EGP**; the course-scoped voucher is **`SANAD-2026`**. Apply it with `pnpm demo:paid`. `arabic-1-prep` remains free and enrolled for the 90-second path.
 - **Local proof:** API **359/359**, web **158/158**, API/web `tsc --noEmit` clean, root build **4/4**, HTTP paid-checkout smoke passed, and browser QA reached “تم تفعيل الكورس” then showed the paid course in the student's course list. The test purchase was removed afterward; the demo database is back to 1 enrollment, 0 orders, 0 payments, and an unused voucher.
-- **Live proof:** on 14 November 2026, `/checkout/arabic-3-prep` was **200**; the live voucher flow accepted **`SANAD-2026`**, created the order and intent (**201**), and showed “تم تفعيل الكورس”. The test purchase was then removed, restoring 1 free enrollment, 0 orders/payments, and an unused voucher. After the 15 November tunnel refresh (`22a5a44`), the checkout page, one-click student/teacher paths, and the direct-enroll **402** guard were re-verified through `https://sanad-edtech.vercel.app`.
-- **Still open:** the checkout page is voucher-only for the demo. A real Paymob/Fawry card sandbox charge and refund remain on the P2 list, as does the stable tunnel/autostart work from Sprint 1.
+- **Live proof:** on 14 November 2026, `/checkout/arabic-3-prep` was **200**; the live voucher flow accepted **`SANAD-2026`**, created the order and intent (**201**), and showed “تم تفعيل الكورس”. The test purchase was then removed, restoring 1 free enrollment, 0 orders/payments, and an unused voucher. After the 15 November fallback sync (`6c98134`), `/demo`, one-click student/teacher access, the analytics redirect, the checkout page, and the direct-enroll **402** guard were re-verified through `https://sanad-edtech.vercel.app`.
+- **Still open:** the checkout page is voucher-only for the demo. A real Paymob/Fawry card sandbox charge and refund remain on the P2 list. The demo autostart is installed with a temporary quick-tunnel sync; a stable ngrok domain and a pinned `API_PROXY_TARGET` remain the next stability step.
 
 ## Stack and repository facts
 
@@ -172,9 +175,9 @@ Do not overstate the following controls; each row is the current limit.
 | Content versioning | Courses, lessons, and exams do not have a separate version/snapshot table. Publishing updates the current row; old attempts are not guaranteed to point at an immutable content version. |
 | Assignment retakes | Live with migration #8; `maxAttempts` is server-enforced and concurrent starts are serialized to one `201` and one `409`. The demo assignment is configured with `maxAttempts=2`. |
 | Railway auto-deploy | The GitHub-linked Railway service did not create a deployment for the 28 October push. The API was deployed manually with `railway up`; verify the deployment status after each push until the integration is fixed. |
-| Demo tunnel | The live web app currently uses a Cloudflare quick tunnel. The URL changed on 15 November 2026 when the local API/tunnel processes restarted; the fallback was refreshed in `22a5a44` and Vercel redeployed. A reboot still requires either a refreshed URL or a pinned `API_PROXY_TARGET`; a free ngrok static domain is the next step; see `docs/DEMO-STABILITY.md`. |
-| Demo autostart | The Windows Startup-folder entry is not installed yet. `pnpm demo:autostart` is a manual step after the stable ngrok domain exists; installing it before that would start a tunnel with a new URL at every logon. |
-| Vercel proxy environment | The local machine does not have the Vercel CLI, so the production `API_PROXY_TARGET` value has not been inspected directly. The live deployment currently works through the refreshed hardcoded fallback in `22a5a44`; confirm the env value when the stable domain is configured. |
+| Demo tunnel | The live web app uses a Cloudflare quick tunnel. The URL changed on 15 November 2026 when the local API/tunnel processes restarted; the launcher wrote the new fallback in `6c98134` and Vercel redeployed. `-SyncFallback` keeps the fallback current across a reboot, but it still causes a Vercel redeploy and a short outage. A free ngrok static domain remains the next step; see `docs/DEMO-STABILITY.md`. |
+| Demo autostart | Installed: the Windows Startup entry runs `start.ps1 -Tunnel cloudflared -Watch -SyncFallback` hidden at logon. It was exercised on 15 November 2026 (new tunnel, fallback commit/push, live health **200**), but a real reboot was not performed. The sync is a temporary bridge until the URL is stable. |
+| Vercel proxy environment | The local machine does not have the Vercel CLI, so the production `API_PROXY_TARGET` value has not been inspected directly. The live deployment currently works through the synced hardcoded fallback; confirm the env value when the stable domain is configured. |
 | SETH-9 advanced security | Post-quantum signing, zero-knowledge delivery, homomorphic grading, active deception, and crypto-shredding are **not implemented**. A dependency-ordered, phased roadmap/ADR is recorded in [`SETH-9-ROADMAP.md`](SETH-9-ROADMAP.md). |
 | Exam auto-submit | The student client submits when the timer reaches zero; the API records a late submit as `TIMED_OUT`. There is no server-side scheduled auto-submit worker. |
 | Reconciliation | `ReconciliationRun`, `ReconciliationItem`, and settlement models exist, but there is no live reconciliation worker or route. |

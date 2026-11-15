@@ -7,12 +7,13 @@
 | Item | Value |
 | --- | --- |
 | Production branch | `main` |
-| Web runtime code | Sprint 2 paid checkout (`aa4d2bc`) + tunnel fallback refresh (`22a5a44`) — 15 November 2026 |
+| Web runtime code | Sprint 2 paid checkout (`aa4d2bc`) + tunnel fallback sync (`6c98134`) — 15 November 2026 |
 | API runtime | Local compiled NestJS API on `:3002`; no schema or migration change in Sprint 2 |
+| Demo launcher | `scripts/demo/start.ps1` at `75ab061`; Windows Startup entry installed with `-Tunnel cloudflared -Watch -SyncFallback` |
 | Hardening / retakes | **Live** — rate limiting, lock enforcement, authoring-read fixes, and assignment retakes |
 | Sprint 2 paid checkout | **Implemented, deployed, and live-verified** — `402` paid-course guard, atomic enrollment, voucher checkout |
 | Web | <https://sanad-edtech.vercel.app> |
-| API public origin | <https://triangle-games-doug-requires.trycloudflare.com> — quick tunnel; changes on restart |
+| API public origin | <https://rich-pursuit-martin-car.trycloudflare.com> — quick tunnel; changes on restart |
 | Health | `/api/health` → **200**, database **up** |
 | Login page | **200** |
 | Demo tenant | `sanad-demo` |
@@ -27,10 +28,11 @@
 | --- | --- | --- |
 | API tests on Sprint 2 code | **359/359**, 35 suites | `pnpm --filter api exec jest --config jest.config.js --runInBand` |
 | Web tests on Sprint 2 code | **158/158**, 12 files | `pnpm --filter web test` |
-| Monorepo build | **4/4** successful; re-run 15 Nov 2026 at `22a5a44` | `pnpm build` |
+| Monorepo build | **4/4** successful; re-run 15 Nov 2026 at `75ab061` | `pnpm build` |
 | Paid checkout HTTP smoke | **passed**: paid direct enroll 402, invalid voucher 400, valid voucher 201, enrollment `source=voucher`, replay one redemption | Local HTTP smoke, 14 Nov 2026 |
 | Paid checkout browser QA | **passed live**: paid CTA → checkout → `SANAD-2026` → order/intent **201** → “تم تفعيل الكورس”; cleanup restored the demo state | Live browser, 14 Nov 2026 |
 | Live judge path | **passed 15 Nov 2026**: `/demo`, one-click student/teacher, demo banner, analytics-to-dashboard redirect, checkout **200**, direct paid enroll **402** | Browser + HTTP through the web domain |
+| Autostart + fallback sync | **passed 15 Nov 2026**: hidden watchdog restarted the tunnel, wrote the new fallback, committed `6c98134`, pushed, and live health returned **200** | Installed Startup entry + sync log |
 | Local migration chain | **8/8**; schema up to date | `prisma migrate status` against Docker |
 | Backup/restore proof | Custom dump + globals restored into local PostgreSQL 18: 44 tables, 3 courses, 1 submission, 7 migrations at backup time | Docker `pg_dump` / `pg_restore` |
 | Production retake smoke (historical) | **31/31**: concurrent start 201+409, attempt 1 submit, attempt 2 submit, third 400, teacher queue excludes active, health 200 | Node script through the production web domain |
@@ -77,7 +79,7 @@ Production retake smoke passed **31/31**; the demo assignment is set to `maxAtte
 | Priority | Gap | What “done” means |
 | --- | --- | --- |
 | P1 | RLS runtime activation | Runtime connects as `app_user`; `MIGRATION_DATABASE_URL` absent from runtime; RLS e2e 5/5 on Railway; isolation re-verified |
-| P1 | Stable demo tunnel + autostart | ngrok static domain or pinned `API_PROXY_TARGET`; autostart installed and a reboot tested with the URL unchanged |
+| P1 | Stable demo tunnel | ngrok static domain or pinned `API_PROXY_TARGET`; URL survives a reboot without a fallback commit/redeploy (autostart is installed and the quick-tunnel sync is tested) |
 | P1 | Outbox dispatcher | Events are delivered, retried, and observable; no longer write-only |
 | P1 | Video webhook | Provider callback route verifies the signature and updates video state |
 | P2 | Railway auto-deploy | A main push creates and reports an API deployment automatically; no manual `railway up` required |
@@ -117,6 +119,6 @@ Production retake smoke passed **31/31**; the demo assignment is set to `maxAtte
 | 2026-10-27 | Retakes branch: attempt model + migration #8, active-attempt ordering, lock/retake UI; 353/353 API and 145/145 web tests, 8/8 local migration chain |
 | 2026-10-28 | Hardening + retakes merged; Railway backup restore-tested; migration #8 applied (8/8); API deployed manually; production retake smoke 31/31; lock card verified dark/light |
 | 2026-11-14 | Sprint 2 paid checkout deployed (`aa4d2bc`); live voucher flow, order/intent 201, `402` guard, and demo-state cleanup verified |
-| 2026-11-15 | Quick tunnel refreshed and fallback updated (`22a5a44`); live health, one-click student/teacher, checkout, and `402` re-verified; launcher health wait fixed |
+| 2026-11-15 | Autostart installed with `-SyncFallback`; hidden watchdog restarted the quick tunnel, synced the fallback (`6c98134`), and live health returned 200; one-click paths and `402` re-verified |
 
 Historical audit: [`AUDIT-2026-10-16.md`](AUDIT-2026-10-16.md). It is preserved as a dated snapshot, not rewritten.
