@@ -1,12 +1,12 @@
 import { fileURLToPath } from "node:url";
 
 /** @type {import('next').NextConfig} */
-// Local dev convention: web on :3001, API on :3002 — same-origin /api proxy
+// Local dev convention: web on :3001, API on :3002 â€” same-origin /api proxy
 // so login works even from a stale cached bundle that still points at the
 // web port itself.
 //
 // Production (Vercel): API_PROXY_TARGET points at the demo tunnel/API, so
-// every /api/* call stays same-origin for the browser — first-party cookies
+// every /api/* call stays same-origin for the browser â€” first-party cookies
 // work (no SameSite=None, no third-party-cookie blocking) and there is no CORS.
 //
 // Fail-safe defaults keep a deploy alive when the env var is missing: a build
@@ -19,7 +19,7 @@ import { fileURLToPath } from "node:url";
 // DEMO_TUNNEL_ORIGIN in Vercel to override this without a code change; remove
 // this fallback after the stable tunnel is verified.
 const FALLBACK_DEMO_TUNNEL_ORIGIN =
-  "https://freebsd-demanding-beginners-allocation.trycloudflare.com";
+  "https://rich-pursuit-martin-car.trycloudflare.com";
 
 /**
  * Normalize a proxy origin.
