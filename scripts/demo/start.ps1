@@ -495,7 +495,7 @@ function Sync-VercelFallback {
     return
   }
 
-  $content = Get-Content -LiteralPath $configPath -Raw
+  $content = [System.IO.File]::ReadAllText($configPath, [System.Text.Encoding]::UTF8)
   $pattern = '(?s)(const FALLBACK_DEMO_TUNNEL_ORIGIN\s*=\s*\r?\n\s*")[^"]+(")'
   $match = [regex]::Match($content, $pattern)
   if (-not $match.Success) {
