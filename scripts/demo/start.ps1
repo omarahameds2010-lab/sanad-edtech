@@ -75,6 +75,25 @@ function Write-SyncLog([string]$Message) {
   Write-Step "Vercel sync: $Message"
 }
 
+function Invoke-GitCapture([string[]]$Arguments) {
+  # Capture git output and its exit code without letting progress written to
+  # stderr terminate the launcher under $ErrorActionPreference = "Stop".
+  # Piping a native command into Select-Object/Out-Null resets $LASTEXITCODE
+  # to -1 in Windows PowerShell, so never check the code after a pipeline.
+  $previous = $ErrorActionPreference
+  $ErrorActionPreference = "Continue"
+  try {
+    $output = & git @Arguments 2>&1
+    $code = $LASTEXITCODE
+    return [pscustomobject]@{
+      ExitCode = $code
+      Output = @($output)
+    }
+  } finally {
+    $ErrorActionPreference = $previous
+  }
+}
+
 function Test-DockerEngine {
   # Native stderr (Docker Desktop not running) can become a terminating error
   # under $ErrorActionPreference = "Stop" in Windows PowerShell. Keep the probe
@@ -483,31 +502,33 @@ function Sync-VercelFallback {
 
   # Only automate on a clean, synchronised main branch. This prevents the
   # launcher from committing or pushing unrelated local work.
-  $branch = (& git rev-parse --abbrev-ref HEAD 2>$null | Select-Object -First 1)
-  if ($LASTEXITCODE -ne 0 -or -not $branch -or $branch.Trim() -ne "main") {
-    Write-SyncLog "Skipped: repository is not on main."
+  $branchResult = Invoke-GitCapture @("rev-parse", "--abbrev-ref", "HEAD")
+  $branch = if ($branchResult.Output.Count -gt 0) { ([string]$branchResult.Output[0]).Trim() } else { "" }
+  if ($branchResult.ExitCode -ne 0 -or $branch -ne "main") {
+    Write-SyncLog "Skipped: repository is not on main (git exit $($branchResult.ExitCode), branch '$branch')."
     return
   }
-  $status = @(& git status --porcelain 2>$null)
-  if ($LASTEXITCODE -ne 0) {
-    Write-SyncLog "Skipped: git status failed."
+
+  $statusResult = Invoke-GitCapture @("status", "--porcelain")
+  if ($statusResult.ExitCode -ne 0) {
+    Write-SyncLog "Skipped: git status failed (exit $($statusResult.ExitCode))."
     return
   }
-  $unrelated = @($status | Where-Object { $_ -notmatch '^\?\?' })
+  $unrelated = @($statusResult.Output | Where-Object { $_ -notmatch '^\?\?' })
   if ($unrelated.Count -gt 0) {
     Write-SyncLog "Skipped: working tree has tracked changes; commit or stash them first."
     return
   }
 
-  & git fetch origin main --quiet 2>$null
-  if ($LASTEXITCODE -ne 0) {
-    Write-SyncLog "Skipped: git fetch failed (network or credentials)."
+  $fetchResult = Invoke-GitCapture @("fetch", "origin", "main", "--quiet")
+  if ($fetchResult.ExitCode -ne 0) {
+    Write-SyncLog "Skipped: git fetch failed (exit $($fetchResult.ExitCode))."
     return
   }
-  $headRaw = (& git rev-parse HEAD 2>$null | Select-Object -First 1)
-  $remoteRaw = (& git rev-parse origin/main 2>$null | Select-Object -First 1)
-  $head = if ($headRaw) { $headRaw.Trim() } else { "" }
-  $remote = if ($remoteRaw) { $remoteRaw.Trim() } else { "" }
+  $headResult = Invoke-GitCapture @("rev-parse", "HEAD")
+  $remoteResult = Invoke-GitCapture @("rev-parse", "origin/main")
+  $head = if ($headResult.Output.Count -gt 0) { ([string]$headResult.Output[0]).Trim() } else { "" }
+  $remote = if ($remoteResult.Output.Count -gt 0) { ([string]$remoteResult.Output[0]).Trim() } else { "" }
   if (-not $head -or -not $remote -or $head -ne $remote) {
     Write-SyncLog "Skipped: local main is not identical to origin/main."
     return
@@ -519,21 +540,21 @@ function Sync-VercelFallback {
   [System.IO.File]::WriteAllText($configPath, $newContent, (New-Object System.Text.UTF8Encoding($false)))
   Write-SyncLog "Updated fallback to $($script:PublicUrl)."
 
-  & git add -- apps/web/next.config.mjs 2>&1 | Out-Null
-  if ($LASTEXITCODE -ne 0) {
-    Write-SyncLog "git add failed."
+  $addResult = Invoke-GitCapture @("add", "--", "apps/web/next.config.mjs")
+  if ($addResult.ExitCode -ne 0) {
+    Write-SyncLog "git add failed (exit $($addResult.ExitCode)): $($addResult.Output -join ' ')"
     return
   }
   $message = "chore: sync demo tunnel fallback"
   $body = "Automated by scripts/demo/start.ps1 because the Cloudflare quick tunnel changed to $($script:PublicUrl)."
-  & git commit -m $message -m $body 2>&1 | Out-Null
-  if ($LASTEXITCODE -ne 0) {
-    Write-SyncLog "git commit failed."
+  $commitResult = Invoke-GitCapture @("commit", "-m", $message, "-m", $body)
+  if ($commitResult.ExitCode -ne 0) {
+    Write-SyncLog "git commit failed (exit $($commitResult.ExitCode)): $($commitResult.Output -join ' ')"
     return
   }
-  & git push origin main 2>&1 | Out-Null
-  if ($LASTEXITCODE -ne 0) {
-    Write-SyncLog "Commit created but git push failed; Vercel was not updated."
+  $pushResult = Invoke-GitCapture @("push", "origin", "main")
+  if ($pushResult.ExitCode -ne 0) {
+    Write-SyncLog "Commit created but git push failed (exit $($pushResult.ExitCode)): $($pushResult.Output -join ' ')"
     return
   }
   Write-SyncLog "Pushed the fallback update; Vercel will redeploy automatically."
