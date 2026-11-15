@@ -227,7 +227,7 @@ pnpm demo:smoke -- -BaseUrl https://sanad-edtech.vercel.app
 pnpm demo:doctor
 ```
 
-الفحص يشمل: Docker والكونتينرز، الـAPI المحلي، الـTunnel، الـHealth الحي، صفحات `/demo` والـCheckout، الـWatchdog، تزامن `main` مع `origin/main`، تطابق الـFallback مع رابط الـTunnel الحالي، وحالة قاعدة الديمو (3 كورسات منشورة، تسجيل واحد، الكورس المدفوع غير مسجل، 0 أوردر/دفع/استخدام كوبون). أي `FAIL` يرجّع Exit Code 1. آخر فحص: **16 نوفمبر 2026 — 9/9 PASS**.
+الفحص يشمل: Docker والكونتينرز، الـAPI المحلي، الـTunnel، الـHealth الحي، صفحات `/demo` والـCheckout، الـWatchdog، وجود Startup Entry، تزامن `main` مع `origin/main`، تطابق الـFallback مع رابط الـTunnel الحالي، وحالة قاعدة الديمو (3 كورسات منشورة، تسجيل واحد، الكورس المدفوع غير مسجل، كوبون واحد، 0 أوردر/دفع/استخدام كوبون). أي `FAIL` يرجّع Exit Code 1. آخر فحص: **16 نوفمبر 2026 — 10/10 PASS**.
 
 ## 7) Backup قبل أي عرض
 

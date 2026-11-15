@@ -133,7 +133,18 @@ $watchdogs = @(Get-CimInstance Win32_Process -Filter "Name='powershell.exe'" | W
   })
 Write-Check "Watchdog is running" ($watchdogs.Count -gt 0) "count=$($watchdogs.Count)"
 
-# 7) Git main must be clean and identical to origin/main.
+# 7) The Startup entry must exist so a Windows logon restarts the demo.
+$startupCmd = Join-Path ([Environment]::GetFolderPath("Startup")) "SANAD-Demo.cmd"
+$startupOk = $false
+$startupDetail = "missing"
+if (Test-Path $startupCmd) {
+  $startupContent = Get-Content $startupCmd -Raw
+  $startupOk = ($startupContent -match "start\.ps1" -and $startupContent -match "-Watch")
+  $startupDetail = "exists=true watch=$($startupContent -match '-Watch') sync=$($startupContent -match '-SyncFallback')"
+}
+Write-Check "Startup entry is installed" $startupOk $startupDetail
+
+# 8) Git main must be clean and identical to origin/main.
 $branch = [string](git -C $repoRoot rev-parse --abbrev-ref HEAD 2>$null | Select-Object -First 1)
 $head = [string](git -C $repoRoot rev-parse HEAD 2>$null | Select-Object -First 1)
 $remote = [string](git -C $repoRoot rev-parse origin/main 2>$null | Select-Object -First 1)
@@ -141,7 +152,7 @@ $dirty = @(git -C $repoRoot status --porcelain 2>$null | Where-Object { $_ -and 
 $gitOk = ($branch.Trim() -eq "main" -and $head.Trim() -and $remote.Trim() -and $head.Trim() -eq $remote.Trim() -and $dirty.Count -eq 0)
 Write-Check "Git main is synced and clean" $gitOk "branch=$($branch.Trim()) head=$(Short-Hash $head.Trim()) remote=$(Short-Hash $remote.Trim()) tracked_changes=$($dirty.Count)"
 
-# 8) The deployed fallback must match the live tunnel.
+# 9) The deployed fallback must match the live tunnel.
 $configPath = Join-Path $repoRoot "apps\web\next.config.mjs"
 $fallback = ""
 if (Test-Path $configPath) {
@@ -153,7 +164,7 @@ if (Test-Path $configPath) {
 }
 Write-Check "Fallback matches the live tunnel" ($tunnel -and $fallback -eq $tunnel) "fallback=$fallback tunnel=$tunnel"
 
-# 9) Demo database state: free course enrolled, paid course unenrolled, no money rows.
+# 10) Demo database state: free course enrolled, paid course unenrolled, voucher ready, no money rows.
 $dbOk = $false
 $dbDetail = "not checked"
 if ($dockerOk) {
@@ -163,9 +174,10 @@ if ($dockerOk) {
   $paid = Get-DbScalar $paidSql
   $orders = Get-DbScalar "SELECT count(*) FROM orders;"
   $payments = Get-DbScalar "SELECT count(*) FROM payments;"
+  $vouchers = Get-DbScalar "SELECT count(*) FROM vouchers;"
   $redemptions = Get-DbScalar "SELECT count(*) FROM voucher_redemptions;"
-  $dbDetail = "published=$published enrollments=$enrollments paid=$paid orders=$orders payments=$payments redemptions=$redemptions"
-  $dbOk = ($published -eq "3" -and $enrollments -eq "1" -and $paid -eq "0" -and $orders -eq "0" -and $payments -eq "0" -and $redemptions -eq "0")
+  $dbDetail = "published=$published enrollments=$enrollments paid=$paid orders=$orders payments=$payments vouchers=$vouchers redemptions=$redemptions"
+  $dbOk = ($published -eq "3" -and $enrollments -eq "1" -and $paid -eq "0" -and $orders -eq "0" -and $payments -eq "0" -and $vouchers -eq "1" -and $redemptions -eq "0")
 }
 Write-Check "Demo database state" $dbOk $dbDetail
 
