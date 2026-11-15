@@ -144,7 +144,7 @@ https://rich-pursuit-martin-car.trycloudflare.com
 - اعمل Redeploy وتحقق من `/api/health` وتسجيل الدخول.
 - أعد تثبيت الـAutostart بدون `-SyncFallback`.
 
-## 5) التشغيل التلقائي بعد الـReboot
+## 5) التشغيل التلقائي بعد الـReboot + Logon
 
 ### الوضع المؤقت الحالي — Quick Tunnel + Fallback Sync
 
@@ -158,6 +158,8 @@ pnpm demo:autostart -- -Tunnel cloudflared -SyncFallback -StartNow
 - يبدأ `start.ps1 -Tunnel cloudflared -Watch -SyncFallback` مخفي.
 - الـWatchdog يعيد تشغيل الـAPI والـTunnel لو وقعوا.
 - لو الرابط اتغير، يحدّث الـFallback ويعمل Commit/Push عشان Vercel يعمل Redeploy.
+
+> الـStartup entry بيشتغل عند تسجيل دخول Windows، مش قبل كده. لو اللابتوب واقف على شاشة القفل بعد الـReboot، الديمو مش هيرجع لحد ما تسجل دخول.
 
 > ده الحل المؤقت. متستخدمهوش كبديل نهائي لو تقدر تظبط ngrok static domain.
 
