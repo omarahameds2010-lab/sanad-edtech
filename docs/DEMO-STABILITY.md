@@ -106,7 +106,7 @@ curl.exe -s https://sanad-edtech.vercel.app/api/health
 الوضع الحالي مؤقت: الـAutostart مثبت على Cloudflare quick tunnel مع `-SyncFallback`. الرابط الحالي:
 
 ```text
-https://rich-pursuit-martin-car.trycloudflare.com
+https://both-suites-worldwide-weekends.trycloudflare.com
 ```
 
 عند كل تغيير في رابط الـQuick Tunnel:
@@ -161,7 +161,7 @@ pnpm demo:autostart -- -Tunnel cloudflared -SyncFallback -StartNow
 
 > الـStartup entry بيشتغل عند تسجيل دخول Windows، مش قبل كده. لو اللابتوب واقف على شاشة القفل بعد الـReboot، الديمو مش هيرجع لحد ما تسجل دخول.
 
-> تم اختبار Cold Start جزئياً: إيقاف Docker Desktop يدوياً خلى `/api/health` يرجع 503، والـWatchdog شغّل Docker وPostgreSQL والـAPI تاني، والموقع رجع **200** في حوالي 40 ثانية. لكن Reboot كامل + Logon لسه متجربش.
+> تم اختبار Cold Start كامل: قفلنا الـWatchdog والـTunnel والـAPI وDocker Desktop، وبعدها شغّلنا `SANAD-Demo.cmd` من Startup Folder بنفس طريقة Windows. الـWatchdog شغّل Docker وPostgreSQL والـAPI والـTunnel، وحدّث الـFallback وعمل Push، والموقع رجع **200** في حوالي 70 ثانية. لكن Windows Logoff/Reboot فعلي لسه متجربش.
 
 > ده الحل المؤقت. متستخدمهوش كبديل نهائي لو تقدر تظبط ngrok static domain.
 
