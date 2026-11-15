@@ -21,6 +21,7 @@
     "demo:start:watch": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/demo/start.ps1 -Watch",
     "demo:stop": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/demo/stop.ps1",
     "demo:smoke": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/demo/smoke.ps1",
+    "demo:doctor": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/demo/doctor.ps1",
     "demo:backup": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/demo/backup.ps1",
     "demo:autostart": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/demo/install-autostart.ps1",
     "prepare": "husky",

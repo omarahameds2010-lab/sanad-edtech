@@ -106,7 +106,7 @@ curl.exe -s https://sanad-edtech.vercel.app/api/health
 الوضع الحالي مؤقت: الـAutostart مثبت على Cloudflare quick tunnel مع `-SyncFallback`. الرابط الحالي:
 
 ```text
-https://both-suites-worldwide-weekends.trycloudflare.com
+https://manufactured-with-alberta-cable.trycloudflare.com
 ```
 
 عند كل تغيير في رابط الـQuick Tunnel:
@@ -123,6 +123,10 @@ https://both-suites-worldwide-weekends.trycloudflare.com
 ```
 
 > ده Bridge مؤقت: لسه فيه Vercel Redeploy ووقت قصير بعد الـReboot. الحل النهائي هو ngrok static domain عشان الرابط ما يتغيرش أصلاً.
+
+> الرابط اتغير تاني بعد منتصف 16 نوفمبر 2026، والـWatchdog كتب الـFallback الجديد (`1fbc7e8`) وعمل Push تلقائياً، والموقع رجع **200**. ده تأكيد إضافي إن مسار الـSync شغال من غير تدخل يدوي.
+
+> لو `API_PROXY_TARGET` متظبط في Vercel Production، فهو بياخد أولوية على الـFallback. الوضع الحالي اتحقق منه بعد تغيير الـTunnel في 15 نوفمبر: الموقع رجع **200** بعد تحديث الـFallback، يعني مفيش `API_PROXY_TARGET` قديم بيغطي عليه. مش قادرين نفحص Vercel env مباشرة لأن الـCLI/Token مش موجودين على اللابتوب.
 
 لو عايز تعملها يدوياً بدل الـSync:
 
@@ -162,6 +166,8 @@ pnpm demo:autostart -- -Tunnel cloudflared -SyncFallback -StartNow
 > الـStartup entry بيشتغل عند تسجيل دخول Windows، مش قبل كده. لو اللابتوب واقف على شاشة القفل بعد الـReboot، الديمو مش هيرجع لحد ما تسجل دخول.
 
 > تم اختبار Cold Start كامل: قفلنا الـWatchdog والـTunnel والـAPI وDocker Desktop، وبعدها شغّلنا `SANAD-Demo.cmd` من Startup Folder بنفس طريقة Windows. الـWatchdog شغّل Docker وPostgreSQL والـAPI والـTunnel، وحدّث الـFallback وعمل Push، والموقع رجع **200** في حوالي 70 ثانية. لكن Windows Logoff/Reboot فعلي لسه متجربش.
+
+> **الطاقة (16 نوفمبر 2026):** السكون على الكهرباء (AC) = **Never**، والهيبرنيت = **Never**، والسكون على البطارية = 10 دقائق. سيب اللابتوب على الشاحن ومفتوح أثناء فترة التحكيم. قفل الشاشة مش بيوقف الـAPI أو الـTunnel.
 
 > ده الحل المؤقت. متستخدمهوش كبديل نهائي لو تقدر تظبط ngrok static domain.
 
@@ -215,6 +221,14 @@ pnpm demo:smoke -- -BaseUrl https://sanad-edtech.vercel.app
 
 لو بيانات الدخول مش متظبطة، السكربت يختبر الـHealth والكورسات العامة ويكتب `SKIP` للاختبارات المحمية.
 
+### فحص البنية قبل العرض
+
+```powershell
+pnpm demo:doctor
+```
+
+الفحص يشمل: Docker والكونتينرز، الـAPI المحلي، الـTunnel، الـHealth الحي، صفحات `/demo` والـCheckout، الـWatchdog، تزامن `main` مع `origin/main`، تطابق الـFallback مع رابط الـTunnel الحالي، وحالة قاعدة الديمو (3 كورسات منشورة، تسجيل واحد، الكورس المدفوع غير مسجل، 0 أوردر/دفع/استخدام كوبون). أي `FAIL` يرجّع Exit Code 1.
+
 ## 7) Backup قبل أي عرض
 
 ```powershell
@@ -228,6 +242,8 @@ backups\sanad-demo-<timestamp>.dump
 ```
 
 المجلد `backups/` متضاف لـ`.gitignore`. النسخة تحتوي بيانات الديمو؛ متترفعش على Git.
+
+> تم اختبار استرجاع النسخة `backups/sanad-demo-20261115-134916.dump` في 16 نوفمبر 2026 داخل قاعدة مؤقتة: **44 جدول، 138 سياسة RLS، 43 جدول عليه RLS، 8 migrations، 2 مستخدمين، 3 كورسات منشورة، تسجيل واحد، 0 أوردر/دفع/استخدام كوبون**. القاعدة المؤقتة اتحذفت، وقاعدة الديمو الأصلية لم تتأثر.
 
 ## 8) إيقاف الديمو
 
