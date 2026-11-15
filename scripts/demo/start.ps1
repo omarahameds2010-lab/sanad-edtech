@@ -9,6 +9,7 @@
 # Examples:
 #   pnpm demo:start
 #   pnpm demo:start -- -Tunnel ngrok -NgrokDomain sanad-demo.ngrok.app -Watch
+#   pnpm demo:start -- -Tunnel cloudflared -Watch -SyncFallback
 #   pnpm demo:start -- -Rebuild
 #   pnpm demo:start -- -NoTunnel
 #
@@ -27,6 +28,7 @@ param(
   [string]$WebOrigin = "https://sanad-edtech.vercel.app",
   [switch]$Rebuild,
   [switch]$Watch,
+  [switch]$SyncFallback,
   [switch]$NoTunnel,
   [int]$WatchIntervalSeconds = 30
 )
@@ -48,6 +50,7 @@ $apiOut = Join-Path $stateDir "api.out.log"
 $apiErr = Join-Path $stateDir "api.err.log"
 $tunnelOut = Join-Path $stateDir "tunnel.out.log"
 $tunnelErr = Join-Path $stateDir "tunnel.err.log"
+$syncLog = Join-Path $stateDir "vercel-sync.log"
 
 New-Item -ItemType Directory -Force -Path $stateDir | Out-Null
 
@@ -66,9 +69,24 @@ function Write-DemoWarning([string]$Message) {
   Write-Warning "[demo] $Message"
 }
 
+function Write-SyncLog([string]$Message) {
+  $line = "$(Get-Date -Format o) $Message"
+  Add-Content -Path $syncLog -Value $line -Encoding UTF8
+  Write-Step "Vercel sync: $Message"
+}
+
 function Test-DockerEngine {
-  docker info *> $null
-  return $LASTEXITCODE -eq 0
+  # Native stderr (Docker Desktop not running) can become a terminating error
+  # under $ErrorActionPreference = "Stop" in Windows PowerShell. Keep the probe
+  # non-terminating so Ensure-Docker can actually start Docker Desktop.
+  $previous = $ErrorActionPreference
+  $ErrorActionPreference = "Continue"
+  try {
+    docker info *> $null
+    return ($LASTEXITCODE -eq 0)
+  } finally {
+    $ErrorActionPreference = $previous
+  }
 }
 
 function Ensure-Docker {
@@ -100,8 +118,15 @@ function Ensure-Containers {
 
   $pgReady = $false
   for ($i = 1; $i -le 45; $i++) {
-    docker exec learning-platform-db pg_isready -U postgres *> $null
-    if ($LASTEXITCODE -eq 0) {
+    $previous = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    try {
+      docker exec learning-platform-db pg_isready -U postgres *> $null
+      $ready = ($LASTEXITCODE -eq 0)
+    } finally {
+      $ErrorActionPreference = $previous
+    }
+    if ($ready) {
       $pgReady = $true
       break
     }
@@ -111,7 +136,13 @@ function Ensure-Containers {
 
   $redisReady = $false
   for ($i = 1; $i -le 30; $i++) {
-    $pong = docker exec learning-platform-redis redis-cli ping 2>$null
+    $previous = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    try {
+      $pong = docker exec learning-platform-redis redis-cli ping 2>$null
+    } finally {
+      $ErrorActionPreference = $previous
+    }
     if ($pong -match "PONG") {
       $redisReady = $true
       break
@@ -248,8 +279,15 @@ function Start-Api {
 }
 
 function Test-TenantDomain {
-  $check = docker exec learning-platform-db psql -U postgres -d learning_platform -Atc "SELECT 1 FROM tenant_domains WHERE domain = '$PublicHost';" 2>$null
-  if ($LASTEXITCODE -ne 0) {
+  $previous = $ErrorActionPreference
+  $ErrorActionPreference = "Continue"
+  try {
+    $check = docker exec learning-platform-db psql -U postgres -d learning_platform -Atc "SELECT 1 FROM tenant_domains WHERE domain = '$PublicHost';" 2>$null
+    $exitCode = $LASTEXITCODE
+  } finally {
+    $ErrorActionPreference = $previous
+  }
+  if ($exitCode -ne 0) {
     Write-DemoWarning "Could not verify tenant_domains in PostgreSQL."
     return
   }
@@ -400,13 +438,105 @@ function Show-DemoSummary {
     if ($Tunnel -eq "cloudflared") {
       Write-Host ""
       Write-Host "This is a quick tunnel: the URL changes on every restart." -ForegroundColor Yellow
-      Write-Host "Use -Tunnel ngrok with a free static domain for a stable demo." -ForegroundColor Yellow
+      if ($SyncFallback) {
+        Write-Host "Fallback sync is enabled: the launcher will commit/push the new URL and Vercel will redeploy." -ForegroundColor Yellow
+        Write-Host "Log: $syncLog" -ForegroundColor Yellow
+      } else {
+        Write-Host "Use -Tunnel ngrok with a free static domain for a stable demo." -ForegroundColor Yellow
+      }
     }
   } else {
     Write-Host "Tunnel disabled. Local API only." -ForegroundColor Yellow
   }
   Write-Host ""
   Write-Host "State and logs: $stateDir"
+}
+
+function Sync-VercelFallback {
+  if (-not $SyncFallback) { return }
+  if ($Tunnel -ne "cloudflared") {
+    Write-SyncLog "Skipped: only quick-tunnel URLs need fallback sync."
+    return
+  }
+  if (-not $script:PublicUrl) {
+    Write-SyncLog "Skipped: no public URL."
+    return
+  }
+
+  $configPath = Join-Path $repoRoot "apps\web\next.config.mjs"
+  if (-not (Test-Path $configPath)) {
+    Write-SyncLog "Skipped: apps/web/next.config.mjs was not found."
+    return
+  }
+
+  $content = Get-Content -LiteralPath $configPath -Raw
+  $pattern = '(?s)(const FALLBACK_DEMO_TUNNEL_ORIGIN\s*=\s*\r?\n\s*")[^"]+(")'
+  $match = [regex]::Match($content, $pattern)
+  if (-not $match.Success) {
+    Write-SyncLog "Skipped: fallback marker was not found."
+    return
+  }
+  if (($match.Groups[1].Value + $script:PublicUrl + $match.Groups[2].Value) -eq $match.Value) {
+    Write-SyncLog "Fallback already points at $($script:PublicUrl)."
+    return
+  }
+
+  # Only automate on a clean, synchronised main branch. This prevents the
+  # launcher from committing or pushing unrelated local work.
+  $branch = (& git rev-parse --abbrev-ref HEAD 2>$null | Select-Object -First 1)
+  if ($LASTEXITCODE -ne 0 -or -not $branch -or $branch.Trim() -ne "main") {
+    Write-SyncLog "Skipped: repository is not on main."
+    return
+  }
+  $status = @(& git status --porcelain 2>$null)
+  if ($LASTEXITCODE -ne 0) {
+    Write-SyncLog "Skipped: git status failed."
+    return
+  }
+  $unrelated = @($status | Where-Object { $_ -notmatch '^\?\?' })
+  if ($unrelated.Count -gt 0) {
+    Write-SyncLog "Skipped: working tree has tracked changes; commit or stash them first."
+    return
+  }
+
+  & git fetch origin main --quiet 2>$null
+  if ($LASTEXITCODE -ne 0) {
+    Write-SyncLog "Skipped: git fetch failed (network or credentials)."
+    return
+  }
+  $headRaw = (& git rev-parse HEAD 2>$null | Select-Object -First 1)
+  $remoteRaw = (& git rev-parse origin/main 2>$null | Select-Object -First 1)
+  $head = if ($headRaw) { $headRaw.Trim() } else { "" }
+  $remote = if ($remoteRaw) { $remoteRaw.Trim() } else { "" }
+  if (-not $head -or -not $remote -or $head -ne $remote) {
+    Write-SyncLog "Skipped: local main is not identical to origin/main."
+    return
+  }
+
+  $prefix = $content.Substring(0, $match.Groups[1].Index + $match.Groups[1].Length)
+  $suffix = $content.Substring($match.Groups[2].Index)
+  $newContent = $prefix + $script:PublicUrl + $suffix
+  [System.IO.File]::WriteAllText($configPath, $newContent, (New-Object System.Text.UTF8Encoding($false)))
+  Write-SyncLog "Updated fallback to $($script:PublicUrl)."
+
+  & git add -- apps/web/next.config.mjs 2>&1 | Out-Null
+  if ($LASTEXITCODE -ne 0) {
+    Write-SyncLog "git add failed."
+    return
+  }
+  $message = "chore: sync demo tunnel fallback"
+  $body = "Automated by scripts/demo/start.ps1 because the Cloudflare quick tunnel changed to $($script:PublicUrl)."
+  & git commit -m $message -m $body 2>&1 | Out-Null
+  if ($LASTEXITCODE -ne 0) {
+    Write-SyncLog "git commit failed."
+    return
+  }
+  & git push origin main 2>&1 | Out-Null
+  if ($LASTEXITCODE -ne 0) {
+    Write-SyncLog "Commit created but git push failed; Vercel was not updated."
+    return
+  }
+  Write-SyncLog "Pushed the fallback update; Vercel will redeploy automatically."
 }
 
 function Watch-Demo {
@@ -424,9 +554,13 @@ function Watch-Demo {
         Write-DemoWarning "Tunnel process is not running. Restarting it..."
         $previousUrl = $script:PublicUrl
         Start-Tunnel
-        if ($previousUrl -and $script:PublicUrl -ne $previousUrl) {
+        if ($script:PublicUrl -ne $previousUrl) {
           Write-DemoWarning "Tunnel URL changed: $previousUrl -> $($script:PublicUrl)"
-          Write-DemoWarning "Update Vercel API_PROXY_TARGET and redeploy, or use a stable ngrok domain."
+          if ($SyncFallback) {
+            Sync-VercelFallback
+          } else {
+            Write-DemoWarning "Update Vercel API_PROXY_TARGET and redeploy, or use a stable ngrok domain."
+          }
         }
       }
 
@@ -449,6 +583,7 @@ try {
 
   Write-Step "Starting tunnel ($Tunnel)..."
   Start-Tunnel
+  Sync-VercelFallback
   Write-DemoState
   Show-DemoSummary
 

@@ -7,6 +7,10 @@
 #   powershell -ExecutionPolicy Bypass -File scripts/demo/install-autostart.ps1 `
 #     -Tunnel ngrok -NgrokDomain sanad-demo.ngrok.app -StartNow
 #
+#   # Temporary bridge while the quick tunnel is still in use:
+#   powershell -ExecutionPolicy Bypass -File scripts/demo/install-autostart.ps1 `
+#     -Tunnel cloudflared -SyncFallback -StartNow
+#
 #   powershell -ExecutionPolicy Bypass -File scripts/demo/install-autostart.ps1 -Remove
 #
 # The ngrok authtoken must be installed once, outside this repo:
@@ -19,6 +23,7 @@ param(
   [string]$Tunnel = "ngrok",
   [string]$NgrokDomain = $env:NGROK_DOMAIN,
   [switch]$NoWatch,
+  [switch]$SyncFallback,
   [switch]$Remove,
   [switch]$StartNow
 )
@@ -50,7 +55,12 @@ if ($Tunnel -eq "ngrok" -and -not $NgrokDomain) {
 
 if ($Tunnel -eq "cloudflared") {
   Write-Warning "[demo] cloudflared quick tunnels get a new URL on every restart."
-  Write-Warning "[demo] Use ngrok with a static domain for an unattended demo."
+  if ($SyncFallback) {
+    Write-Warning "[demo] -SyncFallback will commit/push the new URL so Vercel redeploys automatically."
+    Write-Warning "[demo] This is a temporary bridge until a stable ngrok domain is configured."
+  } else {
+    Write-Warning "[demo] Use ngrok with a static domain for an unattended demo."
+  }
 }
 
 $argument = "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$startScript`" -Tunnel $Tunnel"
@@ -59,6 +69,9 @@ if ($NgrokDomain) {
 }
 if (-not $NoWatch) {
   $argument += " -Watch"
+}
+if ($SyncFallback) {
+  $argument += " -SyncFallback"
 }
 
 $content = @"
