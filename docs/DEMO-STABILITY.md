@@ -103,7 +103,20 @@ curl.exe -s https://sanad-edtech.vercel.app/api/health
 
 ## 4) إزالة الـHardcoded Fallback
 
-حالياً `apps/web/next.config.mjs` فيه Fallback مؤقت للـTunnel القديم عشان الموقع الحي ما يقعش.
+حالياً `apps/web/next.config.mjs` فيه Fallback مؤقت للـTunnel الحالي عشان الموقع الحي ما يقعش:
+
+```text
+https://triangle-games-doug-requires.trycloudflare.com
+```
+
+لو الـQuick Tunnel اتغير (بعد Reboot أو إعادة تشغيل cloudflared):
+
+1. شغّل `pnpm demo:start -- -Tunnel cloudflared` وسجّل الرابط الجديد من `%TEMP%\sanad-local\tunnel.url`.
+2. حدّث `FALLBACK_DEMO_TUNNEL_ORIGIN` في `apps/web/next.config.mjs`.
+3. شغّل `pnpm --filter web build` وتأكد إن البناء يطبع الرابط الجديد.
+4. اعمل Commit/Push؛ Vercel هيعمل Redeploy تلقائي، وبعدها اتأكد من `/api/health` عبر الدومين.
+
+ده حل مؤقت. لو `API_PROXY_TARGET` متظبط في Vercel، غيّره للرابط الجديد بدل تعديل الكود. الهدف النهائي يفضل ngrok static domain عشان الرابط ما يتغيرش.
 
 بعد ما تتأكد إن:
 
@@ -234,6 +247,8 @@ pnpm demo:paid
 | العرض                  | السبب المحتمل                                     | الحل                                                |
 | ---------------------- | ------------------------------------------------- | --------------------------------------------------- |
 | `404` على `/api/*`     | `API_PROXY_TARGET` غلط أو Vercel لم يعمل Redeploy | صحّح المتغير، أعد النشر، راجع Build Log             |
+| `502 Bad Gateway`      | الـQuick Tunnel اتغير أو الـAPI وقع               | راجع `tunnel.url` واللوج، شغّل `start.ps1`، حدّث الـFallback أو `API_PROXY_TARGET` وأعد النشر |
+| `pnpm demo:start` يفضل ماسك التيرمنال بعد الملخص | الـAPI والـTunnel عمليات طويلة العمر | ده متوقع؛ استخدم `-Watch` أو شغّله مخفي عبر Autostart، ومتقفلش العملية بالغلط |
 | `Tenant not found`     | الـHost header أو `tenant_domains` ناقص           | شغّل السكربت، وتأكد من `PROD_TENANT_DOMAINS`        |
 | `403 ORIGIN_REJECTED`  | `ALLOWED_ORIGINS` لا يحتوي دومين Vercel           | راجع `start.ps1` أو أعد تشغيله                      |
 | الصفحة تعمل ثم تقف     | اللابتوب نام أو Tunnel وقع                        | الـWatchdog يعيد التشغيل؛ راجع `%TEMP%\sanad-local` |

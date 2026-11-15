@@ -21,24 +21,24 @@
 | CI/CD       | GitHub Actions workflow exists; local tests/build are the release evidence                                                                                                                     |
 | Infra       | Docker + Terraform (later)                                                                                                                                                                   |
 
-## Current verified release — 2026-11-14
+## Current verified release — 2026-11-15
 
 > Canonical document: `docs/CURRENT-STATE.md`. This is the state to use for answers and documentation. Older entries below are an audit trail.
 
-- Web runtime code is the Sprint 2 paid-checkout release; later docs-only commits may be newer on `main`. Web is live at `https://sanad-edtech.vercel.app`; the current demo API is the local compiled NestJS API on `:3002` exposed through the Cloudflare quick tunnel `https://worcester-lbs-skins-labels.trycloudflare.com`. The Railway API endpoint returns **404 `Application not found`**; treat it as retired.
-- `/api/health` through the web domain is **200** with database **up**. `/demo` is **200**; one-click student and teacher access, the demo banner, the analytics-to-dashboard redirect, and the branded Arabic 404 were verified live.
+- Web runtime code is the Sprint 2 paid-checkout release (`aa4d2bc`) plus the tunnel fallback refresh (`22a5a44`, config only); later docs-only commits may be newer on `main`. Web is live at `https://sanad-edtech.vercel.app`; the current demo API is the local compiled NestJS API on `:3002` exposed through the Cloudflare quick tunnel `https://triangle-games-doug-requires.trycloudflare.com`. The Railway API endpoint returns **404 `Application not found`**; treat it as retired.
+- `/api/health` through the web domain is **200** with database **up**. `/demo` is **200**; one-click student and teacher access, the demo banner, the analytics-to-dashboard redirect, the paid checkout page, and the direct-enroll **402** guard were re-verified live on 15 November 2026 after the quick-tunnel refresh. The branded Arabic 404 was verified live in Sprint 1.
 - The local Docker database has **8/8** migrations and 3 published courses. Sprint 2 makes `arabic-3-prep` **199.00 EGP** with course-scoped voucher **`SANAD-2026`**; `arabic-1-prep` remains free and enrolled for the 90-second path. Final demo state: 2 users, 1 enrollment, 0 orders/payments/redemptions; the paid course is intentionally unenrolled so checkout can be demonstrated.
-- Tests: **359/359 API** (35 suites), **158/158 web** (12 files), build **4/4**.
-- Sprint 2 shipped: a server-side **`402 PAYMENT_REQUIRED`** guard for paid direct enrollment; shared idempotent enrollment writes (`source: purchase` / `voucher`) inside payment and voucher transactions; structured voucher error codes; the `/checkout/[slug]` voucher page; and paid-course CTAs. No schema or migration changed.
-- Demo tooling: `pnpm demo:paid` reapplies the paid course + voucher via `scripts/demo/seed-paid.ps1`; `docs/DEMO-STABILITY.md` has the runbook. The 90-second student path still starts from `/demo` and the free course.
+- Tests: **359/359 API** (35 suites), **158/158 web** (12 files), build **4/4**; the build was re-run on 15 November 2026 at `22a5a44`.
+- Sprint 2 shipped: a server-side **`402 PAYMENT_REQUIRED`** guard for paid direct enrollment; shared idempotent enrollment writes (`source: purchase` / `voucher`) inside payment and voucher transactions; structured voucher error codes; the `/checkout/[slug]` voucher page; and paid-course CTAs. No schema or migration changed. The live voucher flow was verified on 14 November (order/intent **201**, “تم تفعيل الكورس”) and the test purchase was removed so the demo remains unenrolled; the checkout page and `402` guard were re-verified after the tunnel refresh.
+- Demo tooling: `pnpm demo:paid` reapplies the paid course + voucher via `scripts/demo/seed-paid.ps1`; `docs/DEMO-STABILITY.md` has the runbook. The 90-second student path still starts from `/demo` and the free course. `start.ps1` now probes API health with `Invoke-WebRequest` instead of `curl.exe`, so a connection-refused native stderr line cannot abort the retry loop; on 15 November it reused the healthy API and started the new tunnel. The hardcoded quick-tunnel fallback remains temporary until a stable ngrok domain is verified.
 - Sprint 1 remains: `scripts/demo/start.ps1`, `stop.ps1`, `smoke.ps1`, `backup.ps1`, and `install-autostart.ps1`, exposed as `pnpm demo:*`; `apps/web/next.config.mjs` resolves `API_PROXY_TARGET` / `DEMO_TUNNEL_ORIGIN`, strips invisible Unicode marks, and logs the build target. The temporary quick-tunnel fallback remains until a stable domain is verified.
 - Mock teacher screens are gone: analytics redirects to `/teacher`; course builder/preview/publish redirect to the real course workspace; analytics was removed from the teacher nav; dead creation commands were replaced. Root `not-found.tsx`, `error.tsx`, and `loading.tsx` render branded dark/light system pages.
-- Open: stable ngrok domain + autostart (same plan as Sprint 1); voucher-only checkout for the demo, with a real Paymob/Fawry sandbox charge and refund still P2; RLS runtime, outbox dispatcher, video webhook, Bull processors, and other known gaps below remain open.
+- Open: stable ngrok domain + autostart (same plan as Sprint 1); the current quick-tunnel URL changed on 15 November and is still temporary; voucher-only checkout for the demo, with a real Paymob/Fawry sandbox charge and refund still P2; RLS runtime, outbox dispatcher, video webhook, Bull processors, and other known gaps below remain open.
 - No API schema, migration, RLS, outbox, Bull, video-webhook, or payment-provider behavior changed in Sprint 2. The payment logic change is enrollment/settlement wiring only.
 
 ## Previous verified release — 2026-10-28
 
-> Historical state. Superseded by the 2026-11-14 block above; the details are kept as an audit trail.
+> Historical state. Superseded by the 2026-11-15 block above; the details are kept as an audit trail.
 
 - Production branch `main`. Web runtime code `cd03fb0` (web-only SANAD grading selector on top of `5ac122d`; Vercel auto-deploy; later docs-only commits do not change runtime code). API deployment `5ac122d` via manual `railway up` (deployment `16a33f07-f1dd-404f-b110-ba4497ac7408`, status SUCCESS). Web `https://sanad-edtech.vercel.app`; API `https://sanad-edtech-production.up.railway.app`.
 - `/api/health` = **200**, database **up**; `sanad-demo` has 3 published Arabic prep courses + exam/assignment. The demo assignment is now `maxAttempts=2`; the demo student has submitted attempts 1 and 2 from the production smoke.
@@ -69,7 +69,7 @@
 
 ## ⚠️ Verified Reality (audit trail — current release is above)
 
-> Full report: `docs/AUDIT-2026-10-16.md`. The dated entries below are kept as an audit trail. Use the **Current verified release — 2026-11-13** block above for today's runtime.
+> Full report: `docs/AUDIT-2026-10-16.md`. The dated entries below are kept as an audit trail. Use the **Current verified release — 2026-11-15** block above for today's runtime.
 
 **Railway go-live — 2026-10-20 (API is LIVE).** API live at `https://sanad-edtech-production.up.railway.app` — verified `/api/health` **200** (`{"status":"ok","database":"up"}`), teacher login `01000000001` **200**, `/api/tenants/current` → `sanad-demo`, `/api/v1/teacher/courses` → 3 seeded courses. Two root causes fixed:
 1. **Tenant middleware path bug (`9f57ee8`).** `TenantResolverMiddleware` checked `req.path.startsWith("/api/health")` — but Nest mounts `forRoutes("*")` middleware under the global prefix (`app.use("/api/*")`), and Express rewrites `req.path` to `/` inside a wildcard mount. The exemption never matched: every cloud request (including health) hit tenant resolution and 404'd with `Tenant not found` until `tenant_domains` had the host. Fix reads `req.originalUrl` (`apps/api/src/modules/tenants/tenant-resolver.middleware.ts`), regression spec `tenant-resolver.middleware.spec.ts` (4 tests), api suite **311/311**.
