@@ -1,4 +1,4 @@
-# Status — 15 November 2026
+# Status — 16 November 2026
 
 > Canonical detail lives in [`CURRENT-STATE.md`](CURRENT-STATE.md). This page is the short dashboard: what is live, what is proven, and what is still missing.
 
@@ -7,7 +7,7 @@
 | Item | Value |
 | --- | --- |
 | Production branch | `main` |
-| Web runtime code | Sprint 2 paid checkout (`aa4d2bc`) + tunnel fallback sync (`1fbc7e8`) — 15–16 November 2026 |
+| Web runtime code | Sprint 2 paid checkout (`aa4d2bc`) + tunnel fallback sync (`1fbc7e8`) + UTF-8 comment cleanup (`7ca1ed3`) — 15–16 November 2026 |
 | API runtime | Local compiled NestJS API on `:3002`; no schema or migration change in Sprint 2 |
 | Demo launcher | `scripts/demo/start.ps1` at `4ec4546`; Windows Startup entry installed with `-Tunnel cloudflared -Watch -SyncFallback` |
 | Hardening / retakes | **Live** — rate limiting, lock enforcement, authoring-read fixes, and assignment retakes |
@@ -28,11 +28,12 @@
 | --- | --- | --- |
 | API tests on Sprint 2 code | **359/359**, 35 suites | `pnpm --filter api exec jest --config jest.config.js --runInBand` |
 | Web tests on Sprint 2 code | **158/158**, 12 files | `pnpm --filter web test` |
-| Monorepo build | **4/4** successful; re-run 15 Nov 2026 at `4ec4546` | `pnpm build` |
+| Monorepo build | **4/4** successful; re-run 16 Nov 2026 at `2cf5b4a` | `pnpm build` |
 | Paid checkout HTTP smoke | **passed**: paid direct enroll 402, invalid voucher 400, valid voucher 201, enrollment `source=voucher`, replay one redemption | Local HTTP smoke, 14 Nov 2026 |
 | Paid checkout browser QA | **passed live**: paid CTA → checkout → `SANAD-2026` → order/intent **201** → “تم تفعيل الكورس”; cleanup restored the demo state | Live browser, 14 Nov 2026 |
 | Live judge path | **passed 15 Nov 2026**: `/demo`, one-click student/teacher, demo banner, analytics-to-dashboard redirect, checkout **200**, direct paid enroll **402** | Browser + HTTP through the web domain |
-| Live authenticated smoke | **8/8 passed** 15 Nov 2026: health, public catalog, teacher login/tenant/courses, student login/assignments/enrollments | `pnpm demo:smoke -- -BaseUrl https://sanad-edtech.vercel.app` |
+| Live authenticated smoke | **8/8 passed** 15 Nov and re-run **8/8** 16 Nov 2026: health, public catalog, teacher login/tenant/courses, student login/assignments/enrollments | `pnpm demo:smoke -- -BaseUrl https://sanad-edtech.vercel.app` |
+| Demo doctor preflight | **9/9 passed 16 Nov 2026**: Docker/containers, local API, tunnel, live health/database, `/demo` + checkout, watchdog, git sync, fallback match, demo DB state | `pnpm demo:doctor` |
 | Autostart + fallback sync | **passed 15–16 Nov 2026**: hidden watchdog restarted the tunnel twice, wrote the new fallback (`14a82df` after the full logon simulation; `1fbc7e8` after the overnight restart), pushed, and live health returned **200** each time | Installed Startup entry + sync log |
 | Cold Docker recovery | **passed 15 Nov 2026**: stopped Docker Desktop → health **503** → watchdog restarted Docker/PostgreSQL/API → health **200** in about 40 seconds | Hidden watchdog, no manual step |
 | Full logon simulation | **passed 15 Nov 2026**: stopped watchdog/tunnel/API/Docker → launched Startup `SANAD-Demo.cmd` → services restarted, fallback `14a82df` pushed, health **200** in about 70 seconds | Startup entry, no manual step; real Windows logoff not performed |
@@ -126,6 +127,6 @@ Production retake smoke passed **31/31**; the demo assignment is set to `maxAtte
 | 2026-10-28 | Hardening + retakes merged; Railway backup restore-tested; migration #8 applied (8/8); API deployed manually; production retake smoke 31/31; lock card verified dark/light |
 | 2026-11-14 | Sprint 2 paid checkout deployed (`aa4d2bc`); live voucher flow, order/intent 201, `402` guard, and demo-state cleanup verified |
 | 2026-11-15 | Autostart installed with `-SyncFallback`; full cold start (watchdog/tunnel/API/Docker stopped, Startup cmd launched) synced the fallback (`14a82df`) and live health returned 200 in about 70 seconds; one-click paths and `402` re-verified; authenticated live smoke 8/8 |
-| 2026-11-16 | Overnight tunnel restart auto-synced the fallback (`1fbc7e8`, `manufactured-with-alberta-cable`) and live health returned 200; restore-tested the local demo backup into a temporary DB (44 tables, 138 RLS policies, 8 migrations, demo data intact); set AC sleep/hibernate to Never; added `pnpm demo:doctor` preflight |
+| 2026-11-16 | Overnight tunnel restart auto-synced the fallback (`1fbc7e8`, `manufactured-with-alberta-cable`) and live health returned 200; restore-tested the local demo backup into a temporary DB (44 tables, 138 RLS policies, 8 migrations, demo data intact); set AC sleep/hibernate to Never; added `pnpm demo:doctor` preflight (9/9) and re-ran the authenticated smoke (8/8) |
 
 Historical audit: [`AUDIT-2026-10-16.md`](AUDIT-2026-10-16.md). It is preserved as a dated snapshot, not rewritten.

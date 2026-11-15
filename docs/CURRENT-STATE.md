@@ -1,6 +1,6 @@
-# Current State — 15 November 2026
+# Current State — 16 November 2026
 
-> **This is the canonical snapshot for the repository.** If another document disagrees with this file, this file wins. The Sprint 2 paid-checkout release was deployed on 14 November 2026; the live deployment was rechecked on 15 November 2026 after the Cloudflare quick tunnel was refreshed.
+> **This is the canonical snapshot for the repository.** If another document disagrees with this file, this file wins. The Sprint 2 paid-checkout release was deployed on 14 November 2026; the live deployment was rechecked on 15–16 November 2026 after the Cloudflare quick tunnel changed twice. The 16 November preflight passed **9/9** and the authenticated smoke passed **8/8**.
 >
 > Historical reports keep their original date and evidence. They are not silently rewritten; they carry a banner pointing here.
 
@@ -9,7 +9,7 @@
 | Item | Value |
 | --- | --- |
 | Production branch | `main` (GitHub's default branch is `master`; Vercel follows `main`) |
-| Web runtime code | Sprint 2 paid checkout (`aa4d2bc`) + tunnel fallback sync (`1fbc7e8`, config only) — 14–16 November 2026 |
+| Web runtime code | Sprint 2 paid checkout (`aa4d2bc`) + tunnel fallback sync (`1fbc7e8`, config only) + UTF-8 comment cleanup (`7ca1ed3`, config only) — 14–16 November 2026 |
 | API code | Sprint 2 paid checkout (`aa4d2bc`) — 14 November 2026; local compiled API, no schema or migration change |
 | API runtime | Local compiled NestJS API on `:3002`; start with `pnpm demo:start` |
 | Demo launcher | `scripts/demo/start.ps1` at `4ec4546`; Windows Startup entry installed with `-Tunnel cloudflared -Watch -SyncFallback` |
@@ -46,11 +46,12 @@ The demo assignment was set to `maxAttempts = 2` for the production retake smoke
 | --- | --- |
 | API unit suite on Sprint 2 code | **359 / 359 passed**, 35 suites, run 14 November 2026 (`pnpm --filter api exec jest --config jest.config.js --runInBand`) |
 | Web unit suite on Sprint 2 code | **158 / 158 passed**, 12 files, run 14 November 2026 (`pnpm --filter web test`) |
-| Monorepo build | **4/4 tasks successful** (`pnpm build`); re-run 15 November 2026 at `4ec4546` |
+| Monorepo build | **4/4 tasks successful** (`pnpm build`); re-run 16 November 2026 at `2cf5b4a` |
 | Paid checkout HTTP smoke | **passed**: paid direct enroll **402 `PAYMENT_REQUIRED`**; invalid voucher **400 `VOUCHER_NOT_FOUND`**; valid voucher **201**, `success: true`, enrollment `source=voucher`, replay stays one redemption; temporary user and rows removed |
 | Paid checkout browser QA | **passed locally and live**: paid CTA → `/checkout/arabic-3-prep`; live voucher `SANAD-2026` created the order and intent (**201**) and showed “تم تفعيل الكورس”; the temporary purchase was removed so the demo remains unenrolled for checkout |
 | Live judge path | **passed 15 November 2026** after the fallback sync: `/demo` **200**; one-click student and teacher access reached `/student` and `/teacher`; demo banner present; teacher navigation has no analytics link; `/teacher/analytics` redirects to `/teacher`; `/checkout/arabic-3-prep` **200**; direct paid enrollment **402 `PAYMENT_REQUIRED`**; `/api/health` **200** |
-| Live authenticated smoke | **8/8 passed** on 15 November 2026 through `https://sanad-edtech.vercel.app`: health/database, public course catalog, teacher login, tenant resolution, teacher course list, student login, student assignments, student enrollments (`pnpm demo:smoke` with `DEMO_*` variables; credentials not printed) |
+| Live authenticated smoke | **8/8 passed** on 15 November and re-run **8/8** on 16 November 2026 through `https://sanad-edtech.vercel.app`: health/database, public course catalog, teacher login, tenant resolution, teacher course list, student login, student assignments, student enrollments (`pnpm demo:smoke` with `DEMO_*` variables; credentials not printed) |
+| Demo doctor preflight | **9/9 passed 16 November 2026** (`pnpm demo:doctor`): Docker + demo containers, local API health, tunnel health, live health/database, `/demo` + checkout pages, watchdog, clean/synced `main`, fallback matches the live tunnel, and demo DB state (3 published courses, 1 enrollment, paid course unenrolled, 0 orders/payments/redemptions) |
 | Autostart + fallback sync | **passed 15–16 November 2026**: the installed hidden watchdog restarted the quick tunnel twice (full logon simulation → `14a82df`; overnight restart → `1fbc7e8`), wrote the new fallback, pushed, and Vercel redeployed each time; the sync log recorded both changes and live health returned **200**. `4ec4546` adds a retry when the logon network is not ready. |
 | Cold Docker recovery | **passed 15 November 2026**: stopping Docker Desktop made `/api/health` return **503**; the hidden watchdog started Docker, PostgreSQL, and the API again, and live health returned **200** within about 40 seconds. The demo tenant, 3 courses, 1 enrollment, and 0 orders/payments were intact. |
 | Full logon simulation | **passed 15 November 2026**: stopped the watchdog, tunnel, API, and Docker Desktop; launched the installed Startup `SANAD-Demo.cmd`; the hidden watchdog started Docker/PostgreSQL/API/tunnel, wrote the new fallback, committed `14a82df`, pushed, and live health returned **200** in about 70 seconds. An actual Windows logoff/reboot was not performed. |
