@@ -503,9 +503,9 @@ function Sync-VercelFallback {
     Write-SyncLog "Skipped: fallback marker was not found."
     return
   }
-  if (($match.Groups[1].Value + $script:PublicUrl + $match.Groups[2].Value) -eq $match.Value) {
-    $script:SyncPending = $false
-    Write-SyncLog "Fallback already points at $($script:PublicUrl)."
+  $needsWrite = (($match.Groups[1].Value + $script:PublicUrl + $match.Groups[2].Value) -ne $match.Value)
+  if (-not $needsWrite -and -not $script:SyncPending) {
+    Write-SyncLog "Fallback already points at $($script:PublicUrl); no pending sync."
     return
   }
 
@@ -525,7 +525,15 @@ function Sync-VercelFallback {
     Write-SyncLog "Skipped: git status failed (exit $($statusResult.ExitCode)); will retry."
     return
   }
-  $unrelated = @($statusResult.Output | Where-Object { $_ -notmatch '^\?\?' })
+  # The fallback file itself may be dirty only when it already contains the
+  # target URL (for example after add/commit failed). Any other tracked change
+  # is unrelated local work and stops the automation.
+  $allowedConfigChange = -not $needsWrite
+  $unrelated = @($statusResult.Output | Where-Object {
+      if ($_ -match '^\?\?') { return $false }
+      if ($allowedConfigChange -and $_ -match 'apps[\\/]web[\\/]next\.config\.mjs$') { return $false }
+      return $true
+    })
   if ($unrelated.Count -gt 0) {
     $script:SyncPending = $false
     Write-SyncLog "Skipped: working tree has tracked changes; commit or stash them first."
@@ -542,32 +550,79 @@ function Sync-VercelFallback {
   $remoteResult = Invoke-GitCapture @("rev-parse", "origin/main")
   $head = if ($headResult.Output.Count -gt 0) { ([string]$headResult.Output[0]).Trim() } else { "" }
   $remote = if ($remoteResult.Output.Count -gt 0) { ([string]$remoteResult.Output[0]).Trim() } else { "" }
-  if (-not $head -or -not $remote -or $head -ne $remote) {
+  if (-not $head -or -not $remote) {
+    $script:SyncPending = $true
+    Write-SyncLog "Skipped: could not read HEAD or origin/main; will retry."
+    return
+  }
+
+  # A previous sync may have committed locally but failed to push. Allow only
+  # those sync commits to be retried; never push unrelated local history.
+  if ($head -ne $remote) {
+    $behindResult = Invoke-GitCapture @("rev-list", "--count", "HEAD..origin/main")
+    $behindText = if ($behindResult.Output.Count -gt 0) { ([string]$behindResult.Output[0]).Trim() } else { "" }
+    $behind = -1
+    if (-not [int]::TryParse($behindText, [ref]$behind)) { $behind = -1 }
+    if ($behindResult.ExitCode -ne 0 -or $behind -ne 0) {
+      $script:SyncPending = $false
+      Write-SyncLog "Skipped: local main is behind or diverged from origin/main (behind=$behindText)."
+      return
+    }
+    $logResult = Invoke-GitCapture @("log", "origin/main..HEAD", "--format=%s")
+    if ($logResult.ExitCode -ne 0) {
+      $script:SyncPending = $true
+      Write-SyncLog "Skipped: could not inspect local commits; will retry."
+      return
+    }
+    $unexpected = @($logResult.Output | Where-Object { $_ -and $_.Trim() -ne "chore: sync demo tunnel fallback" })
+    if ($unexpected.Count -gt 0) {
+      $script:SyncPending = $false
+      Write-SyncLog "Skipped: local main has commits that are not tunnel-fallback syncs."
+      return
+    }
+  }
+
+  if ($needsWrite) {
+    $prefix = $content.Substring(0, $match.Groups[1].Index + $match.Groups[1].Length)
+    $suffix = $content.Substring($match.Groups[2].Index)
+    $newContent = $prefix + $script:PublicUrl + $suffix
+    [System.IO.File]::WriteAllText($configPath, $newContent, (New-Object System.Text.UTF8Encoding($false)))
+    Write-SyncLog "Updated fallback to $($script:PublicUrl)."
+  }
+
+  # Commit the file if it still has an uncommitted change (first sync or a
+  # previous add/commit failure).
+  $configStatus = Invoke-GitCapture @("status", "--porcelain", "--", "apps/web/next.config.mjs")
+  if ($configStatus.ExitCode -ne 0) {
+    $script:SyncPending = $true
+    Write-SyncLog "Skipped: could not inspect the fallback file; will retry."
+    return
+  }
+  if ($configStatus.Output.Count -gt 0) {
+    $addResult = Invoke-GitCapture @("add", "--", "apps/web/next.config.mjs")
+    if ($addResult.ExitCode -ne 0) {
+      $script:SyncPending = $true
+      Write-SyncLog "git add failed (exit $($addResult.ExitCode)); will retry: $($addResult.Output -join ' ')"
+      return
+    }
+    $message = "chore: sync demo tunnel fallback"
+    $body = "Automated by scripts/demo/start.ps1 because the Cloudflare quick tunnel changed to $($script:PublicUrl)."
+    $commitResult = Invoke-GitCapture @("commit", "-m", $message, "-m", $body)
+    if ($commitResult.ExitCode -ne 0) {
+      $script:SyncPending = $true
+      Write-SyncLog "git commit failed (exit $($commitResult.ExitCode)); will retry: $($commitResult.Output -join ' ')"
+      return
+    }
+  }
+
+  $headAfterResult = Invoke-GitCapture @("rev-parse", "HEAD")
+  $headAfter = if ($headAfterResult.Output.Count -gt 0) { ([string]$headAfterResult.Output[0]).Trim() } else { "" }
+  if ($headAfter -and $headAfter -eq $remote) {
     $script:SyncPending = $false
-    Write-SyncLog "Skipped: local main is not identical to origin/main."
+    Write-SyncLog "Fallback is current and pushed ($($script:PublicUrl))."
     return
   }
 
-  $prefix = $content.Substring(0, $match.Groups[1].Index + $match.Groups[1].Length)
-  $suffix = $content.Substring($match.Groups[2].Index)
-  $newContent = $prefix + $script:PublicUrl + $suffix
-  [System.IO.File]::WriteAllText($configPath, $newContent, (New-Object System.Text.UTF8Encoding($false)))
-  Write-SyncLog "Updated fallback to $($script:PublicUrl)."
-
-  $addResult = Invoke-GitCapture @("add", "--", "apps/web/next.config.mjs")
-  if ($addResult.ExitCode -ne 0) {
-    $script:SyncPending = $true
-    Write-SyncLog "git add failed (exit $($addResult.ExitCode)); will retry: $($addResult.Output -join ' ')"
-    return
-  }
-  $message = "chore: sync demo tunnel fallback"
-  $body = "Automated by scripts/demo/start.ps1 because the Cloudflare quick tunnel changed to $($script:PublicUrl)."
-  $commitResult = Invoke-GitCapture @("commit", "-m", $message, "-m", $body)
-  if ($commitResult.ExitCode -ne 0) {
-    $script:SyncPending = $true
-    Write-SyncLog "git commit failed (exit $($commitResult.ExitCode)); will retry: $($commitResult.Output -join ' ')"
-    return
-  }
   $pushResult = Invoke-GitCapture @("push", "origin", "main")
   if ($pushResult.ExitCode -ne 0) {
     $script:SyncPending = $true
