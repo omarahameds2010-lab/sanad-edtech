@@ -1,7 +1,7 @@
 # Deployment Runbook — Vercel + local demo API
 
 > **Current demo:** web on Vercel; API and PostgreSQL on the demo laptop, exposed through a Cloudflare quick tunnel. The Railway API endpoint returns `404 Application not found` and is retired.
-> **Verified 16 November 2026:** local runtime connects as `app_user` with RLS active; new code `DATABASE_URL` only; API **359/359**, web **158/158**, build **4/4**, RLS e2e **5/5**, live smoke **8/8**, demo doctor **10/10**. Migration chain is **8/8**.
+> **Verified 16 November 2026:** local runtime connects as `app_user` with RLS active; new code `DATABASE_URL` only; API **365/365**, web **158/158**, build **4/4**, RLS e2e **5/5**, live smoke **8/8**, demo doctor **10/10**. Migration chain is **8/8**.
 > Canonical state: [`CURRENT-STATE.md`](CURRENT-STATE.md).
 
 ## 0. Topology
@@ -325,7 +325,7 @@ RLS being inactive on a host is a known gap, not a reason to claim hosted isolat
 
 - Hosted RLS activation: local runtime is active, but the Railway endpoint is retired and was never migrated (section 5).
 - Outbox dispatcher (events are written, not delivered).
-- No video webhook route.
+- Real Bunny webhook round trip (route exists and is unit-tested; no Bunny library/key is configured in the demo).
 - No Bull processors.
 - Railway auto-deploy: the service is retired; the 28 October deploy was manual with `railway up`.
 - Real provider sandbox transaction not yet recorded.

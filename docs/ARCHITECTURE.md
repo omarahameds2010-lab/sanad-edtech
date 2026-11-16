@@ -207,7 +207,7 @@ Paymob and Fawry are implemented. Instapay, Vodafone Cash, and e&money are scaff
 - Signed playback token: HMAC, default 5 minutes.
 - Watermark engine: deterministic positions + HMAC payload.
 - Playback sessions and capture events are modeled.
-- The provider webhook HTTP route is absent. Bunny's webhook verification helper is not exposed.
+- Provider webhook route: `POST /api/video/webhooks/:provider` verifies the raw-body HMAC, resolves the tenant from the callback Host, updates the video and writes the outbox event in one transaction, and ignores stale/replayed callbacks. Unit-tested; a real Bunny library/key is not configured in the demo.
 
 Do not describe the platform as DRM-complete. It is a layered deterrent plus provider controls, not unbreakable DRM.
 
@@ -254,7 +254,7 @@ Vercel fail-safes:
 
 1. Hosted RLS activation (local is active; the retired Railway runtime was not migrated).
 2. Outbox dispatcher.
-3. Video webhook route.
+3. Real-provider video webhook verification (route exists and is unit-tested; no Bunny library/key configured).
 4. Background job processors.
 5. Persisted word-level review evidence.
 6. Provider sandbox verification.

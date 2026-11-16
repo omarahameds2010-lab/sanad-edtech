@@ -39,7 +39,7 @@
 > **Critical caveats**
 >
 > - **RLS is active on the local demo only.** The Railway endpoint is retired and its runtime was never migrated to `app_user`; do not claim hosted RLS enforcement. If the API is redeployed, follow `docs/DEPLOY.md` §5.2 and re-run the 5/5 isolation proof. Application `tenantId` filters remain in every query as defense in depth.
-> - There is no video webhook route; the video webhook design below is not exposed.
+> - The video webhook route now exists (`POST /api/video/webhooks/:provider`) with raw-body HMAC verification, tenant-scoped lookup, and a transactional video update + outbox event. It is unit-tested (6/6); a real Bunny library/key is not configured, so a live provider callback is still pending. VdoCipher remains a stub.
 > - There is no outbox dispatcher.
 > - Published course/lesson/exam content has **no immutable version/snapshot layer yet**; the “publish = immutable snapshot” language below is a target control, not a current guarantee.
 > - Exam auto-submit is client-driven; the API marks a late submit `TIMED_OUT`, but no scheduled worker submits abandoned attempts.
@@ -101,7 +101,7 @@
 | 9 | Tenant-scoped UNIQUE constraints (idempotency, attempts, enrollments) | ✅ | `prisma/schema.prisma:137,394,514,998` |
 | 10 | Paymob HMAC-SHA512 + constant-time compare | ✅ | `payments/providers/paymob/paymob.provider.ts:151,334,338` |
 | 11 | Fawry signature + constant-time compare | ✅ | `payments/providers/fawry/fawry.provider.ts:186,201` |
-| 12 | Bunny webhook HMAC helper + constant-time compare | ⚠️ helper only; no HTTP route | `video/providers/bunny-stream.provider.ts:324,338,343` |
+| 12 | Bunny webhook HMAC + raw-body route + constant-time compare | ✅ route implemented + 6/6 unit tests; real Bunny callback pending | `video/video-webhook.controller.ts` · `video/video.service.ts:516` · `video/providers/bunny-stream.provider.ts:324,338,343` |
 | 13 | Watermark HMAC + verify | ✅ | `video-protection/services/watermark-engine.ts:115,130` |
 | 14 | Playback token HMAC sign/verify | ✅ | `video-protection/services/signed-token.service.ts:103,153,174,179` |
 | 15 | Webhook inbox (provider interface + service) | ✅ | `payments/webhooks/webhook-inbox.service.ts:51` · `payment-provider.interface.ts:131` |
@@ -779,11 +779,15 @@ async verifyWebhook(...) {                      // line 151
 // Fawry reference-number flow (kiosk/cash): PENDING until provider confirms paid (never trust the slip photo).
 ```
 
-### Bunny Video Webhooks (Same Discipline — `bunny-stream.provider.ts:324,338,343,368`)
+### Bunny Video Webhooks (Same Discipline — `video/video-webhook.controller.ts` + `video.service.ts:516` + `bunny-stream.provider.ts:324,338,343`)
 
-```typescript
-// VERIFIED: dual-path verify (signingKey || apiKey fallback, lines 343/368) — DOCUMENT which env
-// selects which path; fallback order is itself a security decision (prefer signingKey, alert on fallback use).
+```
+ROUTE: POST /api/video/webhooks/:provider (public; CSRF-exempt; SkipThrottle)
+AUTH: HMAC-SHA256 over the exact raw body, X-Bunny-Signature, timingSafeEqual with a length guard.
+TENANT: resolved from the callback Host before the controller; every lookup/update is scoped to it.
+STATE: Video status + outbox event commit in one transaction; stale callbacks cannot move READY back;
+       repeated same-status callbacks are acknowledged as duplicates.
+LIMIT: no Bunny library/key in the demo, so the route is unit-tested but has not received a real callback.
 ```
 
 ### Stub Providers (Instapay / Vodafone Cash / e& Money — `*.provider.ts:80`)
@@ -1475,6 +1479,7 @@ DELIVERABLE: findings with SEVERITY + REPRO (requestIds) + retest window. Fix SL
 | v2.1 | 2026-10-27 | Pending retakes branch documented: active-attempt status, attempt uniqueness, server-side `maxAttempts`, active-before-max `409`, gap-tolerant numbering, grading-queue exclusion, migration #8 backfill/preflight; authoring-read bypass fixes added to the hardening branch; production remains on the one-row model |
 | v2.2 | 2026-10-28 | Hardening and retakes merged and deployed; migration #8 applied (8/8); backup restore-tested; production retake smoke 31/31; rate limiting/lock enforcement/authoring-read fixes live; RLS activation and distributed rate limiting remain open; SETH-9 recorded as roadmap-only |
 | v2.3 | 2026-11-16 | Local RLS runtime activated as `app_user` (no SUPERUSER/BYPASSRLS); RLS e2e 5/5; async webhook tenant-context fix and signed round trip; voucher checkout under RLS; destructive demo reset with backup; hosted Railway endpoint retired and not RLS-migrated |
+| v2.4 | 2026-11-16 | Video provider webhook route added (`POST /api/video/webhooks/:provider`): raw-body HMAC before parsing, Host-resolved tenant scope, transactional `Video` update + outbox event, stale/replay handling, 6 unit tests; CSRF exemption mirrors payment webhooks. Bunny library/key not configured, so real-provider verification remains pending. API suite 365/365. |
 
 ---
 

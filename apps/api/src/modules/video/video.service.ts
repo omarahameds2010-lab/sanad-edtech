@@ -4,6 +4,7 @@ import {
   ConflictException,
   NotFoundException,
   ForbiddenException,
+  UnauthorizedException,
   Inject,
   forwardRef,
 } from "@nestjs/common";
@@ -15,6 +16,7 @@ import { EntitlementsService } from "../entitlements/entitlements.service";
 import { AuditService } from "../audit/audit.service";
 import { OutboxService } from "../outbox/outbox.service";
 import { Prisma, VideoStatus } from "@prisma/client";
+import { applyTenantContext } from "../../common/prisma/tenant-context";
 import * as crypto from "crypto";
 
 export interface CreateVideoInput {
@@ -511,36 +513,275 @@ export class VideoService {
   }
 
   /**
-   * Handle provider webhook
+   * Handle a provider webhook.
+   *
+   * The raw body is verified before any parsing so the HMAC covers exactly the
+   * bytes the provider signed. The tenant comes from the request Host (the
+   * provider posts to the tenant's public API origin), and every lookup/update
+   * is scoped to it. The route is public at the HTTP layer but the provider
+   * signature is the authentication boundary.
    */
   async handleProviderWebhook(
     providerName: string,
-    payload: any,
+    tenantId: string,
+    rawBody: Buffer | string | undefined,
     headers: Record<string, string>,
-  ) {
-    const provider = this.videoProviderRegistry.getProvider(providerName);
+  ): Promise<{
+    received: true;
+    matched: boolean;
+    videoId?: string;
+    status?: VideoStatus;
+    ignored?: string;
+    duplicate?: boolean;
+  }> {
+    const normalizedProvider =
+      providerName === "bunny" ? "bunny-stream" : providerName;
+    const provider =
+      this.videoProviderRegistry.getProvider(normalizedProvider);
     if (!provider) {
       throw new BadRequestException("Provider not found");
     }
 
-    // Verify webhook signature
-    const isValid = await provider.verifyWebhook(payload, headers);
-    if (!isValid) {
-      throw new BadRequestException("Invalid webhook signature");
+    if (!rawBody || rawBody.length === 0) {
+      throw new BadRequestException("Raw webhook body is required");
     }
 
-    // Process webhook
-    await provider.handleWebhook(payload);
+    const isValid = await provider.verifyWebhook(rawBody, headers);
+    if (!isValid) {
+      throw new UnauthorizedException("Invalid webhook signature");
+    }
 
-    // Log webhook
-    await this.auditService.log({
-      tenantId: "system",
-      actorUserId: undefined,
-      action: "VIDEO_WEBHOOK_RECEIVED",
-      resourceType: "video",
-      resourceId: payload.providerVideoId,
-      metadata: { provider: providerName, eventType: payload.eventType },
+    let payload: any;
+    try {
+      payload = JSON.parse(
+        typeof rawBody === "string" ? rawBody : rawBody.toString("utf8"),
+      );
+    } catch {
+      throw new BadRequestException("Invalid webhook JSON");
+    }
+
+    if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+      throw new BadRequestException("Invalid webhook payload");
+    }
+
+    const providerVideoId = String(
+      payload.VideoGuid ??
+        payload.videoGuid ??
+        payload.videoId ??
+        payload.providerVideoId ??
+        "",
+    ).trim();
+
+    if (!providerVideoId) {
+      return { received: true, matched: false, ignored: "MISSING_VIDEO_ID" };
+    }
+
+    const video = await this.prisma.video.findFirst({
+      where: { tenantId, providerVideoId },
     });
+    if (!video) {
+      return { received: true, matched: false, ignored: "VIDEO_NOT_FOUND" };
+    }
+    if (video.status === VideoStatus.ARCHIVED) {
+      return {
+        received: true,
+        matched: true,
+        videoId: video.id,
+        status: video.status,
+        ignored: "ARCHIVED",
+      };
+    }
+
+    const nextStatus = this.mapVideoWebhookStatus(payload);
+    if (!nextStatus) {
+      return {
+        received: true,
+        matched: true,
+        videoId: video.id,
+        ignored: "UNKNOWN_STATUS",
+      };
+    }
+
+    // Do not let a late/out-of-order callback move a finished video backwards.
+    if (
+      nextStatus !== VideoStatus.FAILED &&
+      this.videoStatusRank(nextStatus) < this.videoStatusRank(video.status)
+    ) {
+      return {
+        received: true,
+        matched: true,
+        videoId: video.id,
+        status: video.status,
+        ignored: "STALE_STATUS",
+      };
+    }
+
+    if (video.status === nextStatus) {
+      return {
+        received: true,
+        matched: true,
+        videoId: video.id,
+        status: video.status,
+        duplicate: true,
+      };
+    }
+
+    const duration = this.positiveInt(
+      payload.Length ?? payload.length ?? payload.duration,
+    );
+    const width = this.positiveInt(payload.Width ?? payload.width);
+    const height = this.positiveInt(payload.Height ?? payload.height);
+    const thumbnailUrl =
+      payload.ThumbnailUrl ?? payload.thumbnailUrl ?? undefined;
+    const errorMessage =
+      payload.ErrorMessage ?? payload.errorMessage ?? payload.Message;
+
+    const updated = await this.prisma.$transaction(async (tx) => {
+      await applyTenantContext(tx, tenantId);
+
+      const row = await tx.video.update({
+        where: { id: video.id },
+        data: {
+          status: nextStatus,
+          ...(duration !== null ? { duration } : {}),
+          ...(width !== null ? { width } : {}),
+          ...(height !== null ? { height } : {}),
+          ...(typeof thumbnailUrl === "string" && thumbnailUrl
+            ? { thumbnailUrl }
+            : {}),
+          ...(nextStatus === VideoStatus.READY
+            ? { processedAt: new Date(), errorMessage: null }
+            : {}),
+          ...(nextStatus === VideoStatus.PUBLISHED
+            ? { processedAt: new Date(), publishedAt: new Date() }
+            : {}),
+          ...(nextStatus === VideoStatus.FAILED
+            ? {
+                errorMessage:
+                  typeof errorMessage === "string" && errorMessage
+                    ? errorMessage
+                    : "Provider reported a processing failure",
+              }
+            : {}),
+        },
+      });
+
+      // The status update and the outbox row commit together. A retry after a
+      // crash cannot leave a READY video with no event, and the duplicate
+      // status check above prevents a replayed callback from publishing twice.
+      await this.outboxService.publish(
+        tenantId,
+        {
+          eventType: this.videoWebhookEventType(nextStatus),
+          aggregateType: "video",
+          aggregateId: video.id,
+          payload: {
+            videoId: video.id,
+            provider: normalizedProvider,
+            providerVideoId,
+            status: nextStatus,
+          },
+        },
+        tx,
+      );
+
+      return row;
+    });
+
+    await this.auditService.log({
+      tenantId,
+      action: "VIDEO_WEBHOOK_PROCESSED",
+      resourceType: "video",
+      resourceId: video.id,
+      metadata: {
+        provider: normalizedProvider,
+        providerVideoId,
+        status: nextStatus,
+        eventType: payload.EventType ?? payload.eventType ?? null,
+      },
+    });
+
+    return {
+      received: true,
+      matched: true,
+      videoId: updated.id,
+      status: updated.status,
+    };
+  }
+
+  private mapVideoWebhookStatus(payload: any): VideoStatus | null {
+    const numeric = Number(payload.Status ?? payload.status);
+    if (Number.isFinite(numeric)) {
+      const statusMap: Record<number, VideoStatus> = {
+        0: VideoStatus.UPLOADING,
+        1: VideoStatus.PROCESSING,
+        2: VideoStatus.READY,
+        3: VideoStatus.FAILED,
+      };
+      if (statusMap[numeric]) return statusMap[numeric];
+    }
+
+    const event = String(
+      payload.EventType ?? payload.eventType ?? "",
+    ).toLowerCase();
+    if (event.includes("fail")) return VideoStatus.FAILED;
+    if (
+      event.includes("processed") ||
+      event.includes("finished") ||
+      event.includes("completed")
+    ) {
+      return VideoStatus.READY;
+    }
+    if (event.includes("processing") || event.includes("uploaded")) {
+      return VideoStatus.PROCESSING;
+    }
+    if (event.includes("created")) return VideoStatus.UPLOADING;
+
+    return null;
+  }
+
+  private videoStatusRank(status: VideoStatus): number {
+    switch (status) {
+      case VideoStatus.UPLOADING:
+        return 0;
+      case VideoStatus.PROCESSING:
+        return 1;
+      case VideoStatus.FAILED:
+        return 1;
+      case VideoStatus.READY:
+        return 2;
+      case VideoStatus.PUBLISHED:
+        return 3;
+      case VideoStatus.ARCHIVED:
+        return 4;
+      default:
+        return 0;
+    }
+  }
+
+  private videoWebhookEventType(status: VideoStatus): string {
+    switch (status) {
+      case VideoStatus.UPLOADING:
+        return "video.upload.started";
+      case VideoStatus.PROCESSING:
+        return "video.processing.started";
+      case VideoStatus.READY:
+        return "video.processing.completed";
+      case VideoStatus.FAILED:
+        return "video.processing.failed";
+      case VideoStatus.PUBLISHED:
+        return "video.published";
+      case VideoStatus.ARCHIVED:
+        return "video.deleted";
+      default:
+        return "video.processing.completed";
+    }
+  }
+
+  private positiveInt(value: unknown): number | null {
+    const numeric = Number(value);
+    if (!Number.isFinite(numeric) || numeric <= 0) return null;
+    return Math.trunc(numeric);
   }
 
   private formatBytes(bytes: number): string {

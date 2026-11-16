@@ -11,7 +11,7 @@
 >
 > **What does not exist / is not active**
 >
-> - There is **no video webhook HTTP route**. Provider webhook helpers are not exposed.
+> - The video webhook route exists (`POST /api/video/webhooks/:provider`) and is unit-tested with raw-body HMAC verification, tenant scoping, and transactional updates. A real Bunny library/key is not configured, so no live provider callback has been recorded.
 > - There is **no `WatermarkOverlay` React component** in `apps/web`; the overlay/tamper-detection UI described below is a specification, not current UI.
 > - The current YouTube demo path does not use the Bunny token/watermark pipeline.
 > - The playback token TTL default is **5 minutes** (`VIDEO_TOKEN_TTL_MS=300000`), not 2 hours.

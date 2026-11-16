@@ -339,12 +339,13 @@ export class BunnyStreamProvider implements VideoProvider {
       .update(typeof payload === "string" ? payload : payload.toString())
       .digest("hex");
 
-    return Promise.resolve(
-      crypto.timingSafeEqual(
-        Buffer.from(signature),
-        Buffer.from(expectedSignature),
-      ),
-    );
+    const received = Buffer.from(signature);
+    const expected = Buffer.from(expectedSignature);
+    if (received.length !== expected.length) {
+      return Promise.resolve(false);
+    }
+
+    return Promise.resolve(crypto.timingSafeEqual(received, expected));
   }
 
   private generateTusToken(videoGuid: string): string {

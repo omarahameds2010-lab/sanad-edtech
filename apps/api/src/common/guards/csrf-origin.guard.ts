@@ -45,6 +45,7 @@ export class CsrfOriginGuard implements CanActivate {
    */
   private static readonly EXEMPT_PATH_PREFIXES = [
     "/api/payments/webhooks",
+    "/api/video/webhooks",
     "/api/health",
     "/api/ready",
   ];

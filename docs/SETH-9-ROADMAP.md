@@ -15,7 +15,7 @@ SETH-9 is the working name for a set of advanced security ideas raised for the p
 - active deception (honeytokens, canary content, decoy paths);
 - crypto-shredding as a deletion mechanism.
 
-These are legitimate long-term research directions, but none of them is a substitute for the basic controls this platform still needs. The local demo has now closed the RLS runtime gap (`app_user`, 5/5 isolation proof), but the following P1 gaps remain: hosted RLS activation if the API is redeployed (Railway is retired), no transactional-outbox dispatcher, no video webhook route, and rate limiting that is in-memory per API instance. Adding advanced cryptography before those controls are closed would increase complexity without reducing the most likely risks.
+These are legitimate long-term research directions, but none of them is a substitute for the basic controls this platform still needs. The local demo has now closed the RLS runtime gap (`app_user`, 5/5 isolation proof) and added a unit-tested video webhook route, but the following P1 gaps remain: hosted RLS activation if the API is redeployed (Railway is retired), no transactional-outbox dispatcher, no real Bunny webhook round trip, and rate limiting that is in-memory per API instance. Adding advanced cryptography before those controls are closed would increase complexity without reducing the most likely risks.
 
 The platform also handles minors, assessments, payments, and video content. A security control that is hard to operate, hard to explain, or easy to misconfigure can make the system less safe than a simpler control that is actually enforced.
 
@@ -51,7 +51,7 @@ Required work:
 
 - activate RLS at runtime as `app_user`; rotate the database password by hand; remove the owner URL from the runtime path;
 - add an outbox dispatcher with retries and observability;
-- add the video-provider webhook route with signature verification;
+- [x] add the video-provider webhook route with signature verification (unit-tested; real Bunny callback pending);
 - replace in-memory rate limiting with shared storage and verify proxy-IP handling;
 - keep migration backups, restore tests, and rollback drills current;
 - make CI a reliable release signal, or explicitly keep local test/build evidence as the gate;
@@ -166,7 +166,7 @@ Hard problems:
 Phase 0 baseline
   ├─ RLS activation
   ├─ outbox dispatcher
-  ├─ video webhook
+  ├─ video webhook (route + unit tests done; live Bunny callback pending)
   ├─ distributed rate limiting
   └─ backup/restore + CI evidence
         ↓

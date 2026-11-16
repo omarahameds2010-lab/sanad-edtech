@@ -164,7 +164,7 @@ Do not claim every provider is live.
 | Claim | Status |
 | --- | --- |
 | 3 published Arabic courses | Seeded in `sanad-demo` |
-| 359 API tests | Verified 16 Nov 2026 after local RLS activation |
+| 365 API tests | Verified 16 Nov 2026 after RLS activation + video webhook |
 | 158 web tests | Verified 16 Nov 2026 |
 | Build 4/4 | Verified 16 Nov 2026 |
 | Migrations 8/8 | Verified on the local Docker database |
@@ -172,6 +172,6 @@ Do not claim every provider is live.
 | Rate limiting + lock enforcement live | Yes — local API; still in-memory per API instance |
 | RLS enforced | **Yes locally** — runtime connects as `app_user`; 5/5 isolation proof; hosted Railway retired and not migrated |
 | Outbox delivered | **No** — no dispatcher |
-| Video webhook | **No** — no route |
+| Video webhook | **Route implemented + unit-tested** — no real Bunny callback yet |
 | Paymob/Fawry sandbox charge | **Not yet verified** |
 | 38.8ms / Recall@5 / 393 achievements | **Not in this repository; do not claim** |

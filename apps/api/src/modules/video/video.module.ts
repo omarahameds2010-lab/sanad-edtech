@@ -1,6 +1,7 @@
 import { Module } from "@nestjs/common";
 import { VideoService } from "./video.service";
 import { VideoController } from "./video.controller";
+import { VideoWebhookController } from "./video-webhook.controller";
 import { VideoProviderRegistry } from "./providers/video-provider.registry";
 import { BunnyStreamProvider } from "./providers/bunny-stream.provider";
 import { VdoCipherProvider } from "./providers/vdocipher.provider";
@@ -18,7 +19,7 @@ import { OutboxModule } from "../outbox/outbox.module";
     AuditModule,
     OutboxModule,
   ],
-  controllers: [VideoController],
+  controllers: [VideoController, VideoWebhookController],
   providers: [
     VideoService,
     VideoProviderRegistry,
