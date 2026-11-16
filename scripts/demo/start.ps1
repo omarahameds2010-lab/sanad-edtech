@@ -392,6 +392,8 @@ function Start-Cloudflared {
   # normal stop-and-replace path below still runs.
   if (Test-TunnelHealth) {
     $script:PublicUrl = (Get-Content $tunnelUrlFile -Raw).Trim()
+    $pidText = Get-Content $tunnelPidFile -ErrorAction SilentlyContinue | Select-Object -First 1
+    if ($pidText -match "^\d+$") { $script:TunnelPid = [int]$pidText }
     Write-Step "Cloudflare quick tunnel already healthy: $($script:PublicUrl); reusing it."
     return
   }
@@ -589,8 +591,8 @@ function Sync-VercelFallback {
       return $true
     })
   if ($unrelated.Count -gt 0) {
-    $script:SyncPending = $false
-    Write-SyncLog "Skipped: working tree has tracked changes; commit or stash them first."
+    $script:SyncPending = $true
+    Write-SyncLog "Skipped: working tree has tracked changes; commit or stash them first; will retry."
     return
   }
 
@@ -630,8 +632,8 @@ function Sync-VercelFallback {
     }
     $unexpected = @($logResult.Output | Where-Object { $_ -and $_.Trim() -ne "chore: sync demo tunnel fallback" })
     if ($unexpected.Count -gt 0) {
-      $script:SyncPending = $false
-      Write-SyncLog "Skipped: local main has commits that are not tunnel-fallback syncs."
+      $script:SyncPending = $true
+      Write-SyncLog "Skipped: local main has commits that are not tunnel-fallback syncs; will retry after they are pushed."
       return
     }
   }
