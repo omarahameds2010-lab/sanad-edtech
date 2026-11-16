@@ -114,7 +114,7 @@ curl.exe -s https://sanad-edtech.vercel.app/api/health
 الوضع الحالي مؤقت: الـAutostart مثبت على Cloudflare quick tunnel مع `-SyncFallback`. الرابط الحالي:
 
 ```text
-https://manufactured-with-alberta-cable.trycloudflare.com
+https://longest-order-ham-membrane.trycloudflare.com
 ```
 
 عند كل تغيير في رابط الـQuick Tunnel:
@@ -132,9 +132,9 @@ https://manufactured-with-alberta-cable.trycloudflare.com
 
 > ده Bridge مؤقت: لسه فيه Vercel Redeploy ووقت قصير بعد الـReboot. الحل النهائي هو ngrok static domain عشان الرابط ما يتغيرش أصلاً.
 
-> **16 نوفمبر 2026:** تشغيل الـWatchdog والـAPI والـTunnel شغالين أعاد استخدام الـAPI والـTunnel الصحيين، وحافظ على نفس الرابط `manufactured-with-alberta-cable.trycloudflare.com`، فمفيش Redeploy على Vercel. ده مهم بعد أي إعادة تشغيل يدوية للـWatchdog.
+> **16 نوفمبر 2026:** تشغيل الـWatchdog والـAPI والـTunnel شغالين أعاد استخدام الـAPI والـTunnel الصحيين، وحافظ على نفس الرابط، فمفيش Redeploy على Vercel. ده مهم بعد أي إعادة تشغيل يدوية للـWatchdog.
 
-> الرابط اتغير تاني بعد منتصف 16 نوفمبر 2026، والـWatchdog كتب الـFallback الجديد (`1fbc7e8`) وعمل Push تلقائياً، والموقع رجع **200**. ده تأكيد إضافي إن مسار الـSync شغال من غير تدخل يدوي.
+> في وقت لاحق من 16 نوفمبر 2026، عملية cloudflared وقعت؛ الـWatchdog عمل Tunnel جديد `longest-order-ham-membrane.trycloudflare.com`، وsync الـFallback (`3dab53e`) بعد ما اتعمل push لشغل RLS، والموقع رجع **200**. اتصلح كمان خطأ الـPID القديم: مسار إعادة الاستخدام بقى يقرأ `tunnel.pid` من الملف، والـSync بيفضل معلّق ويعيد المحاولة لو الشجرة فيها تغييرات أو commits مش متدفوعة.
 
 > لو `API_PROXY_TARGET` متظبط في Vercel Production، فهو بياخد أولوية على الـFallback. الوضع الحالي اتحقق منه بعد تغيير الـTunnel في 15 نوفمبر: الموقع رجع **200** بعد تحديث الـFallback، يعني مفيش `API_PROXY_TARGET` قديم بيغطي عليه. مش قادرين نفحص Vercel env مباشرة لأن الـCLI/Token مش موجودين على اللابتوب.
 

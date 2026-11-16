@@ -13,7 +13,7 @@
 | Hardening / retakes | **Live** — rate limiting, lock enforcement, authoring-read fixes, and assignment retakes |
 | Sprint 2 paid checkout | **Implemented, deployed, and live-verified** — `402` paid-course guard, atomic enrollment, voucher checkout |
 | Web | <https://sanad-edtech.vercel.app> |
-| API public origin | <https://manufactured-with-alberta-cable.trycloudflare.com> — quick tunnel; changes on restart |
+| API public origin | <https://longest-order-ham-membrane.trycloudflare.com> — quick tunnel; changes on restart |
 | Health | `/api/health` → **200**, database **up** |
 | Login page | **200** |
 | Demo tenant | `sanad-demo` |
@@ -134,5 +134,6 @@ Production retake smoke passed **31/31**; the demo assignment is set to `maxAtte
 | 2026-11-15 | Autostart installed with `-SyncFallback`; full cold start (watchdog/tunnel/API/Docker stopped, Startup cmd launched) synced the fallback (`14a82df`) and live health returned 200 in about 70 seconds; one-click paths and `402` re-verified; authenticated live smoke 8/8 |
 | 2026-11-16 | Overnight tunnel restart auto-synced the fallback (`1fbc7e8`, `manufactured-with-alberta-cable`) and live health returned 200; restore-tested the local demo backup into a temporary DB (44 tables, 138 RLS policies, 8 migrations, demo data intact); set AC sleep/hibernate to Never; added `pnpm demo:doctor` preflight (10/10) and re-ran the authenticated smoke (8/8) |
 | 2026-11-16 | RLS runtime activated locally as `app_user` (no SUPERUSER/BYPASSRLS); destructive `pnpm demo:reset` with automatic backup; RLS e2e 5/5; voucher and signed Paymob webhook round trips under RLS; 359/359 API, 158/158 web, build 4/4; watchdog resumed and reused the healthy tunnel/API; doctor 10/10 after commit |
+| 2026-11-16 | Afternoon: cloudflared process died; the watchdog started `longest-order-ham-membrane`, synced the fallback (`3dab53e`) after the RLS commit was pushed, and Vercel redeployed; live health returned 200. Fixed the watchdog reuse path to read `tunnel.pid` back and to keep retrying fallback sync after a dirty tree or unpushed commits. |
 
 Historical audit: [`AUDIT-2026-10-16.md`](AUDIT-2026-10-16.md). It is preserved as a dated snapshot, not rewritten.
