@@ -11,14 +11,15 @@ export class PrismaService
   implements OnModuleInit, OnModuleDestroy
 {
   constructor() {
-    // Connection comes from the environment (never hardcode credentials:
-    // a live superuser password in source is a secret leak AND, written as
-    // a bare identifier, a compile error). MIGRATION_DATABASE_URL is the
-    // superuser connection string per apps/api/.env.example.
-    const url = process.env.MIGRATION_DATABASE_URL || process.env.DATABASE_URL;
+    // Runtime connection: the non-owner app_user role, subject to FORCE RLS.
+    // Never fall back to MIGRATION_DATABASE_URL here. Migrations and seeds
+    // opt into the owner connection explicitly (MIGRATION_DATABASE_URL) in
+    // their own commands; the API runtime must not silently become a
+    // superuser bypass.
+    const url = process.env.DATABASE_URL;
     if (!url) {
       throw new Error(
-        "Missing MIGRATION_DATABASE_URL (or DATABASE_URL) environment variable",
+        "Missing DATABASE_URL (runtime app_user connection) environment variable",
       );
     }
 
@@ -39,8 +40,11 @@ export class PrismaService
     // same connection, same transaction — so PostgreSQL RLS policies see
     // the right tenant even on a reused pooled connection.
     //
-    // Without a store (health checks, seeds, CLI scripts) operations pass
-    // through exactly as before.
+    // Without a store (health/readiness, pre-auth tenant resolution) the
+    // operation passes through. Health uses SELECT 1 and tenant resolution
+    // uses a SECURITY DEFINER function, so neither needs tenant rows. Seeds
+    // and migrations connect separately as the owner via
+    // MIGRATION_DATABASE_URL.
     //
     // Interactive `$transaction(cb)` callers get a plain tx client; they
     // set the context themselves via applyTenantContext(tx, tenantId)
@@ -95,6 +99,33 @@ export class PrismaService
       try {
         await this.$connect();
         console.log(`✅ Database connected (attempt ${i})`);
+
+        // Make the RLS mode visible in the startup log. A superuser connection
+        // silently bypasses FORCE ROW LEVEL SECURITY, so this line is the
+        // quickest way to catch a misconfigured runtime URL.
+        try {
+          const identity = await this.$queryRawUnsafe<
+            Array<{ current_user: string; is_superuser: string }>
+          >(
+            "SELECT current_user, current_setting('is_superuser') AS is_superuser",
+          );
+          const row = identity[0];
+          if (row) {
+            console.log(
+              `🔐 DB runtime role: ${row.current_user} (superuser=${row.is_superuser})`,
+            );
+            if (row.is_superuser === "on") {
+              console.warn(
+                "⚠️ RLS is NOT enforcing: the runtime is connected as a superuser. Point DATABASE_URL at app_user.",
+              );
+            }
+          }
+        } catch (identityError: any) {
+          console.warn(
+            `Could not read the database runtime role: ${identityError?.message ?? identityError}`,
+          );
+        }
+
         return;
       } catch (err: any) {
         console.log(

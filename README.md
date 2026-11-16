@@ -62,7 +62,7 @@
 
 **Ready-made first slide:** [PNG](docs/assets/readme/01-demo-first-slide.png) · [editable HTML](docs/assets/readme/demo-first-slide.html) — includes the live link, QR, and the 4-step path.
 
-<sub>Demo-only accounts — never reuse them for a real tenant. Data can be reset before every walkthrough with `pnpm demo:reset`; see [`docs/DEMO-JUDGES.md`](docs/DEMO-JUDGES.md). Fallback film: [five-minute founder cut](https://drive.google.com/file/d/1j_6TDQVtOVDRyEcU1q0Jbt2ZMC5-zzIW/view?usp=sharing).</sub>
+<sub>Demo-only accounts - never reuse them for a real tenant. Data can be reset before every walkthrough with `pnpm demo:reset -Force`; see [`docs/DEMO-JUDGES.md`](docs/DEMO-JUDGES.md). Fallback film: [five-minute founder cut](https://drive.google.com/file/d/1j_6TDQVtOVDRyEcU1q0Jbt2ZMC5-zzIW/view?usp=sharing).</sub>
 
 ---
 

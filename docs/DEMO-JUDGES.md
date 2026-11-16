@@ -45,16 +45,14 @@ If they are unset, the seeded defaults above are used.
 
 ## Reset before a walkthrough
 
-The seed is idempotent and rebuilds the demo tenant without duplicating the core rows:
+`pnpm demo:reset -Force` is the destructive reset for the local Docker demo: automatic backup → `prisma migrate deploy` → truncate demo tables → seed free + paid demo → verify. It preserves `tenants`, `tenant_domains`, and `_prisma_migrations`, so the tenant ID and API cache stay valid.
 
 ```powershell
-# From the repo root, with the production/demo DB env loaded
-pnpm demo:reset
+# From the repo root, against the local Docker database
+pnpm demo:reset -Force
 ```
 
-If you want the "data is reset every 24 hours" promise to be automatic, create a
-daily Railway cron service that runs the same command at 02:00. Until that cron is
-configured, the banner says the data **can be reset** before each walkthrough.
+If you only want the idempotent backfill without deleting anything, use `pnpm demo:seed`. The Railway endpoint is retired; there is no production cron reset.
 
 ---
 

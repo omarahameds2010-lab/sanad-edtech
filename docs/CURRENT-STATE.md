@@ -1,6 +1,6 @@
 # Current State — 16 November 2026
 
-> **This is the canonical snapshot for the repository.** If another document disagrees with this file, this file wins. The Sprint 2 paid-checkout release was deployed on 14 November 2026; the live deployment was rechecked on 15–16 November 2026 after the Cloudflare quick tunnel changed twice. The 16 November preflight passed **10/10** and the authenticated smoke passed **8/8**.
+> **This is the canonical snapshot for the repository.** If another document disagrees with this file, this file wins. The Sprint 2 paid-checkout release was deployed on 14 November 2026; the live deployment was rechecked on 15–16 November 2026 after the Cloudflare quick tunnel changed twice. On 16 November 2026 the local API runtime was switched to the non-owner `app_user` role, so PostgreSQL RLS now enforces isolation locally (verified by the RLS isolation suite, the voucher checkout, and a signed Paymob webhook round trip). The destructive reset was exercised twice and restored the clean demo state. The 16 November preflight passed **10/10** and the authenticated smoke passed **8/8** after the RLS activation was committed.
 >
 > Historical reports keep their original date and evidence. They are not silently rewritten; they carry a banner pointing here.
 
@@ -10,9 +10,11 @@
 | --- | --- |
 | Production branch | `main` (GitHub's default branch is `master`; Vercel follows `main`) |
 | Web runtime code | Sprint 2 paid checkout (`aa4d2bc`) + tunnel fallback sync (`1fbc7e8`, config only) + UTF-8 comment cleanup (`7ca1ed3`, config only) — 14–16 November 2026 |
-| API code | Sprint 2 paid checkout (`aa4d2bc`) — 14 November 2026; local compiled API, no schema or migration change |
-| API runtime | Local compiled NestJS API on `:3002`; start with `pnpm demo:start` |
-| Demo launcher | `scripts/demo/start.ps1` at `4ec4546`; Windows Startup entry installed with `-Tunnel cloudflared -Watch -SyncFallback` |
+| API code | Sprint 2 paid checkout (`aa4d2bc`) + local RLS runtime activation and destructive-reset tooling — 16 November 2026; no schema or migration change |
+| API runtime | Local compiled NestJS API on `:3002`; runtime `DATABASE_URL` is the non-owner `app_user`; start with `pnpm demo:start` |
+| RLS runtime | **Active locally**: `app_user` (no SUPERUSER, no BYPASSRLS); startup log `DB runtime role: app_user (superuser=off)`; tenant context injected per request |
+| Demo reset | `pnpm demo:reset` = destructive reset (backup → migrate → truncate → seed free + paid demo → verify); `pnpm demo:seed` = idempotent backfill; `pnpm demo:paid` = paid data only |
+| Demo launcher | `scripts/demo/start.ps1`; Windows Startup entry installed with `-Tunnel cloudflared -Watch -SyncFallback`; a healthy API/tunnel is reused instead of rotated |
 | API public origin | <https://manufactured-with-alberta-cable.trycloudflare.com> — Cloudflare quick tunnel; the URL changes on restart until a stable ngrok domain is configured |
 | Web | <https://sanad-edtech.vercel.app> |
 | API through the web domain | <https://sanad-edtech.vercel.app/api/health> (Vercel rewrite to the current tunnel) |
@@ -21,7 +23,7 @@
 | Database | Local Docker PostgreSQL `learning_platform`; **8/8** Prisma migrations, 3 published courses (one paid: `arabic-3-prep`, 199 EGP), 1 enrollment, 0 orders/payments/voucher redemptions at final verification |
 | Demo tenant | `sanad-demo` |
 
-The quick tunnel changed twice. During the 15 November 2026 full logon simulation the launcher obtained `https://both-suites-worldwide-weekends.trycloudflare.com` and synced `14a82df`; overnight on 16 November it restarted again, obtained `https://manufactured-with-alberta-cable.trycloudflare.com`, and the watchdog synced `1fbc7e8` automatically. Vercel redeployed after each change and `/api/health` returned **200**. A Windows Startup entry now runs the launcher hidden at logon with `-Watch -SyncFallback`, and the watchdog retries `git fetch`/`git push` if the network is not ready. This is still a temporary bridge: it causes a Vercel redeploy after a URL change, so a stable ngrok static domain remains the target.
+The quick tunnel changed twice. During the 15 November 2026 full logon simulation the launcher obtained `https://both-suites-worldwide-weekends.trycloudflare.com` and synced `14a82df`; overnight on 16 November it restarted again, obtained `https://manufactured-with-alberta-cable.trycloudflare.com`, and the watchdog synced `1fbc7e8` automatically. Vercel redeployed after each change and `/api/health` returned **200**. A Windows Startup entry now runs the launcher hidden at logon with `-Watch -SyncFallback`, and the watchdog retries `git fetch`/`git push` if the network is not ready. On 16 November the launcher was restarted with a healthy API and tunnel already running; it reused both, kept the same URL, and did not cause a Vercel redeploy. This is still a temporary bridge: it causes a Vercel redeploy after a URL change, so a stable ngrok static domain remains the target.
 
 The Railway API endpoint (`https://sanad-edtech-production.up.railway.app`) currently returns **404 `Application not found`**; treat it as retired. The current demo web app is proxied to the laptop tunnel. The live student dashboard shows 0 submissions, matching the local Docker database (0 rows), not the Railway demo state (3 submissions). Railway's GitHub-linked service also did **not** auto-deploy the 28 October push; do not assume a push to `main` redeploys that API until the integration is fixed.
 
@@ -44,19 +46,24 @@ The demo assignment was set to `maxAttempts = 2` for the production retake smoke
 
 | Check | Result |
 | --- | --- |
-| API unit suite on Sprint 2 code | **359 / 359 passed**, 35 suites, run 14 November 2026 (`pnpm --filter api exec jest --config jest.config.js --runInBand`) |
-| Web unit suite on Sprint 2 code | **158 / 158 passed**, 12 files, run 14 November 2026 (`pnpm --filter web test`) |
-| Monorepo build | **4/4 tasks successful** (`pnpm build`); re-run 16 November 2026 at `2cf5b4a` |
+| API unit suite on Sprint 2 + RLS activation code | **359 / 359 passed**, 35 suites, re-run 16 November 2026 after the RLS changes (`pnpm --filter api exec jest --config jest.config.js --runInBand`) |
+| Web unit suite | **158 / 158 passed**, 12 files, re-run 16 November 2026 (`pnpm --filter web test`) |
+| Monorepo build | **4/4 tasks successful** (`pnpm build`); re-run 16 November 2026 after the RLS changes |
+| RLS runtime activation | **passed 16 November 2026**: the compiled API started with `DATABASE_URL` = `app_user` and logged `DB runtime role: app_user (superuser=off)`; `app_user` has no SUPERUSER and no BYPASSRLS; health **200** |
+| RLS isolation proof | **5/5 passed 16 November 2026** against PostgreSQL with `RLS_ADMIN_URL` + `RLS_APP_URL`: own-tenant SELECT, cross-tenant UPDATE/DELETE = 0 rows, cross-tenant INSERT rejected, empty context returns 0 rows |
+| Voucher checkout under RLS | **passed 16 November 2026**: logged in as the demo student, created an order for `arabic-3-prep` (19900 minor units), redeemed `SANAD-2026`, got `success: true`, and `GET /api/v1/enrollments/me` returned one ACTIVE paid enrollment. Reset afterward restored the clean demo state. |
+| Signed Paymob webhook under RLS | **passed 16 November 2026**: a manually seeded PROCESSING intent plus an HMAC-SHA512-signed callback returned `{"received":true}`; async processing (inside `setImmediate`) completed in the tenant scope: order **CONFIRMED**, intent **SUCCEEDED**, payment **PAID**, paid enrollment created, 2 balanced ledger rows, webhook event **PROCESSED** with the demo tenant ID. Reset afterward restored the clean demo state. |
+| Destructive demo reset | **passed twice on 16 November 2026** (`pnpm demo:reset -Force`, exit **0**): backup → `prisma migrate deploy` → delete known RLS test tenants → truncate demo tables → seed free + paid demo → verify invariants. It preserves `tenants`, `tenant_domains`, and `_prisma_migrations`, so the tenant ID and API cache stay valid. Final state: 8 migrations, 1 tenant, 2 users, 3 published courses, 1 free enrollment, paid course unenrolled, 0 orders/payments/redemptions, 1 voucher, 1 video. |
 | Paid checkout HTTP smoke | **passed**: paid direct enroll **402 `PAYMENT_REQUIRED`**; invalid voucher **400 `VOUCHER_NOT_FOUND`**; valid voucher **201**, `success: true`, enrollment `source=voucher`, replay stays one redemption; temporary user and rows removed |
 | Paid checkout browser QA | **passed locally and live**: paid CTA → `/checkout/arabic-3-prep`; live voucher `SANAD-2026` created the order and intent (**201**) and showed “تم تفعيل الكورس”; the temporary purchase was removed so the demo remains unenrolled for checkout |
 | Live judge path | **passed 15 November 2026** after the fallback sync: `/demo` **200**; one-click student and teacher access reached `/student` and `/teacher`; demo banner present; teacher navigation has no analytics link; `/teacher/analytics` redirects to `/teacher`; `/checkout/arabic-3-prep` **200**; direct paid enrollment **402 `PAYMENT_REQUIRED`**; `/api/health` **200** |
-| Live authenticated smoke | **8/8 passed** on 15 November and re-run **8/8** on 16 November 2026 through `https://sanad-edtech.vercel.app`: health/database, public course catalog, teacher login, tenant resolution, teacher course list, student login, student assignments, student enrollments (`pnpm demo:smoke` with `DEMO_*` variables; credentials not printed) |
-| Demo doctor preflight | **10/10 passed 16 November 2026** (`pnpm demo:doctor`): Docker + demo containers, local API health, tunnel health, live health/database, `/demo` + checkout pages, watchdog, Startup entry, clean/synced `main`, fallback matches the live tunnel, and demo DB state (3 published courses, 1 enrollment, paid course unenrolled, 1 voucher, 0 orders/payments/redemptions) |
+| Live authenticated smoke | **8/8 passed** on 15 November and re-run **8/8** on 16 November 2026 through `https://sanad-edtech.vercel.app` after the RLS activation and reset: health/database, public course catalog, teacher login, tenant resolution, teacher course list, student login, student assignments, student enrollments (`pnpm demo:smoke` with `DEMO_*` variables; credentials not printed) |
+| Demo doctor preflight | **10/10 passed 16 November 2026** (`pnpm demo:doctor`): Docker + demo containers, local API health, tunnel health, live health/database, `/demo` + checkout pages, watchdog, Startup entry, clean/synced `main`, fallback matches the live tunnel, and demo DB state (3 published courses, 1 enrollment, paid course unenrolled, 1 voucher, 0 orders/payments/redemptions). Before the RLS commit the only failure was the intentionally dirty working tree; it passed after the commit. |
 | Autostart + fallback sync | **passed 15–16 November 2026**: the installed hidden watchdog restarted the quick tunnel twice (full logon simulation → `14a82df`; overnight restart → `1fbc7e8`), wrote the new fallback, pushed, and Vercel redeployed each time; the sync log recorded both changes and live health returned **200**. `4ec4546` adds a retry when the logon network is not ready. |
 | Cold Docker recovery | **passed 15 November 2026**: stopping Docker Desktop made `/api/health` return **503**; the hidden watchdog started Docker, PostgreSQL, and the API again, and live health returned **200** within about 40 seconds. The demo tenant, 3 courses, 1 enrollment, and 0 orders/payments were intact. |
 | Full logon simulation | **passed 15 November 2026**: stopped the watchdog, tunnel, API, and Docker Desktop; launched the installed Startup `SANAD-Demo.cmd`; the hidden watchdog started Docker/PostgreSQL/API/tunnel, wrote the new fallback, committed `14a82df`, pushed, and live health returned **200** in about 70 seconds. An actual Windows logoff/reboot was not performed. |
-| Local database | **8/8** migrations, 3 published courses, 1 free enrollment, 0 submissions, 0 orders/payments/voucher redemptions after cleanup (`learning-platform-db`) |
-| Local backup | **created 15 November 2026**: `backups/sanad-demo-20261115-134916.dump` (0.26 MB), gitignored; **restore-tested 16 November 2026** into a temporary database: 44 tables, 138 RLS policies, 43 RLS-enabled tables, 8 migrations, 2 users, 3 published courses, 1 enrollment, 0 orders/payments/redemptions, 1 voucher. The temporary database was dropped. |
+| Local database | **8/8** migrations, 43 models, 138 RLS policies on 43 tables, 1 tenant, 2 users, 3 published courses, 1 free enrollment, paid course unenrolled, 0 submissions, 0 orders/payments/redemptions, 1 voucher, 1 video (`learning-platform-db`) |
+| Local backup | **created 16 November 2026**: `backups/sanad-demo-20261116-012118.dump` (266,109 bytes), written automatically before the post-RLS destructive reset; the earlier `backups/sanad-demo-20261116-010851.dump` (273,544 bytes) and `backups/sanad-demo-20261115-134916.dump` (0.26 MB) are also present. All are gitignored. The 15 November dump was **restore-tested 16 November 2026** into a temporary database: 44 tables, 138 RLS policies, 43 RLS-enabled tables, 8 migrations, 2 users, 3 published courses, 1 enrollment, 0 orders/payments/redemptions, 1 voucher. The temporary database was dropped. |
 | Power/sleep | **configured 16 November 2026**: AC sleep = **Never**, hibernate = **Never**, battery sleep = 10 minutes. Keep the demo laptop plugged in and its lid open; a closed lid may still follow the OEM sleep policy. |
 | Vercel proxy target | The 15 November full logon simulation changed the tunnel URL and the live site recovered after the fallback commit, so the Production rewrite is following `FALLBACK_DEMO_TUNNEL_ORIGIN`; no stale `API_PROXY_TARGET` override was observed. Vercel environment variables could not be inspected because the Vercel CLI/token is absent. |
 | Production migration chain | **8/8**; `prisma migrate status` reports “Database schema is up to date!” |
@@ -97,6 +104,19 @@ Sprint 2 closes the free-enrollment hole for paid courses and adds the student-f
 - **Local proof:** API **359/359**, web **158/158**, API/web `tsc --noEmit` clean, root build **4/4**, HTTP paid-checkout smoke passed, and browser QA reached “تم تفعيل الكورس” then showed the paid course in the student's course list. The test purchase was removed afterward; the demo database is back to 1 enrollment, 0 orders, 0 payments, and an unused voucher.
 - **Live proof:** on 14 November 2026, `/checkout/arabic-3-prep` was **200**; the live voucher flow accepted **`SANAD-2026`**, created the order and intent (**201**), and showed “تم تفعيل الكورس”. The test purchase was then removed, restoring 1 free enrollment, 0 orders/payments, and an unused voucher. After the 15 November fallback sync (`14a82df`), `/demo`, one-click student/teacher access, the analytics redirect, the checkout page, and the direct-enroll **402** guard were re-verified through `https://sanad-edtech.vercel.app`.
 - **Still open:** the checkout page is voucher-only for the demo. A real Paymob/Fawry card sandbox charge and refund remain on the P2 list. The demo autostart is installed with a temporary quick-tunnel sync; a stable ngrok domain and a pinned `API_PROXY_TARGET` remain the next stability step.
+
+## RLS runtime activation and destructive reset — 2026-11-16
+
+The local demo no longer runs on the database owner. The API runtime now connects as `app_user`, and the destructive reset makes the demo state reproducible.
+
+- **Runtime URL split:** `apps/api/src/modules/tenants/prisma.service.ts` reads `DATABASE_URL` only; it does not silently fall back to `MIGRATION_DATABASE_URL`. `scripts/demo/start.ps1` passes `app_user` to the API and keeps the owner URL for `prisma migrate deploy` and seeds. Startup logs the connected role and warns if it is a superuser. `.env.local` was updated to the `app_user` runtime URL; the owner URL remains in `MIGRATION_DATABASE_URL` for migrations and seeding.
+- **Startup evidence:** the compiled API logged `DB runtime role: app_user (superuser=off)`; `/api/health` returned **200**; `app_user` has no SUPERUSER and no BYPASSRLS. The isolation suite passed **5/5** (own-tenant SELECT; cross-tenant UPDATE/DELETE = 0 rows; cross-tenant INSERT rejected; empty context = 0 rows).
+- **Webhook tenant context:** `WebhookInboxService` now stores the request tenant ID on the webhook event, wraps the asynchronous `setImmediate()` processing in `runWithTenantId()`, and re-enters the event tenant scope on retry. Without this, async webhook work would run with no tenant context under RLS and see zero rows.
+- **Webhook proof:** a manually seeded `PROCESSING` Paymob intent plus an HMAC-SHA512-signed callback returned `{"received":true}`. Async processing completed under `app_user`: order **CONFIRMED**, intent **SUCCEEDED**, payment **PAID**, paid enrollment created, **2** balanced ledger rows, webhook event **PROCESSED** with the demo tenant ID. The database was reset afterward.
+- **Voucher proof:** the demo student created an order for `arabic-3-prep` and redeemed `SANAD-2026`; the intent returned `success: true`, and `/api/v1/enrollments/me` returned one ACTIVE paid enrollment. Reset afterward restored the paid course to unenrolled.
+- **Destructive reset:** `pnpm demo:reset` writes a backup, runs `prisma migrate deploy`, deletes known RLS test tenants, truncates the demo tables, re-seeds the free and paid demo, and verifies the invariants. It preserves `tenants`, `tenant_domains`, and `_prisma_migrations` so the demo tenant ID (`05587220-79b3-4f8f-9a66-b7bf5338c176`) and the API tenant cache stay valid. It exited **0** twice. `pnpm demo:seed` remains the idempotent backfill; `pnpm demo:paid` applies only the paid course + voucher.
+- **Watchdog/tunnel reuse:** starting the hidden watchdog with a healthy API and quick tunnel reused both (`API already healthy...`, `Cloudflare quick tunnel already healthy...`) and kept `https://manufactured-with-alberta-cable.trycloudflare.com`; no Vercel redeploy was triggered.
+- **Remaining:** hosted/Railway runtime is retired and was not migrated to `app_user`; the evidence above is local. A stable ngrok static domain, a real Paymob/Fawry sandbox charge/refund, and removing the temporary fallback sync remain open.
 
 ## Stack and repository facts
 
@@ -171,7 +191,7 @@ Do not overstate the following controls; each row is the current limit.
 
 | Area | Current reality |
 | --- | --- |
-| RLS enforcement on Railway | Policies exist for all 43 application tables and tenant context is injected per request, but the runtime currently selects `MIGRATION_DATABASE_URL` first and therefore connects with owner/superuser credentials. **RLS is not enforcing at runtime until the runtime URL is `app_user` and that preference is flipped.** Every query must still carry `tenantId`. |
+| RLS enforcement | **Active locally**: the API runtime connects as `app_user` (no SUPERUSER, no BYPASSRLS), tenant context is injected per request, and the 5/5 isolation suite plus voucher/webhook round trips pass. The retired Railway runtime was not migrated; do not claim RLS enforcement there. Every query still carries `tenantId`. |
 | Transactional outbox | Events are written to `OutboxEvent`; there is **no dispatcher/relay** delivering them. |
 | Background jobs | Redis/Bull dependencies exist, but no processors or scheduled jobs are registered. |
 | Video provider webhook | There is no video webhook route. Bunny's provider-side webhook helper is not exposed as an HTTP endpoint. |
@@ -202,15 +222,14 @@ Do not overstate the following controls; each row is the current limit.
 4. RLS policies compare `current_setting('app.tenant_id', true)` with the row's `tenantId`.
 5. Interactive `$transaction` sites call `applyTenantContext(tx)` explicitly.
 
-The database side is complete. Runtime activation is the remaining operational step:
+The database side is complete, and the local demo runtime is now active:
 
-- rotate the Railway database password by hand;
-- apply the migrations as the migration owner;
-- point the **runtime** `DATABASE_URL` at the non-owner `app_user`;
-- remove/avoid `MIGRATION_DATABASE_URL` in the runtime environment;
-- flip the preference in `apps/api/src/modules/tenants/prisma.service.ts` so runtime no longer selects the migration URL.
+- `PrismaService` reads `DATABASE_URL` only; the runtime points it at the non-owner `app_user` and does not fall back to the migration owner.
+- Migrations and seeds use `MIGRATION_DATABASE_URL` (owner) explicitly through the demo wrappers; the runtime process does not need it.
+- `app_user` has no SUPERUSER and no BYPASSRLS; startup logs `DB runtime role: app_user (superuser=off)` and warns on a superuser.
+- The isolation proof is `apps/api/test/rls-isolation.e2e-spec.ts` (**5/5**), plus the voucher and signed-webhook flows that exercise real request scopes.
 
-Until that is done, the application-level `tenantId` filters are not a backup to RLS — they are the active isolation control.
+Hosted activation is still pending: the Railway API endpoint is retired (`404 Application not found`), so its runtime was not migrated. If the API is redeployed to a host, point its `DATABASE_URL` at `app_user` and repeat the RLS e2e before claiming isolation. The application-level `tenantId` filters remain in every query as defense in depth, not as a replacement for RLS.
 
 ## Payment truth
 
@@ -250,7 +269,12 @@ pnpm build
 pnpm demo:start -- -Tunnel none
 pnpm demo:smoke
 pnpm demo:backup
+pnpm demo:reset -Force   # destructive: backup → migrate → truncate → seed → verify
+pnpm demo:seed           # idempotent backfill only
 pnpm demo:stop
+
+# RLS proof (requires RLS_ADMIN_URL and RLS_APP_URL)
+pnpm --filter api exec jest --config ./test/jest-e2e.json --runInBand rls-isolation
 
 # Live check
 Invoke-RestMethod https://sanad-edtech.vercel.app/api/health

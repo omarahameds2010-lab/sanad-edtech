@@ -7,6 +7,10 @@ import { PaymentAuditService } from "../security/payment-audit.service";
 import { OutboxService } from "../../outbox/outbox.service";
 import { Prisma } from "@prisma/client";
 import * as crypto from "crypto";
+import {
+  getTenantId,
+  runWithTenantId,
+} from "../../../common/prisma/tenant-context";
 
 @Injectable()
 export class WebhookInboxService {
@@ -53,6 +57,13 @@ export class WebhookInboxService {
       throw new Error(`Provider ${provider} not found`);
     }
 
+    // The controller is behind TenantResolverMiddleware, so the provider
+    // callback's Host has already resolved the tenant and this ALS scope is
+    // active. Capture it now: setImmediate() runs after the request scope has
+    // exited, and app_user RLS would otherwise hide every tenant row during
+    // async processing.
+    const tenantId = getTenantId() ?? null;
+
     const payloadHash = this.hashPayload(rawBody);
     const rawPayload = this.parsePayload(rawBody);
 
@@ -71,7 +82,7 @@ export class WebhookInboxService {
         payloadHash,
         rawPayload,
         errorCode: verification.errorCode,
-      });
+      }, tenantId);
       throw new Error(`Invalid webhook signature: ${verification.errorCode}`);
     }
 
@@ -90,6 +101,7 @@ export class WebhookInboxService {
     try {
       event = await this.prisma.webhookEvent.create({
         data: {
+          tenantId,
           provider,
           externalEventId,
           eventType: verification.eventType || "UNKNOWN",
@@ -113,7 +125,7 @@ export class WebhookInboxService {
       throw error;
     }
 
-    await this.queueForProcessing(event.id);
+    await this.queueForProcessing(event.id, tenantId);
 
     return { received: true, eventId: event.id };
   }
@@ -130,10 +142,12 @@ export class WebhookInboxService {
       rawPayload: Prisma.InputJsonValue;
       errorCode?: string;
     },
+    tenantId: string | null,
   ): Promise<void> {
     try {
       await this.prisma.webhookEvent.create({
         data: {
+          tenantId,
           provider,
           externalEventId,
           eventType: "SIGNATURE_INVALID",
@@ -154,7 +168,10 @@ export class WebhookInboxService {
     );
   }
 
-  private async queueForProcessing(eventId: string): Promise<void> {
+  private async queueForProcessing(
+    eventId: string,
+    tenantId?: string | null,
+  ): Promise<void> {
     // In a real implementation, this would push to a queue (BullMQ); for now
     // the event runs on the next tick. The rejection MUST be swallowed here:
     // `processEvent` records FAILED + errorCode on the row before rethrowing,
@@ -162,7 +179,14 @@ export class WebhookInboxService {
     // bundle-B live smoke left an orphan `INTENT_NOT_FOUND` event that killed
     // the server moments after every HTTP check had passed.
     setImmediate(() => {
-      this.processEvent(eventId).catch((error) => {
+      // setImmediate() is outside the HTTP request's AsyncLocalStorage scope.
+      // Re-enter the resolved tenant scope explicitly so app_user RLS can see
+      // the event, intent, order and payment rows.
+      const run = tenantId
+        ? () => runWithTenantId(tenantId, () => this.processEvent(eventId))
+        : () => this.processEvent(eventId);
+
+      run().catch((error) => {
         console.error(
           `Webhook processing failed for event ${eventId}: ${error?.message ?? error}`,
         );
@@ -628,7 +652,14 @@ export class WebhookInboxService {
     let retried = 0;
     for (const event of failedEvents) {
       try {
-        await this.processEvent(event.id);
+        const eventTenantId = event.tenantId;
+        const run = eventTenantId
+          ? () =>
+              runWithTenantId(eventTenantId, () =>
+                this.processEvent(event.id),
+              )
+          : () => this.processEvent(event.id);
+        await run();
         retried++;
       } catch {
         // Keep as failed

@@ -1,7 +1,7 @@
-# Deployment Runbook — Vercel + Railway
+# Deployment Runbook — Vercel + local demo API
 
-> **Current production:** web on Vercel, API and PostgreSQL on Railway.
-> **Verified 28 October 2026:** production branch `main`; web runtime code `cd03fb0` (Vercel auto-deploy; later docs-only commits do not change runtime code), API `5ac122d` (manual `railway up`, deployment `16a33f07-f1dd-404f-b110-ba4497ac7408`); migration #8 applied (**8/8**); `/api/health` **200** with database **up**; production retake smoke **31/31**.
+> **Current demo:** web on Vercel; API and PostgreSQL on the demo laptop, exposed through a Cloudflare quick tunnel. The Railway API endpoint returns `404 Application not found` and is retired.
+> **Verified 16 November 2026:** local runtime connects as `app_user` with RLS active; new code `DATABASE_URL` only; API **359/359**, web **158/158**, build **4/4**, RLS e2e **5/5**, live smoke **8/8**, demo doctor **10/10**. Migration chain is **8/8**.
 > Canonical state: [`CURRENT-STATE.md`](CURRENT-STATE.md).
 
 ## 0. Topology
@@ -9,17 +9,18 @@
 ```text
 Browser
   → https://sanad-edtech.vercel.app        (Next.js 15, Vercel)
-      /api/* ─────────────────────────────→ https://sanad-edtech-production.up.railway.app
-                                              (NestJS 10, Railway)
-                                              → PostgreSQL (Railway)
-                                              → Redis (Railway; no processors yet)
+      /api/* ─────────────────────────────→ https://<quick-tunnel>.trycloudflare.com
+                                              (NestJS 10, laptop :3002)
+                                              → PostgreSQL (local Docker, app_user + RLS)
+                                              → Redis (local Docker; no processors yet)
 ```
 
 - Web project: `sanad-edtech`
 - Web production branch: `main`
-- API service: `sanad-edtech-production`
+- API runtime: `scripts/demo/start.ps1` (compiled `apps/api/dist/src/main.js`)
 - API health: `/api/health`
 - API docs: `/api/docs` (served by the API when running)
+- Railway: retired; the old endpoint is **404**, and its runtime was never migrated to `app_user`.
 
 ## 1. Before deploying
 
@@ -213,19 +214,51 @@ pnpm seed:path2
 
 The seed is idempotent: tenant, teacher/student accounts, three published courses, sections/lessons, exam/assignment, enrollment, and entitlements.
 
-## 5. RLS activation — still pending
+## 5. RLS activation
 
-The policies are installed, but production is **not** yet enforcing them because the API connects with the migration/owner URL.
+### 5.1 Local demo — active (verified 16 November 2026)
 
-`apps/api/src/modules/tenants/prisma.service.ts` currently does:
+`apps/api/src/modules/tenants/prisma.service.ts` now reads the runtime URL from `DATABASE_URL` only. There is no silent fallback to `MIGRATION_DATABASE_URL`:
 
 ```ts
-const url = process.env.MIGRATION_DATABASE_URL || process.env.DATABASE_URL;
+const url = process.env.DATABASE_URL;
+if (!url) {
+  throw new Error("DATABASE_URL is required for the API runtime");
+}
 ```
 
-Activation requires all of the following, in order:
+- The runtime uses `app_user` (non-owner, no `SUPERUSER`, no `BYPASSRLS`).
+- `scripts/demo/start.ps1` checks that `app_user` can connect before starting the API and passes the owner URL only to migrations/seeds.
+- The API logs the connected role at startup: `DB runtime role: app_user (superuser=off)`; it warns if the role is a superuser.
+- `.env.local` contains the `app_user` `DATABASE_URL`; `MIGRATION_DATABASE_URL` remains the owner URL for `pnpm demo:reset`, `pnpm demo:seed`, and `pnpm demo:paid`.
+- `WebhookInboxService` captures the request tenant ID and re-enters `runWithTenantId()` around asynchronous `setImmediate()` processing and retries, so webhook work does not lose the RLS tenant context.
 
-1. **Rotate the Railway database password by hand** in the dashboard.
+Local verification (16 November 2026):
+
+| Check | Result |
+| --- | --- |
+| Startup role | `DB runtime role: app_user (superuser=off)` |
+| RLS isolation e2e | **5/5** (scoped SELECT; cross-tenant UPDATE/DELETE = 0 rows; cross-tenant INSERT rejected; empty context = 0 rows) |
+| Voucher checkout | order + `SANAD-2026` intent `success: true`; one ACTIVE paid enrollment |
+| Signed Paymob webhook | async event **PROCESSED** with tenant ID; order **CONFIRMED**, intent **SUCCEEDED**, payment **PAID**, ledger + enrollment created |
+| Live smoke | **8/8** through `https://sanad-edtech.vercel.app` |
+| Demo doctor | **10/10** |
+
+To reproduce locally:
+
+```powershell
+pnpm demo:start -- -Tunnel cloudflared -Watch
+pnpm demo:doctor
+pnpm --filter api exec jest --config ./test/jest-e2e.json --runInBand rls-isolation
+```
+
+`pnpm demo:reset -Force` is the destructive reset: backup → `prisma migrate deploy` → remove known RLS test tenants → truncate demo tables → seed free + paid demo → verify. It preserves `tenants`, `tenant_domains`, and `_prisma_migrations`.
+
+### 5.2 Hosted activation — pending
+
+The Railway API endpoint is retired (`404 Application not found`), so the hosted runtime was not migrated and **RLS must not be claimed as active there**. If the API is redeployed to a host, activate it in this order:
+
+1. **Rotate the database password by hand** in the provider dashboard.
 2. Confirm `app_user` exists and is not a superuser / does not have `BYPASSRLS`:
 
    ```sql
@@ -243,43 +276,37 @@ Activation requires all of the following, in order:
    # Do NOT set MIGRATION_DATABASE_URL in the runtime service.
    ```
 
-6. Change the runtime preference in `prisma.service.ts` to:
-
-   ```ts
-   const url = process.env.DATABASE_URL || process.env.MIGRATION_DATABASE_URL;
-   ```
-
-   (The migration command still uses `MIGRATION_DATABASE_URL` explicitly.)
-
-7. Redeploy and re-run the isolation proof with `RLS_ADMIN_URL` and `RLS_APP_URL`:
+6. Deploy the current code, which reads `DATABASE_URL` only.
+7. Re-run the isolation proof with `RLS_ADMIN_URL` and `RLS_APP_URL`:
 
    ```powershell
    cd apps/api
    pnpm exec jest --config ./test/jest-e2e.json --runInBand rls-isolation
    ```
 
-   Expected: **5/5** (scoped SELECT; cross-tenant UPDATE/DELETE = 0 rows; cross-tenant INSERT rejected; empty context = 0 rows).
+   Expected: **5/5**.
 
-8. Verify a normal login, course list, and student lesson after the switch.
+8. Verify a normal login, course list, voucher checkout, and student lesson after the switch.
 
 ### Rollback
 
 If the app cannot connect as `app_user`:
 
-- restore the previous Railway service variables;
+- restore the previous service variables;
 - keep `MIGRATION_DATABASE_URL` available to operators but not the runtime;
 - redeploy the previous image;
 - do not disable RLS policies or drop the app role.
 
-RLS being inactive is a known P1 gap, not a reason to claim isolation is complete.
+RLS being inactive on a host is a known gap, not a reason to claim hosted isolation is complete.
 
-## 6. Production verification checklist
+## 6. Demo verification checklist
 
 | Check | Expected |
 | --- | --- |
 | Web `/login` | 200, page renders |
 | Web `/api/health` | 200, `database: up` |
-| Direct API `/api/health` | 200, `database: up` |
+| Local API `/api/health` | 200, `database: up` |
+| Local API startup log | `DB runtime role: app_user (superuser=off)` |
 | Teacher login (`01000000001`) | 200, role `TEACHER` |
 | `/api/tenants/current` | `sanad-demo` |
 | `/api/v1/teacher/courses` | 3 published courses |
@@ -291,16 +318,16 @@ RLS being inactive is a known P1 gap, not a reason to claim isolation is complet
 | Assignment retake | concurrent start **201 + 409**; third start **400** at `maxAttempts=2` |
 | Teacher grading queue | excludes `IN_PROGRESS`; shows both submitted attempts |
 | Locked assignment | **403 `LESSON_LOCKED`**; lock card in dark and light with no overflow |
-| Railway deployment | `railway service status --service sanad-edtech` reports **SUCCESS** for the intended deployment |
+| Demo doctor | `pnpm demo:doctor` → **10/10** |
 | Logout → refresh | **401**, `/student` redirected to login |
 
 ## 7. Known deployment gaps
 
-- RLS runtime activation (section 5).
+- Hosted RLS activation: local runtime is active, but the Railway endpoint is retired and was never migrated (section 5).
 - Outbox dispatcher (events are written, not delivered).
 - No video webhook route.
 - No Bull processors.
-- Railway may not auto-deploy a `main` push; the 28 October API deploy was manual with `railway up`.
+- Railway auto-deploy: the service is retired; the 28 October deploy was manual with `railway up`.
 - Real provider sandbox transaction not yet recorded.
 - SETH-9 advanced controls are roadmap-only; see [`SETH-9-ROADMAP.md`](SETH-9-ROADMAP.md).
 - CI workflow is present but not the release evidence; use the local commands above.
@@ -308,6 +335,6 @@ RLS being inactive is a known P1 gap, not a reason to claim isolation is complet
 ## 8. Costs and operations
 
 - Vercel Hobby is sufficient for the demo; preview URLs may be protected by Vercel Authentication.
-- Railway Hobby is required for the API/Postgres/Redis services after the trial credit.
+- The API/Postgres/Redis demo runs in local Docker; Railway is retired for this demo.
 - A custom domain is optional. If added, update `ALLOWED_ORIGINS`, `tenant_domains`, and the Vercel domain configuration together.
 - Never paste database passwords or provider keys into chat, source, logs, or issue trackers.

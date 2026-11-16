@@ -15,7 +15,7 @@ SETH-9 is the working name for a set of advanced security ideas raised for the p
 - active deception (honeytokens, canary content, decoy paths);
 - crypto-shredding as a deletion mechanism.
 
-These are legitimate long-term research directions, but none of them is a substitute for the basic controls this platform still needs. The current production release has known P1 gaps: RLS is not enforcing at runtime, the transactional outbox has no dispatcher, there is no video webhook route, and rate limiting is in-memory per API instance. Adding advanced cryptography before those controls are closed would increase complexity without reducing the most likely risks.
+These are legitimate long-term research directions, but none of them is a substitute for the basic controls this platform still needs. The local demo has now closed the RLS runtime gap (`app_user`, 5/5 isolation proof), but the following P1 gaps remain: hosted RLS activation if the API is redeployed (Railway is retired), no transactional-outbox dispatcher, no video webhook route, and rate limiting that is in-memory per API instance. Adding advanced cryptography before those controls are closed would increase complexity without reducing the most likely risks.
 
 The platform also handles minors, assessments, payments, and video content. A security control that is hard to operate, hard to explain, or easy to misconfigure can make the system less safe than a simpler control that is actually enforced.
 

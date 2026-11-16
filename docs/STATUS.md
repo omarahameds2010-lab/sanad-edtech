@@ -8,8 +8,8 @@
 | --- | --- |
 | Production branch | `main` |
 | Web runtime code | Sprint 2 paid checkout (`aa4d2bc`) + tunnel fallback sync (`1fbc7e8`) + UTF-8 comment cleanup (`7ca1ed3`) — 15–16 November 2026 |
-| API runtime | Local compiled NestJS API on `:3002`; no schema or migration change in Sprint 2 |
-| Demo launcher | `scripts/demo/start.ps1` at `4ec4546`; Windows Startup entry installed with `-Tunnel cloudflared -Watch -SyncFallback` |
+| API runtime | Local compiled NestJS API on `:3002`; runtime `DATABASE_URL` = non-owner `app_user`; RLS active locally |
+| Demo launcher | `scripts/demo/start.ps1`; Windows Startup entry installed with `-Tunnel cloudflared -Watch -SyncFallback`; healthy API/tunnel are reused |
 | Hardening / retakes | **Live** — rate limiting, lock enforcement, authoring-read fixes, and assignment retakes |
 | Sprint 2 paid checkout | **Implemented, deployed, and live-verified** — `402` paid-course guard, atomic enrollment, voucher checkout |
 | Web | <https://sanad-edtech.vercel.app> |
@@ -20,26 +20,31 @@
 | Migrations | **8/8** applied on the local Docker PostgreSQL |
 | Database models | 43 |
 | RLS policies | 138 across 43 application tables |
-| RLS runtime enforcement | **Not active** — runtime still uses owner/superuser credentials |
+| RLS runtime enforcement | **Active locally** — `app_user` (no SUPERUSER/BYPASSRLS); startup log `DB runtime role: app_user (superuser=off)`; hosted/Railway runtime retired |
 
 ## Evidence
 
 | Check | Result | Command |
 | --- | --- | --- |
-| API tests on Sprint 2 code | **359/359**, 35 suites | `pnpm --filter api exec jest --config jest.config.js --runInBand` |
-| Web tests on Sprint 2 code | **158/158**, 12 files | `pnpm --filter web test` |
-| Monorepo build | **4/4** successful; re-run 16 Nov 2026 at `2cf5b4a` | `pnpm build` |
+| API tests on Sprint 2 + RLS activation code | **359/359**, 35 suites; re-run 16 Nov 2026 | `pnpm --filter api exec jest --config jest.config.js --runInBand` |
+| Web tests | **158/158**, 12 files; re-run 16 Nov 2026 | `pnpm --filter web test` |
+| Monorepo build | **4/4** successful; re-run 16 Nov 2026 after the RLS changes | `pnpm build` |
+| RLS runtime activation | **passed 16 Nov 2026**: `app_user` (no SUPERUSER/BYPASSRLS); startup log `DB runtime role: app_user (superuser=off)`; health 200 | Local compiled API |
+| RLS isolation proof | **5/5 passed 16 Nov 2026**: scoped SELECT; cross-tenant UPDATE/DELETE = 0 rows; cross-tenant INSERT rejected; empty context = 0 rows | `jest --config ./test/jest-e2e.json --runInBand rls-isolation` |
+| Voucher checkout under RLS | **passed 16 Nov 2026**: order for `arabic-3-prep`, `SANAD-2026` → `success: true`, one ACTIVE paid enrollment; reset restored the clean state | Local HTTP flow through the API |
+| Signed Paymob webhook under RLS | **passed 16 Nov 2026**: HMAC-SHA512 callback → async event PROCESSED with tenant ID; order CONFIRMED, intent SUCCEEDED, payment PAID, 2 ledger rows, enrollment created; reset restored the clean state | Local signed webhook + DB checks |
+| Destructive demo reset | **passed twice 16 Nov 2026**, exit 0: backup → migrate → truncate → seed free + paid demo → verify; preserves `tenants`, `tenant_domains`, `_prisma_migrations` and the tenant ID | `pnpm demo:reset -Force` |
 | Paid checkout HTTP smoke | **passed**: paid direct enroll 402, invalid voucher 400, valid voucher 201, enrollment `source=voucher`, replay one redemption | Local HTTP smoke, 14 Nov 2026 |
 | Paid checkout browser QA | **passed live**: paid CTA → checkout → `SANAD-2026` → order/intent **201** → “تم تفعيل الكورس”; cleanup restored the demo state | Live browser, 14 Nov 2026 |
 | Live judge path | **passed 15 Nov 2026**: `/demo`, one-click student/teacher, demo banner, analytics-to-dashboard redirect, checkout **200**, direct paid enroll **402** | Browser + HTTP through the web domain |
-| Live authenticated smoke | **8/8 passed** 15 Nov and re-run **8/8** 16 Nov 2026: health, public catalog, teacher login/tenant/courses, student login/assignments/enrollments | `pnpm demo:smoke -- -BaseUrl https://sanad-edtech.vercel.app` |
-| Demo doctor preflight | **10/10 passed 16 Nov 2026**: Docker/containers, local API, tunnel, live health/database, `/demo` + checkout, watchdog, Startup entry, git sync, fallback match, demo DB state (including 1 voucher) | `pnpm demo:doctor` |
+| Live authenticated smoke | **8/8 passed** 15 Nov and re-run **8/8** 16 Nov 2026 after RLS + reset: health, public catalog, teacher login/tenant/courses, student login/assignments/enrollments | `pnpm demo:smoke -- -BaseUrl https://sanad-edtech.vercel.app` |
+| Demo doctor preflight | **10/10 passed 16 Nov 2026** after the RLS commit: Docker/containers, local API, tunnel, live health/database, `/demo` + checkout, watchdog, Startup entry, git sync, fallback match, demo DB state (including 1 voucher) | `pnpm demo:doctor` |
 | Autostart + fallback sync | **passed 15–16 Nov 2026**: hidden watchdog restarted the tunnel twice, wrote the new fallback (`14a82df` after the full logon simulation; `1fbc7e8` after the overnight restart), pushed, and live health returned **200** each time | Installed Startup entry + sync log |
 | Cold Docker recovery | **passed 15 Nov 2026**: stopped Docker Desktop → health **503** → watchdog restarted Docker/PostgreSQL/API → health **200** in about 40 seconds | Hidden watchdog, no manual step |
 | Full logon simulation | **passed 15 Nov 2026**: stopped watchdog/tunnel/API/Docker → launched Startup `SANAD-Demo.cmd` → services restarted, fallback `14a82df` pushed, health **200** in about 70 seconds | Startup entry, no manual step; real Windows logoff not performed |
 | Local migration chain | **8/8**; schema up to date | `prisma migrate status` against Docker |
 | Backup/restore proof | Custom dump + globals restored into local PostgreSQL 18: 44 tables, 3 courses, 1 submission, 7 migrations at backup time | Docker `pg_dump` / `pg_restore` |
-| Local demo backup restore | **passed 16 Nov 2026**: restored `backups/sanad-demo-20261115-134916.dump` into a temporary DB: 44 tables, 138 RLS policies, 43 RLS-enabled tables, 8 migrations, 2 users, 3 published courses, 1 enrollment, 0 orders/payments/redemptions, 1 voucher; temporary DB dropped | Docker `pg_restore` |
+| Local demo backup restore | **passed 16 Nov 2026**: restored `backups/sanad-demo-20261115-134916.dump` into a temporary DB: 44 tables, 138 RLS policies, 43 RLS-enabled tables, 8 migrations, 2 users, 3 published courses, 1 enrollment, 0 orders/payments/redemptions, 1 voucher; temporary DB dropped. New 16 Nov backups: `sanad-demo-20261116-010851.dump`, `sanad-demo-20261116-012118.dump`. | Docker `pg_restore` |
 | Power/sleep | **configured 16 Nov 2026**: AC sleep and hibernate **Never**; battery sleep 10 minutes; keep the demo laptop plugged in and its lid open | `powercfg` |
 | Vercel proxy target | After the tunnel URL changed, live recovery followed the fallback commit; no stale `API_PROXY_TARGET` override was observed. Vercel env could not be inspected (CLI/token absent). | Full-logon simulation |
 | Production retake smoke (historical) | **31/31**: concurrent start 201+409, attempt 1 submit, attempt 2 submit, third 400, teacher queue excludes active, health 200 | Node script through the production web domain |
@@ -85,11 +90,11 @@ Production retake smoke passed **31/31**; the demo assignment is set to `maxAtte
 
 | Priority | Gap | What “done” means |
 | --- | --- | --- |
-| P1 | RLS runtime activation | Runtime connects as `app_user`; `MIGRATION_DATABASE_URL` absent from runtime; RLS e2e 5/5 on Railway; isolation re-verified |
+| P1 | Hosted RLS activation | Local demo runs as `app_user` with RLS active. If the API is redeployed, point its `DATABASE_URL` at `app_user`, omit `MIGRATION_DATABASE_URL` from the runtime, and re-run RLS e2e 5/5. Railway is retired. |
 | P1 | Stable demo tunnel | ngrok static domain or pinned `API_PROXY_TARGET`; URL survives a reboot without a fallback commit/redeploy (autostart is installed and the quick-tunnel sync is tested) |
 | P1 | Outbox dispatcher | Events are delivered, retried, and observable; no longer write-only |
 | P1 | Video webhook | Provider callback route verifies the signature and updates video state |
-| P2 | Railway auto-deploy | A main push creates and reports an API deployment automatically; no manual `railway up` required |
+| P2 | Hosted API (optional) | If the Railway endpoint is revived, a `main` push creates and reports an API deployment automatically; no manual `railway up` required |
 | P2 | Real provider sandbox | One Paymob/Fawry sandbox charge and one refund recorded end to end |
 | P2 | Distributed rate limiting | The live in-memory limits are backed by shared storage and proxy-IP handling is verified under production traffic |
 | P2 | Review evidence | Per-word/answer evidence persisted instead of an aggregate bridge |
@@ -102,7 +107,7 @@ Production retake smoke passed **31/31**; the demo assignment is set to `maxAtte
 
 ## What is not a current claim
 
-- RLS is not enforcing production traffic while the runtime uses the owner URL.
+- RLS is active on the local demo runtime (`app_user`); the retired Railway runtime is not migrated, so do not claim hosted RLS enforcement.
 - The transactional outbox is not delivering events.
 - There is no video webhook endpoint.
 - Railway did not auto-deploy the 28 October API push; the API was deployed manually with `railway up`.
@@ -128,5 +133,6 @@ Production retake smoke passed **31/31**; the demo assignment is set to `maxAtte
 | 2026-11-14 | Sprint 2 paid checkout deployed (`aa4d2bc`); live voucher flow, order/intent 201, `402` guard, and demo-state cleanup verified |
 | 2026-11-15 | Autostart installed with `-SyncFallback`; full cold start (watchdog/tunnel/API/Docker stopped, Startup cmd launched) synced the fallback (`14a82df`) and live health returned 200 in about 70 seconds; one-click paths and `402` re-verified; authenticated live smoke 8/8 |
 | 2026-11-16 | Overnight tunnel restart auto-synced the fallback (`1fbc7e8`, `manufactured-with-alberta-cable`) and live health returned 200; restore-tested the local demo backup into a temporary DB (44 tables, 138 RLS policies, 8 migrations, demo data intact); set AC sleep/hibernate to Never; added `pnpm demo:doctor` preflight (10/10) and re-ran the authenticated smoke (8/8) |
+| 2026-11-16 | RLS runtime activated locally as `app_user` (no SUPERUSER/BYPASSRLS); destructive `pnpm demo:reset` with automatic backup; RLS e2e 5/5; voucher and signed Paymob webhook round trips under RLS; 359/359 API, 158/158 web, build 4/4; watchdog resumed and reused the healthy tunnel/API; doctor 10/10 after commit |
 
 Historical audit: [`AUDIT-2026-10-16.md`](AUDIT-2026-10-16.md). It is preserved as a dated snapshot, not rewritten.

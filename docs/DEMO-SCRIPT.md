@@ -164,13 +164,13 @@ Do not claim every provider is live.
 | Claim | Status |
 | --- | --- |
 | 3 published Arabic courses | Seeded in `sanad-demo` |
-| 357 API tests | Verified 28 Oct 2026 |
-| 147 web tests | Verified 28 Oct 2026 |
-| Build 4/4 | Verified 28 Oct 2026 |
-| Production migrations 8/8 | Verified 28 Oct 2026 |
-| Assignment retakes live | Yes — production smoke 31/31 |
-| Rate limiting + lock enforcement live | Yes — still in-memory per API instance |
-| RLS enforced in production | **No** — runtime still owner/superuser |
+| 359 API tests | Verified 16 Nov 2026 after local RLS activation |
+| 158 web tests | Verified 16 Nov 2026 |
+| Build 4/4 | Verified 16 Nov 2026 |
+| Migrations 8/8 | Verified on the local Docker database |
+| Assignment retakes live | Yes — production smoke 31/31 (historical Railway deploy); local retake behavior intact |
+| Rate limiting + lock enforcement live | Yes — local API; still in-memory per API instance |
+| RLS enforced | **Yes locally** — runtime connects as `app_user`; 5/5 isolation proof; hosted Railway retired and not migrated |
 | Outbox delivered | **No** — no dispatcher |
 | Video webhook | **No** — no route |
 | Paymob/Fawry sandbox charge | **Not yet verified** |

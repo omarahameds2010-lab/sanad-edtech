@@ -1,6 +1,6 @@
 # Architecture — Learning Platform
 
-> **Current runtime architecture, verified 28 October 2026 after migration #8 and the hardening/retakes release.** This replaces the older aspirational architecture notes. For exact release/test facts see [`CURRENT-STATE.md`](CURRENT-STATE.md). For deployment steps see [`DEPLOY.md`](DEPLOY.md).
+> **Current runtime architecture, verified 16 November 2026 after local RLS activation and the destructive-reset work.** This replaces the older aspirational architecture notes. For exact release/test facts see [`CURRENT-STATE.md`](CURRENT-STATE.md). For deployment steps see [`DEPLOY.md`](DEPLOY.md).
 
 ## 1. System shape
 
@@ -105,9 +105,9 @@ The database side is installed:
 - `FORCE ROW LEVEL SECURITY` on application tables;
 - `app_user` role created by the bootstrap.
 
-The runtime side is **not active** on Railway yet: `PrismaService` selects `MIGRATION_DATABASE_URL` before `DATABASE_URL`, and the deployed service uses the migration/owner URL. A table owner with `FORCE` still obeys RLS, but a superuser bypasses it; in either case the intended non-owner role is not in use.
+The local demo runtime is **active**: `PrismaService` reads `DATABASE_URL` only (no fallback to `MIGRATION_DATABASE_URL`), `scripts/demo/start.ps1` passes the non-owner `app_user` URL to the API, and startup logs `DB runtime role: app_user (superuser=off)`. Migrations and seeds use the owner URL explicitly. The RLS isolation suite passed **5/5**; a voucher checkout and a signed Paymob webhook (async `setImmediate` re-enters the event tenant scope) both completed under `app_user`. The retired Railway runtime was never migrated, so hosted RLS is still pending.
 
-**Therefore:** application-level `tenantId` filters are still required on every query. See `docs/DEPLOY.md` for activation.
+**Therefore:** application-level `tenantId` filters remain required on every query as defense in depth. See `docs/DEPLOY.md` for local verification and hosted activation.
 
 ## 4. Data model
 
@@ -238,19 +238,21 @@ No mock data is allowed in these surfaces. Every count and state comes from the 
 
 | Layer | Platform | Notes |
 | --- | --- | --- |
-| Web | Vercel | `main` production branch; `/api/*` rewrite to Railway |
-| API | Railway | root `Dockerfile`; `railway.json` `DOCKERFILE` builder; `nixpacks.toml` fallback |
-| DB | Railway PostgreSQL | 7 migrations applied in production (8 on the retakes branch); runtime currently owner/superuser |
-| Redis | Railway | dependency present; no jobs registered |
+| Web | Vercel | `main` production branch; `/api/*` rewrite to the current tunnel |
+| API | Local Docker/laptop | compiled NestJS on `:3002`; runtime `DATABASE_URL` = `app_user`; RLS active |
+| DB | Local Docker PostgreSQL | **8/8** migrations; 138 RLS policies on 43 tables; runtime non-owner |
+| Redis | Local Docker | dependency present; no jobs registered |
+| Tunnel | Cloudflare quick tunnel | temporary; `-SyncFallback` updates the Vercel build fallback when the URL changes |
+| Railway | Retired | endpoint returns `404 Application not found`; not RLS-migrated |
 
 Vercel fail-safes:
 
-- `next.config.mjs` defaults `API_PROXY_TARGET` to the Railway API on Vercel, `http://localhost:3002` locally.
-- `app/lib/api.ts` defaults the browser to same-origin, the server to the production origin on Vercel.
+- `next.config.mjs` resolves `API_PROXY_TARGET` / `DEMO_TUNNEL_ORIGIN` with the current quick-tunnel fallback; an env override wins.
+- `app/lib/api.ts` defaults the browser to same-origin, the server to the API origin on Vercel.
 
 ## 11. Known architectural gaps
 
-1. RLS runtime activation.
+1. Hosted RLS activation (local is active; the retired Railway runtime was not migrated).
 2. Outbox dispatcher.
 3. Video webhook route.
 4. Background job processors.
@@ -258,8 +260,8 @@ Vercel fail-safes:
 6. Provider sandbox verification.
 7. Reconciliation worker.
 8. Distributed rate limiting (current limits are in-memory per instance).
-9. Railway API auto-deploy (the 28 October release was manual).
-10. CI workflow verification (local evidence is authoritative for the 28 October release).
+9. Hosted API auto-deploy, if the Railway endpoint is revived (the 28 October release was manual).
+10. CI workflow verification (local evidence is authoritative for the current release).
 11. SETH-9 advanced controls remain roadmap-only; see [`SETH-9-ROADMAP.md`](SETH-9-ROADMAP.md).
 
 These are tracked with acceptance criteria in [`STATUS.md`](STATUS.md) and [`CURRENT-STATE.md`](CURRENT-STATE.md).

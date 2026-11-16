@@ -5,9 +5,13 @@
  *
  * Usage (Postgres must be migrated first):
  *   cd apps/api
+ *   $env:MIGRATION_DATABASE_URL="<owner-connection-string>"
  *   $env:DATABASE_URL=$env:MIGRATION_DATABASE_URL  # superuser bypasses RLS for seeding
  *   npx prisma migrate deploy
  *   pnpm seed:path2
+ *
+ * The script prefers MIGRATION_DATABASE_URL when constructing its own client,
+ * so the owner connection is used even when DATABASE_URL points at app_user.
  *
  * Env overrides:
  *   DEMO_TEACHER_PASSWORD  teacher login password (default in docs/DEMO.md)
@@ -26,7 +30,16 @@
 import { PrismaClient } from "@prisma/client";
 import * as argon2 from "argon2";
 
-const prisma = new PrismaClient();
+const databaseUrl =
+  process.env.MIGRATION_DATABASE_URL || process.env.DATABASE_URL;
+if (!databaseUrl) {
+  throw new Error(
+    "DATABASE_URL or MIGRATION_DATABASE_URL is required to seed the demo database.",
+  );
+}
+const prisma = new PrismaClient({
+  datasources: { db: { url: databaseUrl } },
+});
 
 const TENANT_SLUG = "sanad-demo";
 const TENANT_NAME = process.env.DEMO_TENANT_NAME ?? "الأستاذ صالح حسين";

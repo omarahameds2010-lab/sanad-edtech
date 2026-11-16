@@ -3,7 +3,7 @@
 > **Verified 25 October 2026.** This runbook uses only shipped flows. Do not improvise claims about RLS enforcement, RAG benchmarks, or live payment providers.
 > Current state: [`CURRENT-STATE.md`](CURRENT-STATE.md).
 
-> **Judge-facing entry:** `https://sanad-edtech.vercel.app/demo` — one-click student/teacher access, no signup. See [`DEMO-JUDGES.md`](DEMO-JUDGES.md) for the 90-second path, manual credentials, QR asset, and reset command (`pnpm demo:reset`).
+> **Judge-facing entry:** `https://sanad-edtech.vercel.app/demo` - one-click student/teacher access, no signup. See [`DEMO-JUDGES.md`](DEMO-JUDGES.md) for the 90-second path, manual credentials, QR asset, and destructive reset command (`pnpm demo:reset -Force`).
 
 ## 1. What the demo proves
 
@@ -150,10 +150,10 @@ The seed registers the localhost tenant domain; tenant resolution is Host-based,
 
 ## 7. Known limitations to mention if asked
 
-- RLS policies exist but production still connects with the owner/superuser URL; RLS is not enforcing yet.
+- RLS is active on the local demo runtime (`app_user`, RLS e2e 5/5); the retired Railway runtime was not migrated, so do not claim hosted RLS enforcement.
 - Outbox events are written but not dispatched.
 - No video webhook endpoint.
-- Locked lessons can still return content in student API views.
+- Locked lesson payloads are redacted and locked assessment entry returns `403 LESSON_LOCKED`; other content types still need their own enforcement review.
 - Word-level review highlights are not persisted.
 - Advanced progression types are future work.
 - CI is not the release evidence for this commit; local runs are.

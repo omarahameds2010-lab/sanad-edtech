@@ -20,9 +20,9 @@
 
 ### *Protected by architecture, not by promises. Every claim below cites code.*
 
-> **Current security posture — production verified 28 October 2026 after migration #8 and the hardening/retakes release.** Read [`CURRENT-STATE.md`](CURRENT-STATE.md) for the canonical state. This document is a threat model and control catalogue; the dated dashboard below is a historical snapshot.
+> **Current security posture — local demo verified 16 November 2026 after RLS runtime activation; the Railway endpoint is retired.** Read [`CURRENT-STATE.md`](CURRENT-STATE.md) for the canonical state. This document is a threat model and control catalogue; the dated dashboard below is a historical snapshot.
 >
-> **Active controls on production**
+> **Active controls on the local demo**
 >
 > - Argon2id password hashing; JWT access cookie (15 min); rotating opaque refresh cookie (HttpOnly, hashed at rest).
 > - JWT `tenantId` bound to the host-resolved tenant; CSRF origin guard; CORS fail-closed when `ALLOWED_ORIGINS` is unset.
@@ -30,7 +30,7 @@
 > - Paymob/Fawry webhook signature verification with raw-body retention, constant-time comparison, deduplication, idempotency, and atomic settlement.
 > - Refund idempotency, CAS transitions, ledger reversal, and entitlement revocation.
 > - Audit/security event writes for sensitive actions.
-> - DB-side: 138 RLS policies on 43 application tables, `FORCE ROW LEVEL SECURITY`, and per-request tenant context injection (runtime enforcement is **not** active; see the caveat below).
+> - DB-side: 138 RLS policies on 43 application tables, `FORCE ROW LEVEL SECURITY`, and per-request tenant context injection. **The local runtime connects as `app_user` (no SUPERUSER, no BYPASSRLS), so RLS is enforcing locally.** The RLS e2e passed 5/5, and voucher + signed-webhook flows ran under `app_user`.
 > - Global per-IP rate limiting: 120 requests/minute per route; login 10/min, register 5/min, refresh 30/min; health/readiness and payment webhooks exempt. Storage is in-memory per API instance.
 > - Locked lesson payloads are metadata-only; student assignment/exam view and enter endpoints return `403 LESSON_LOCKED` without a per-student grant.
 > - Authoring reads require `update`: generic exam/assignment reads, teacher lesson routes, and legacy lesson routes. Student lists expose navigation metadata only, and pre-start exam views withhold the question paper.
@@ -38,16 +38,16 @@
 >
 > **Critical caveats**
 >
-> - **RLS is not enforcing production traffic yet.** The runtime selects `MIGRATION_DATABASE_URL` first and connects with owner/superuser credentials. Until the runtime URL is `app_user` and the preference is flipped, application `tenantId` filters are the active isolation control.
+> - **RLS is active on the local demo only.** The Railway endpoint is retired and its runtime was never migrated to `app_user`; do not claim hosted RLS enforcement. If the API is redeployed, follow `docs/DEPLOY.md` §5.2 and re-run the 5/5 isolation proof. Application `tenantId` filters remain in every query as defense in depth.
 > - There is no video webhook route; the video webhook design below is not exposed.
 > - There is no outbox dispatcher.
 > - Published course/lesson/exam content has **no immutable version/snapshot layer yet**; the “publish = immutable snapshot” language below is a target control, not a current guarantee.
 > - Exam auto-submit is client-driven; the API marks a late submit `TIMED_OUT`, but no scheduled worker submits abandoned attempts.
 > - 2FA, KMS/Vault, SIEM/Sentry/Prometheus, and WAF are not implemented. Application-level rate limiting uses in-memory storage, not a shared cluster store.
 > - SETH-9 post-quantum signing, ZK delivery, homomorphic grading, active deception, and crypto-shredding are **roadmap-only**; see [`SETH-9-ROADMAP.md`](SETH-9-ROADMAP.md).
-> - Do not treat the older “178 + 26 policies” or `20240101000000_init_rls.sql` references as current; production has 8 migrations with 138 policies on 43 tables.
+> - Do not treat the older “178 + 26 policies” or `20240101000000_init_rls.sql` references as current; the database has 8 migrations with 138 policies on 43 tables.
 
-[![RLS](https://img.shields.io/badge/RLS-policies_ready%2C_runtime_pending-4169E1?style=for-the-badge&logo=postgresql&logoColor=white)](#-5-tenancy--isolation-rls-the-last-wall)
+[![RLS](https://img.shields.io/badge/RLS-active_local_app__user-4169E1?style=for-the-badge&logo=postgresql&logoColor=white)](#-5-tenancy--isolation-rls-the-last-wall)
 [![Argon2id](https://img.shields.io/badge/Hashing-Argon2id-2D3748?style=for-the-badge)](#-31-password-security-argon2id-real)
 [![HMAC](https://img.shields.io/badge/Webhooks-HMAC_verified-DC2626?style=for-the-badge)](#-62-webhook-security-verify-before-you-trust)
 [![Ledger](https://img.shields.io/badge/Ledger-Double_entry-059669?style=for-the-badge)](#-64-ledger-append-only-money)
@@ -86,7 +86,7 @@
 >
 > Status: ✅ **REAL** (code read, cited) · 🧪 **NEEDS LIVE PROOF** (compiles, not run against prod-like env) · � **PLANNED** (documented, not built)
 >
-> **Current note:** rows that describe RLS policies or the `app_user` cage are database-side facts. The runtime still connects with owner/superuser credentials, so RLS is **not active** on Railway. See the banner at the top of this document.
+> **Current note:** rows that describe RLS policies or the `app_user` cage are database-side facts. The local demo runtime now connects as `app_user`, so RLS is **active locally**; the retired Railway runtime was not migrated. See the banner at the top of this document.
 
 | # | Control | Status | Evidence (file:line) |
 |---|---------|--------|----------------------|
@@ -96,8 +96,8 @@
 | 4 | PolicyEngine: 22 actions, RBAC + conditions | ✅ | `modules/authorization/policy-engine.ts:27,215,407` |
 | 5 | `redeem` action exists (old gap CLOSED) | ✅ | `policy-engine.ts:47` |
 | 6 | Entitlement model (5 sources × 4 statuses) | ✅ | `policy-engine.ts:62,69` |
-| 7 | RLS policy coverage (current: **138 policies / 43 tables**) | ✅ DB-side · runtime pending | `prisma/migrations/20261016000000_rls_hardening` + `20261007000000_lms_rls` · `20261017000001_student_lesson_unlocks` |
-| 8 | `app_user`: LOGIN + CRUD-only + REVOKE BYPASSRLS + FORCE per table | ✅ DB-side · not runtime | `docker/postgres/init/01-create-app-user.sql:9,21,31,34` |
+| 7 | RLS policy coverage (current: **138 policies / 43 tables**) | ✅ DB-side · **active locally** | `prisma/migrations/20261016000000_rls_hardening` + `20261007000000_lms_rls` · `20261017000001_student_lesson_unlocks` |
+| 8 | `app_user`: LOGIN + CRUD-only + REVOKE BYPASSRLS + FORCE per table | ✅ DB-side · **runtime locally** | `docker/postgres/init/01-create-app-user.sql:9,21,31,34` |
 | 9 | Tenant-scoped UNIQUE constraints (idempotency, attempts, enrollments) | ✅ | `prisma/schema.prisma:137,394,514,998` |
 | 10 | Paymob HMAC-SHA512 + constant-time compare | ✅ | `payments/providers/paymob/paymob.provider.ts:151,334,338` |
 | 11 | Fawry signature + constant-time compare | ✅ | `payments/providers/fawry/fawry.provider.ts:186,201` |
@@ -1403,12 +1403,11 @@ Q20 Compliance certificates? → SAQ-A (PCI) + PDPL file + DPAs 📋 — tracked
 
 ```
 DB-SIDE DONE: RLS policy set (138 policies / 43 tables) + `app_user` role + FORCE.
-RUNTIME NOT ACTIVE: API still connects with owner/superuser credentials; tenant filters are the active control.
+RUNTIME ACTIVE (local demo): API connects as `app_user`; RLS e2e 5/5; voucher + signed webhook round trips passed. The Railway endpoint is retired and was not migrated.
 CODE DONE: Argon2id · refresh rotation · PolicyEngine · redeem · HMAC paymob/fawry/bunny-helper/watermark/tokens ·
   inbox interface · tenant uniques · boot validator.
-NEXT (P1): activate RLS on Railway as `app_user` · isolation E2E green on that role · rate limits live ·
-  answers-absent CI gate · log-grep CI · RLS-coverage CI · external pentest (money+isolation) ·
-  backup-restore drill · secret hunt in release PRs.
+NEXT (P1): hosted RLS activation if the API is redeployed · answers-absent CI gate · log-grep CI · RLS-coverage CI ·
+  external pentest (money+isolation) · backup-restore drill · secret hunt in release PRs.
 P1: TOTP enforced · KMS/Vault + PII envelope · Cloudflare WAF/bot/rate-limit · IP allowlists ·
   dual approvals · read replica · SIEM/Sentry/Prometheus · DPAs signed · DPO named.
 P2: Per-pod DB creds · HSM-backed keys · SOC2-type controls · bug-bounty (scoped) · red-team exercise.
@@ -1475,6 +1474,7 @@ DELIVERABLE: findings with SEVERITY + REPRO (requestIds) + retest window. Fix SL
 | v2.0 | 2026-10-25 | Current-state banner; RLS counts corrected to 138 policies / 43 tables with runtime activation pending; Bunny webhook marked helper-only; outbox/Bull/video-route gaps called out; token TTL confirmed 5 minutes; local test/build evidence recorded |
 | v2.1 | 2026-10-27 | Pending retakes branch documented: active-attempt status, attempt uniqueness, server-side `maxAttempts`, active-before-max `409`, gap-tolerant numbering, grading-queue exclusion, migration #8 backfill/preflight; authoring-read bypass fixes added to the hardening branch; production remains on the one-row model |
 | v2.2 | 2026-10-28 | Hardening and retakes merged and deployed; migration #8 applied (8/8); backup restore-tested; production retake smoke 31/31; rate limiting/lock enforcement/authoring-read fixes live; RLS activation and distributed rate limiting remain open; SETH-9 recorded as roadmap-only |
+| v2.3 | 2026-11-16 | Local RLS runtime activated as `app_user` (no SUPERUSER/BYPASSRLS); RLS e2e 5/5; async webhook tenant-context fix and signed round trip; voucher checkout under RLS; destructive demo reset with backup; hosted Railway endpoint retired and not RLS-migrated |
 
 ---
 
@@ -3275,7 +3275,7 @@ TAIL-SWALLOW-T-->
 | C-AUTHZ-05 | Guard coverage (all routes declared) | check-guards.sh CI | platform | every PR |
 | C-AUTHZ-06 | TOCTOU in-tx re-checks | service tx patterns + review Q-list | backend | per money/state PR |
 | C-TEN-01 | app_user cage (CRUD, no bypass/DDL) | init script:9,21,27,31 | dba | quarterly queries S1 |
-| C-TEN-02 | RLS policies + FORCE on all 43 application tables (DB-side); runtime activation pending | migrations + manual SQL review | dba/backend | every migration |
+| C-TEN-02 | RLS policies + FORCE on all 43 application tables (DB-side); **active on local runtime** (`app_user`); hosted activation pending | migrations + RLS e2e 5/5 + manual SQL review | dba/backend | every migration |
 | C-TEN-03 | Tx-local tenant context | set_config pattern + interceptor | backend | per new module |
 | C-TEN-04 | Fetch-by-(tenantId,id) | SEC001 lint + service review | backend | every PR |
 | C-TEN-05 | Domain allowlist + verification | domains flow + 404 default | platform | quarterly |

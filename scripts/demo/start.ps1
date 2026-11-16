@@ -54,7 +54,10 @@ $syncLog = Join-Path $stateDir "vercel-sync.log"
 
 New-Item -ItemType Directory -Force -Path $stateDir | Out-Null
 
-$dbUrl = "postgresql://postgres:postgres@127.0.0.1:5432/learning_platform?schema=public"
+$migrationDbUrl = "postgresql://postgres:postgres@127.0.0.1:5432/learning_platform?schema=public"
+# Runtime role from docker/postgres/init/01-create-app-user.sql. This is a
+# local-only dev password; rotate it out of band for any shared deployment.
+$runtimeDbUrl = "postgresql://app_user:app_user_password@127.0.0.1:5432/learning_platform?schema=public"
 $allowedOrigins = "$WebOrigin,http://localhost:3001,http://127.0.0.1:3001"
 
 $script:ApiPid = 0
@@ -194,8 +197,8 @@ function Ensure-LocalEnv {
   $videoToken = [guid]::NewGuid().ToString("N")
   $videoHmac = [guid]::NewGuid().ToString("N")
   $content = @"
-DATABASE_URL="$dbUrl"
-MIGRATION_DATABASE_URL="$dbUrl"
+DATABASE_URL="$runtimeDbUrl"
+MIGRATION_DATABASE_URL="$migrationDbUrl"
 JWT_SECRET="$jwt"
 VIDEO_TOKEN_SECRET="$videoToken"
 VIDEO_WATERMARK_HMAC_SECRET="$videoHmac"
@@ -253,6 +256,18 @@ function Get-PortOwnerPid([int]$Port) {
   return 0
 }
 
+function Test-AppUserConnection {
+  $previous = $ErrorActionPreference
+  $ErrorActionPreference = "Continue"
+  try {
+    docker exec -e PGPASSWORD=app_user_password learning-platform-db psql `
+      -U app_user -d learning_platform -Atc "SELECT 1" *> $null
+    return ($LASTEXITCODE -eq 0)
+  } finally {
+    $ErrorActionPreference = $previous
+  }
+}
+
 function Start-Api {
   $portOwner = Get-PortOwnerPid $ApiPort
   if ($portOwner -gt 0 -and -not $Rebuild -and (Test-ApiHealth)) {
@@ -271,8 +286,14 @@ function Start-Api {
   Stop-PidFile $apiPidFile
   Remove-Item $apiOut, $apiErr -Force -ErrorAction SilentlyContinue
 
-  $env:DATABASE_URL = $dbUrl
-  $env:MIGRATION_DATABASE_URL = $dbUrl
+  if (-not (Test-AppUserConnection)) {
+    throw "app_user cannot connect to the local learning_platform database. Restore the role/password from docker/postgres/init/01-create-app-user.sql before starting the API."
+  }
+
+  # Runtime uses app_user (FORCE RLS); MIGRATION_DATABASE_URL stays available
+  # to operator commands but is no longer selected by PrismaService.
+  $env:DATABASE_URL = $runtimeDbUrl
+  $env:MIGRATION_DATABASE_URL = $migrationDbUrl
   $env:ALLOWED_ORIGINS = $allowedOrigins
   $env:NODE_ENV = "production"
   $env:PORT = "$ApiPort"
@@ -341,7 +362,40 @@ function Get-Ngrok {
   return $ngrok
 }
 
+function Test-TunnelHealth {
+  if (-not (Test-Path $tunnelPidFile) -or -not (Test-Path $tunnelUrlFile)) {
+    return $false
+  }
+  $pidText = Get-Content $tunnelPidFile -ErrorAction SilentlyContinue | Select-Object -First 1
+  if (-not ($pidText -match "^\d+$")) { return $false }
+  $tunnelPid = [int]$pidText
+  if (-not (Test-ProcessRunning $tunnelPid)) { return $false }
+
+  $process = Get-Process -Id $tunnelPid -ErrorAction SilentlyContinue
+  if (-not $process -or $process.ProcessName -notmatch "cloudflared") {
+    return $false
+  }
+
+  $url = (Get-Content $tunnelUrlFile -Raw -ErrorAction SilentlyContinue).Trim()
+  if (-not $url) { return $false }
+  try {
+    $response = Invoke-WebRequest -Uri "$url/api/health" -UseBasicParsing -TimeoutSec 5 -ErrorAction Stop
+    return ($response.StatusCode -eq 200)
+  } catch {
+    return $false
+  }
+}
+
 function Start-Cloudflared {
+  # Reuse a healthy quick tunnel instead of generating a new URL and forcing a
+  # Vercel redeploy on every launcher/watchdog start. If it is unhealthy, the
+  # normal stop-and-replace path below still runs.
+  if (Test-TunnelHealth) {
+    $script:PublicUrl = (Get-Content $tunnelUrlFile -Raw).Trim()
+    Write-Step "Cloudflare quick tunnel already healthy: $($script:PublicUrl); reusing it."
+    return
+  }
+
   Stop-PidFile $tunnelPidFile
   Remove-Item $tunnelOut, $tunnelErr -Force -ErrorAction SilentlyContinue
   $cf = Get-Cloudflared

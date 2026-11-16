@@ -6,8 +6,12 @@
  * you want the paid enrollment guard + voucher checkout to be reachable.
  *
  * Usage (local demo database):
- *   $env:DATABASE_URL = "postgresql://postgres:postgres@127.0.0.1:5432/learning_platform?schema=public"
+ *   $env:MIGRATION_DATABASE_URL = "postgresql://postgres:postgres@127.0.0.1:5432/learning_platform?schema=public"
+ *   $env:DATABASE_URL = $env:MIGRATION_DATABASE_URL
  *   pnpm --filter api seed:paid-demo
+ *
+ * The script prefers MIGRATION_DATABASE_URL when constructing its own client,
+ * so the owner connection is used even when DATABASE_URL points at app_user.
  *
  * Env overrides:
  *   DEMO_PAID_COURSE_SLUG  default arabic-3-prep
@@ -21,19 +25,22 @@
 import { PrismaClient } from "@prisma/client";
 import * as crypto from "crypto";
 
-const prisma = new PrismaClient();
+const databaseUrl =
+  process.env.MIGRATION_DATABASE_URL || process.env.DATABASE_URL;
+if (!databaseUrl) {
+  throw new Error(
+    "DATABASE_URL or MIGRATION_DATABASE_URL is required to seed the paid demo data.",
+  );
+}
+const prisma = new PrismaClient({
+  datasources: { db: { url: databaseUrl } },
+});
 
 const COURSE_SLUG = process.env.DEMO_PAID_COURSE_SLUG ?? "arabic-3-prep";
 const PRICE = process.env.DEMO_PAID_COURSE_PRICE ?? "199.00";
 const VOUCHER_CODE = process.env.DEMO_VOUCHER_CODE ?? "SANAD-2026";
 
 async function main() {
-  if (!process.env.DATABASE_URL) {
-    throw new Error(
-      "DATABASE_URL is required. Set it to the local demo database before running this script.",
-    );
-  }
-
   const tenant = await prisma.tenant.findFirst({
     where: { slug: "sanad-demo" },
     select: { id: true, name: true },

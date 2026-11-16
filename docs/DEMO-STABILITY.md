@@ -77,6 +77,14 @@ pnpm demo:start -- -Tunnel ngrok -NgrokDomain sanad-demo.ngrok.app -Watch
    - لو الـAPI وقع: يعيد تشغيل Docker/API.
    - لو الـTunnel وقع: يعيد تشغيله.
 
+### 2.1) قاعدة البيانات وRLS (16 نوفمبر 2026)
+
+- الـAPI runtime بياخد `DATABASE_URL` = `app_user` (non-owner، no SUPERUSER، no BYPASSRLS). ممنوع يشغّل الـAPI بـ`MIGRATION_DATABASE_URL` أو owner URL، لأن ده بيعطّل RLS.
+- الـMigrations والـSeeds بياخدوا `MIGRATION_DATABASE_URL` = owner، من خلال سكربتات الديمو فقط.
+- `start.ps1` بيفحص اتصال `app_user` قبل تشغيل الـAPI، والـAPI بيسجّل `DB runtime role: app_user (superuser=off)` في `api.out.log`.
+- الـWebhook async بيسجّل tenant الـevent ويعيد دخول نفس الـtenant scope قبل المعالجة، otherwise RLS هيرجع صفر صفوف.
+- الإثبات المحلي: RLS isolation e2e **5/5**، voucher checkout ناجح، وsigned Paymob webhook round trip ناجح (order CONFIRMED، payment PAID، enrollment، ledger، event PROCESSED بنفس tenant).
+
 ## 3) ربط Vercel مرة واحدة
 
 في Vercel → Project → Settings → Environment Variables → Production:
@@ -123,6 +131,8 @@ https://manufactured-with-alberta-cable.trycloudflare.com
 ```
 
 > ده Bridge مؤقت: لسه فيه Vercel Redeploy ووقت قصير بعد الـReboot. الحل النهائي هو ngrok static domain عشان الرابط ما يتغيرش أصلاً.
+
+> **16 نوفمبر 2026:** تشغيل الـWatchdog والـAPI والـTunnel شغالين أعاد استخدام الـAPI والـTunnel الصحيين، وحافظ على نفس الرابط `manufactured-with-alberta-cable.trycloudflare.com`، فمفيش Redeploy على Vercel. ده مهم بعد أي إعادة تشغيل يدوية للـWatchdog.
 
 > الرابط اتغير تاني بعد منتصف 16 نوفمبر 2026، والـWatchdog كتب الـFallback الجديد (`1fbc7e8`) وعمل Push تلقائياً، والموقع رجع **200**. ده تأكيد إضافي إن مسار الـSync شغال من غير تدخل يدوي.
 
@@ -243,7 +253,7 @@ backups\sanad-demo-<timestamp>.dump
 
 المجلد `backups/` متضاف لـ`.gitignore`. النسخة تحتوي بيانات الديمو؛ متترفعش على Git.
 
-> تم اختبار استرجاع النسخة `backups/sanad-demo-20261115-134916.dump` في 16 نوفمبر 2026 داخل قاعدة مؤقتة: **44 جدول، 138 سياسة RLS، 43 جدول عليه RLS، 8 migrations، 2 مستخدمين، 3 كورسات منشورة، تسجيل واحد، 0 أوردر/دفع/استخدام كوبون**. القاعدة المؤقتة اتحذفت، وقاعدة الديمو الأصلية لم تتأثر.
+> تم اختبار استرجاع النسخة `backups/sanad-demo-20261115-134916.dump` في 16 نوفمبر 2026 داخل قاعدة مؤقتة: **44 جدول، 138 سياسة RLS، 43 جدول عليه RLS، 8 migrations، 2 مستخدمين، 3 كورسات منشورة، تسجيل واحد، 0 أوردر/دفع/استخدام كوبون**. القاعدة المؤقتة اتحذفت، وقاعدة الديمو الأصلية لم تتأثر. النسخ الأحدث من 16 نوفمبر: `sanad-demo-20261116-010851.dump` و`sanad-demo-20261116-012118.dump`.
 
 ## 8) إيقاف الديمو
 
@@ -257,7 +267,27 @@ pnpm demo:stop
 pnpm demo:stop -- -StopDocker
 ```
 
-## 9) بيانات الدفع والكوبون (Sprint 2)
+## 9) إعادة ضبط الديمو (Destructive Reset)
+
+```powershell
+pnpm demo:reset -Force
+```
+
+السكربت بيعمل بالترتيب:
+
+1. Backup حديث في `backups\sanad-demo-<timestamp>.dump`.
+2. `prisma migrate deploy` باستخدام owner URL.
+3. حذف tenants الاختبار المعروفة الخاصة بـRLS (لو موجودة).
+4. Truncate لجداول الديمو، مع الاحتفاظ بـ`tenants` و`tenant_domains` و`_prisma_migrations` عشان الـtenant ID (`05587220-79b3-4f8f-9a66-b7bf5338c176`) والـAPI tenant cache يفضلوا صالحين.
+5. إعادة seed للديمو المجاني والمدفوع.
+6. Verification: **8 migrations، 1 tenant، 2 users، 3 كورسات منشورة، تسجيل مجاني واحد، الكورس المدفوع غير مسجل، 0 أوردر/دفع/استخدام كوبون، كوبون واحد، فيديو واحد**.
+
+- `pnpm demo:seed` = idempotent backfill فقط، مش reset.
+- `pnpm demo:paid` = يعيد تطبيق الكورس المدفوع والكوبون فقط.
+- `pnpm demo:reset` **مدمر** ومخصص للديمو المحلي فقط؛ متشغّلوش على قاعدة إنتاج.
+- آخر Backup قبل الـreset: `backups/sanad-demo-20261116-012118.dump` (266,109 bytes).
+
+## 10) بيانات الدفع والكوبون (Sprint 2)
 
 الديمو فيه كورس مدفوع واحد مخصص لإظهار الـCheckout:
 
@@ -283,7 +313,7 @@ pnpm demo:paid
 
 > الكوبون ده بيانات ديمو، مش كلمة سر. متحطهوش في README أو أي ملف عام غير مخصص للديمو.
 
-لو محتاج ترجع بيانات الديمو الأساسية: `pnpm demo:reset` ثم `pnpm demo:paid`. ولو عندك Backup حديث، استرجعه بدل إعادة البناء.
+لو محتاج ترجع بيانات الديمو الأساسية: `pnpm demo:reset -Force` (بيعيد المجاني والمدفوع معاً)، أو `pnpm demo:seed` لو عايز backfill غير مدمر. ولو عندك Backup حديث، استرجعه بدل إعادة البناء.
 
 ## Troubleshooting
 

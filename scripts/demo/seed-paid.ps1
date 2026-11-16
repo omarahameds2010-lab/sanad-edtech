@@ -27,6 +27,7 @@ if ($running -ne "true") {
 }
 
 $env:DATABASE_URL = "postgresql://postgres:postgres@127.0.0.1:5432/learning_platform?schema=public"
+$env:MIGRATION_DATABASE_URL = $env:DATABASE_URL
 $env:DEMO_PAID_COURSE_SLUG = $CourseSlug
 $env:DEMO_PAID_COURSE_PRICE = $Price
 $env:DEMO_VOUCHER_CODE = $VoucherCode
