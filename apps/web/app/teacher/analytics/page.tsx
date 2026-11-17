@@ -384,7 +384,7 @@ export default function TeacherAnalyticsPage() {
         </article>
 
         <div className="ta-two-col">
-          <article className="td-card" aria-label="الالتحاقات الجديدة">
+          <article className="td-card" aria-label="التحاقات الطلاب الجديدة">
             <header className="td-card-head">
               <div>
                 <span className="td-card-kicker">آخر {overview.windowDays} يومًا</span>
