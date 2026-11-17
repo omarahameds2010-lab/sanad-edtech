@@ -482,7 +482,7 @@ graph LR
     PAY --> LEDGER[ledger inside payments]
     PAY --> OUTBOX[outbox]
     OUTBOX --> NOTIF[notifications planned]
-    OUTBOX --> ANALYTICS[analytics planned]
+    OUTBOX --> ANALYTICS[analytics service]
     PAY --> AUDIT[audit]
     VPROT --> AUDIT
     EXAMS --> AUDIT
@@ -615,7 +615,7 @@ learning-platform/
 │   │           ├── audit/              ← Audit logs + security_events
 │   │           ├── outbox/             ← Transactional outbox relay
 │   │           ├── notifications/      ← (planned) email/WhatsApp/push
-│   │           └── analytics/          ← (planned) OLAP-friendly views
+│   │           └── analytics/          ← teacher overview (operational tables)
 │   └── web/                            ← Next.js 16 App Router
 │       ├── package.json
 │       ├── next.config.mjs
@@ -1098,7 +1098,7 @@ git commit -m "feat(lms): add ENTER_EXAM unlock for next lesson
 | `audit` | `modules/audit` | `audit_logs`, `payment_audit_logs`, `security_events` | `audit.service.ts` | `tenants` |
 | `outbox` | `modules/outbox` | `outbox_events` writer + BullMQ relay (no lost events) | `outbox.service.ts`, `relay.worker.ts` | `tenants` |
 | `notifications` | `modules/notifications` | (planned) email/WhatsApp/push via BullMQ | — | `outbox` |
-| `analytics` | `modules/analytics` | (planned) OLAP views, teacher dashboards | — | `courses`, `payments` |
+| `analytics` | `modules/analytics` | Teacher overview: tenant-scoped KPIs, enrollment trend, course completion, assessment averages, pending grading, recent activity; plan-aware history window | `analytics.service.ts` | `courses`, `plans` |
 
 ### 10.2 Guarded Endpoint Pattern (Copy This)
 

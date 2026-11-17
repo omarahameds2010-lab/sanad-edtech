@@ -83,12 +83,20 @@ async function main() {
   const tenant =
     (await prisma.tenant.findUnique({ where: { slug: TENANT_SLUG } })) ??
     (await prisma.tenant.create({
-      data: { name: TENANT_NAME, slug: TENANT_SLUG, status: "ACTIVE" },
+      data: {
+        name: TENANT_NAME,
+        slug: TENANT_SLUG,
+        status: "ACTIVE",
+        // Analytics is a Starter+ feature. The demo shows the real teacher
+        // analytics workspace, so the demo tenant must be on a plan that
+        // includes it (and the 30-day retention window matches the UI range).
+        planId: "starter",
+      },
     }));
 
   await prisma.tenant.update({
     where: { id: tenant.id },
-    data: { name: TENANT_NAME, status: "ACTIVE" },
+    data: { name: TENANT_NAME, status: "ACTIVE", planId: "starter" },
   });
 
   await prisma.tenantDomain.upsert({

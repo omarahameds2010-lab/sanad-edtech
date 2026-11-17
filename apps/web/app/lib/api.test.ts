@@ -497,3 +497,20 @@ describe("signup helpers", () => {
     expect(isValidEgyptianPhone("")).toBe(false);
   });
 });
+
+describe("teacher analytics endpoint", () => {
+  it("requests the tenant-scoped overview with the selected window", async () => {
+    const { fetchMock } = mockFetchOnce({ data: { windowDays: 7 } });
+
+    const result = await api.getTeacherAnalytics("tok-analytics", 7);
+
+    expect(result.windowDays).toBe(7);
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe(
+      `${API_BASE_URL}/api/v1/teacher/analytics/overview?days=7`,
+    );
+    expect((init.headers as Record<string, string>).Authorization).toBe(
+      "Bearer tok-analytics",
+    );
+  });
+});

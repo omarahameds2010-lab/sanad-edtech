@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useRef, useState, type ComponentType } from "react";
 import {
+  AnalyticsIcon,
   AssignmentsIcon,
   CloseIcon,
   CoursesIcon,
@@ -44,6 +45,7 @@ export const teacherNavItems: NavItem[] = [
     Icon: StudentsIcon,
     mobile: true,
   },
+  { href: "/teacher/analytics", label: "التحليلات", Icon: AnalyticsIcon },
   { href: "/teacher/assignments", label: "الواجبات", Icon: AssignmentsIcon },
   {
     href: "/teacher/exams",

@@ -38,7 +38,7 @@ flowchart TB
 
 ## 2. Modules
 
-`apps/api/src/modules/` contains 13 domain modules:
+`apps/api/src/modules/` contains 14 domain modules:
 
 | Module | Responsibility |
 | --- | --- |
@@ -55,6 +55,7 @@ flowchart TB
 | `video-protection` | Signed playback tokens, watermark engine, playback sessions |
 | `audit` | Audit and security event writes |
 | `outbox` | Transactional event rows (no dispatcher) |
+| `analytics` | Tenant-scoped teacher overview: enrollment trend, course completion, assessment averages, pending grading, recent activity; plan-aware history window |
 
 The `courses` module contains subfolders for assignments, exams, lessons, resources, enrollments, progress, and progression; they are not separate top-level Nest modules.
 

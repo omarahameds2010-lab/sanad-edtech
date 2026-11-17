@@ -20,6 +20,7 @@ import { VideoProtectionModule } from "./modules/video-protection/video-protecti
 import { PaymentsModule } from "./modules/payments/payments.module";
 import { VideoModule } from "./modules/video/video.module";
 import { CoursesModule } from "./modules/courses/courses.module";
+import { AnalyticsModule } from "./modules/analytics/analytics.module";
 
 @Module({
   imports: [
@@ -54,6 +55,7 @@ import { CoursesModule } from "./modules/courses/courses.module";
     PaymentsModule,
     VideoModule,
     CoursesModule,
+    AnalyticsModule,
   ],
   controllers: [HealthController],
   providers: [

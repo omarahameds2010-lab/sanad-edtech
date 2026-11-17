@@ -833,6 +833,56 @@ export interface TeacherStudent {
   }>;
 }
 
+export interface TeacherAnalyticsOverview {
+  generatedAt: string;
+  windowDays: number;
+  maxWindowDays: number;
+  totals: {
+    activeStudents: number;
+    newStudents: number;
+    activeEnrollments: number;
+    publishedCourses: number;
+    publishedAssignments: number;
+    publishedExams: number;
+    completedLessons: number;
+    lessonCompletionRate: number;
+    pendingGrading: number;
+  };
+  enrollmentTrend: Array<{ date: string; count: number }>;
+  courses: Array<{
+    id: string;
+    title: string;
+    slug: string;
+    enrollments: number;
+    lessons: number;
+    completedLessons: number;
+    completionRate: number;
+  }>;
+  assignments: {
+    submitted: number;
+    graded: number;
+    pending: number;
+    averageScore: number | null;
+  };
+  exams: {
+    attempts: number;
+    graded: number;
+    passed: number;
+    pending: number;
+    averageScore: number | null;
+    passRate: number | null;
+  };
+  recentActivity: Array<{
+    id: string;
+    kind: "assignment" | "exam";
+    title: string;
+    studentName: string;
+    status: string;
+    score: number | null;
+    at: string;
+  }>;
+}
+
 export interface StudentFile {
   user: {
     id: string;
@@ -1392,6 +1442,12 @@ export const api = {
 
   listStudents: (token: string) =>
     apiFetch<TeacherStudent[]>("/api/users/students", { token }),
+
+  getTeacherAnalytics: (token: string, days = 30) =>
+    apiFetch<TeacherAnalyticsOverview>(
+      `/api/v1/teacher/analytics/overview?days=${days}`,
+      { token },
+    ),
 
   getStudentProgression: (token: string, courseId: string) =>
     apiFetch<CourseProgression>(`/api/v1/progression/courses/${courseId}`, {

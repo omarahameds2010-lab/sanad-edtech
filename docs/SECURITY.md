@@ -1480,6 +1480,7 @@ DELIVERABLE: findings with SEVERITY + REPRO (requestIds) + retest window. Fix SL
 | v2.2 | 2026-10-28 | Hardening and retakes merged and deployed; migration #8 applied (8/8); backup restore-tested; production retake smoke 31/31; rate limiting/lock enforcement/authoring-read fixes live; RLS activation and distributed rate limiting remain open; SETH-9 recorded as roadmap-only |
 | v2.3 | 2026-11-16 | Local RLS runtime activated as `app_user` (no SUPERUSER/BYPASSRLS); RLS e2e 5/5; async webhook tenant-context fix and signed round trip; voucher checkout under RLS; destructive demo reset with backup; hosted Railway endpoint retired and not RLS-migrated |
 | v2.4 | 2026-11-16 | Video provider webhook route added (`POST /api/video/webhooks/:provider`): raw-body HMAC before parsing, Host-resolved tenant scope, transactional `Video` update + outbox event, stale/replay handling, 6 unit tests; CSRF exemption mirrors payment webhooks. Bunny library/key not configured, so real-provider verification remains pending. API suite 365/365. |
+| v2.5 | 2026-11-17 | Teacher analytics workspace added: `GET /api/v1/teacher/analytics/overview` under `AnalyticsModule` with `@CanReadAnalytics()`, tenant-scoped reads only, plan-aware history retention, and no cross-tenant aggregates; `/teacher/analytics` now a real Arabic page. Analytics service 4/4; API suite 369/369, web 159/159, build 4/4. No schema or migration change. |
 
 ---
 
@@ -1534,6 +1535,7 @@ DELIVERABLE: findings with SEVERITY + REPRO (requestIds) + retest window. Fix SL
 | POST | `/courses/:id/unpublish` | yes | `unpublish` + reason | Reason audited |
 | GET | `/lessons/:id` | yes | `read` lesson | Entitlement + lock evaluation |
 | GET | `/teacher/*` dashboards | yes | role-scoped | Own tenant only |
+| GET | `/teacher/analytics/overview` | yes | `read` analytics | Tenant-scoped aggregates; plan retention cap; no cross-tenant reads |
 
 ## F3. LMS Routes (Attempts, Grading, Progression)
 
