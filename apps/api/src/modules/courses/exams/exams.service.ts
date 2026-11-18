@@ -4,6 +4,7 @@ import {
   BadRequestException,
   ConflictException,
   ForbiddenException,
+  Optional,
 } from "@nestjs/common";
 import { PrismaService } from "../../tenants/prisma.service";
 import {
@@ -16,16 +17,20 @@ import {
 import { IdempotencyService } from "../../payments/security/idempotency.service";
 import { ProgressionService } from "../progression/progression.service";
 import { assertLessonAccessible } from "../lessons/lesson-access";
+import { ExamExpiryScheduler } from "./expiry/exam-expiry.scheduler";
 
 @Injectable()
 export class ExamsService {
   private readonly DEFAULT_TIMER_MINUTES = 70; // 70 minutes default
   private readonly MAX_TIMER_MINUTES = 10080; // 1 week
+  private readonly RECENT_TIMEOUT_GRACE_MS = 60_000;
 
   constructor(
     private prisma: PrismaService,
     private idempotencyService: IdempotencyService,
     private progressionService: ProgressionService,
+    @Optional()
+    private readonly examExpiryScheduler?: ExamExpiryScheduler,
   ) {}
 
   // ==================== TEACHER METHODS ====================
@@ -541,6 +546,18 @@ export class ExamsService {
       },
     });
 
+    // Server-side expiry: the job survives an API restart and closes an
+    // abandoned attempt even when the student's tab never submits. Scheduled a
+    // few seconds after the deadline so the client auto-submit wins the normal
+    // race. Queue failures are intentionally non-fatal.
+    await this.examExpiryScheduler?.scheduleAttemptExpiry({
+      tenantId,
+      examId,
+      attemptId: attempt.id,
+      studentId: userId,
+      expiresAt,
+    });
+
     // Trigger progression ONCE: ENTER_EXAM → unlock the next lesson for THIS
     // student (audit 2026-10-16 §6.1 — this used to be a tenant-wide flip AND
     // the controller called it a second time). It runs before the idempotent
@@ -605,6 +622,7 @@ export class ExamsService {
     // Find active attempt
     const attempt = await this.prisma.examAttempt.findFirst({
       where: {
+        tenantId,
         examId,
         studentId: userId,
         status: AttemptStatus.IN_PROGRESS,
@@ -613,6 +631,38 @@ export class ExamsService {
     });
 
     if (!attempt) {
+      // The server-side expiry worker may have closed the attempt between the
+      // client's submit click and this request. Return the same timed-out shape
+      // instead of a confusing 404 (only for a very recent auto-expiry).
+      const recentlyTimedOut = await this.prisma.examAttempt.findFirst({
+        where: {
+          tenantId,
+          examId,
+          studentId: userId,
+          status: AttemptStatus.TIMED_OUT,
+          submittedAt: {
+            gte: new Date(Date.now() - this.RECENT_TIMEOUT_GRACE_MS),
+          },
+        },
+        orderBy: { submittedAt: "desc" },
+      });
+
+      if (recentlyTimedOut) {
+        const response = {
+          attemptId: recentlyTimedOut.id,
+          status: AttemptStatus.TIMED_OUT,
+          submittedAt: recentlyTimedOut.submittedAt,
+          isTimedOut: true,
+          message: "Exam submitted: timer expired",
+        };
+        await this.idempotencyService.markCompleted(
+          tenantId,
+          dto.idempotencyKey,
+          response,
+        );
+        return response;
+      }
+
       throw new NotFoundException("No active attempt found");
     }
 

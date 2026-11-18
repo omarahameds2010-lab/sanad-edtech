@@ -15,6 +15,7 @@ describe("ExamsService", () => {
   let prisma: any;
   let idempotencyService: any;
   let progressionService: any;
+  let examExpiryScheduler: any;
 
   const tenantId = "tenant1";
   const userId = "user1";
@@ -55,8 +56,16 @@ describe("ExamsService", () => {
         .fn()
         .mockResolvedValue({ unlocked: 1, lessonIds: ["lessonNext"] }),
     };
+    examExpiryScheduler = {
+      scheduleAttemptExpiry: jest.fn().mockResolvedValue(undefined),
+    };
 
-    service = new ExamsService(prisma, idempotencyService, progressionService);
+    service = new ExamsService(
+      prisma,
+      idempotencyService,
+      progressionService,
+      examExpiryScheduler,
+    );
   });
 
   describe("createExam", () => {
@@ -250,6 +259,13 @@ describe("ExamsService", () => {
       );
       expect(result.timeRemainingSeconds).toBe(70 * 60);
       expect(result.questions[0]).not.toHaveProperty("correctAnswer");
+      expect(examExpiryScheduler.scheduleAttemptExpiry).toHaveBeenCalledWith({
+        tenantId,
+        examId: "e1",
+        attemptId: "at1",
+        studentId: userId,
+        expiresAt: result.expiresAt,
+      });
 
       expect(progressionService.handleEnterExam).toHaveBeenCalledWith(
         tenantId,
@@ -284,6 +300,34 @@ describe("ExamsService", () => {
           idempotencyKey: "k1",
         }),
       ).rejects.toThrow(NotFoundException);
+    });
+
+    it("returns a timed-out response when the expiry worker already closed the attempt", async () => {
+      const submittedAt = new Date();
+      prisma.examAttempt.findFirst
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce({
+          id: "at1",
+          status: "TIMED_OUT",
+          submittedAt,
+        });
+
+      const result = await service.submitExamAttempt(tenantId, userId, "e1", {
+        answers: {},
+        idempotencyKey: "k1",
+      });
+
+      expect(result).toMatchObject({
+        attemptId: "at1",
+        status: "TIMED_OUT",
+        submittedAt,
+        isTimedOut: true,
+      });
+      expect(idempotencyService.markCompleted).toHaveBeenCalledWith(
+        tenantId,
+        "k1",
+        expect.objectContaining({ attemptId: "at1", isTimedOut: true }),
+      );
     });
 
     it("marks TIMED_OUT when timer expired", async () => {
