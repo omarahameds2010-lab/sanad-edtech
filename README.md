@@ -263,7 +263,8 @@ PLATFORM (universe)
 | PolicyEngine + Guards | ✅ | `authorization` module |
 | Entitlements vs Feature Flags split | ✅ | Separate modules |
 | Plans + Subscriptions | ✅ | `plans` module |
-| Transactional outbox | ✅ | `outbox` module |
+| Transactional outbox | Partial | `outbox` module writes events; no relay/dispatcher |
+| Server-side exam expiry | ✅ | Delayed Bull `exam-expiry` worker; client timer remains the normal path |
 | Idempotency keys (24h TTL) | ✅ | `payments` + `IdempotencyKeys` table |
 | Audit logging | ✅ | `audit` + `payment_audit_logs` |
 
@@ -1096,7 +1097,7 @@ git commit -m "feat(lms): add ENTER_EXAM unlock for next lesson
 | `video` | `modules/video` | Upload URLs (TUS), status sync, provider abstraction | `bunny.provider.ts`, `vdocipher.provider.ts` (stub) | `tenants` |
 | `video-protection` | `modules/video-protection` | Tokens, watermark, sessions, heartbeat, risk | `watermark-engine.ts`, `signed-token.service.ts`, `playback-session.service.ts` | `video`, `entitlements` |
 | `audit` | `modules/audit` | `audit_logs`, `payment_audit_logs`, `security_events` | `audit.service.ts` | `tenants` |
-| `outbox` | `modules/outbox` | `outbox_events` writer + BullMQ relay (no lost events) | `outbox.service.ts`, `relay.worker.ts` | `tenants` |
+| `outbox` | `modules/outbox` | `outbox_events` writer only; relay/dispatcher is not implemented | `outbox.service.ts` | `tenants` |
 | `notifications` | `modules/notifications` | (planned) email/WhatsApp/push via BullMQ | — | `outbox` |
 | `analytics` | `modules/analytics` | Teacher overview: tenant-scoped KPIs, enrollment trend, course completion, assessment averages, pending grading, recent activity; plan-aware history window | `analytics.service.ts` | `courses`, `plans` |
 
@@ -2144,14 +2145,16 @@ Post-deploy:
 
 ### 23.2 BullMQ Queues
 
+> **Current implementation (18 November 2026):** only the `exam-expiry` delayed worker is registered, using Bull (`@nestjs/bull`), not BullMQ. It schedules one job per exam attempt at `expiresAt + 5s`, runs in the tenant/RLS scope, retries 3× with exponential backoff, and CAS-closes only `IN_PROGRESS` attempts. The other rows below are target architecture, not live processors.
+
 | Queue | Jobs | Concurrency | Retry |
 |-------|------|-------------|-------|
-| `outbox-relay` | `outbox_events` → handlers (enroll, notify, analytics) | 10 | 5× exponential + DLQ |
-| `exam-autosubmit` | Delayed job per attempt (`expiresAt - now`) | 20 | 3× (idempotent) |
-| `webhook-normalize` | Provider payload → canonical `PaymentStatus` | 10 | 5× |
-| `reconciliation` | Nightly provider ↔ ledger diff | 1 | Manual rerun |
+| `exam-expiry` | Delayed job per attempt (`expiresAt + 5s`), idempotent `TIMED_OUT` CAS | default | 3× exponential |
+| `outbox-relay` (planned) | `outbox_events` → handlers (enroll, notify, analytics) | 10 | 5× exponential + DLQ |
+| `webhook-normalize` (planned) | Provider payload → canonical `PaymentStatus` | 10 | 5× |
+| `reconciliation` (planned) | Nightly provider ↔ ledger diff | 1 | Manual rerun |
 | `notifications` (planned) | Email/WhatsApp/push | 20 | 5× + DLQ |
-| `video-sync` | Poll provider status (fallback to webhooks) | 5 | 3× |
+| `video-sync` (planned) | Poll provider status (fallback to webhooks) | 5 | 3× |
 
 ### 23.3 Web Vitals Budgets (Web)
 

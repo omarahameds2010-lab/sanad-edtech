@@ -23,7 +23,8 @@ flowchart TB
     B -->|HTTPS| W
     W -->|same-origin /api rewrite| A
     A -->|Prisma 5.22| P
-    A -.->|dependencies present; no processors| R
+    A -->|delayed exam-expiry jobs| R
+    A -.->|outbox relay not wired| R
     A -->|signed checkout| PAY[Paymob / Fawry]
     A -->|upload/sign| BUN[Bunny Stream]
     B -->|unlisted embed| YT[YouTube]
@@ -33,7 +34,7 @@ flowchart TB
 - **Web:** Next.js 15, React 19, App Router, RTL-first.
 - **API:** NestJS 10 modular monolith, global prefix `/api`.
 - **DB:** PostgreSQL + Prisma, shared schema with `tenantId` on every tenant-owned row.
-- **Cache/jobs:** Redis and Bull dependencies exist, but no processors are registered.
+- **Cache/jobs:** Redis + Bull are active for the tenant-scoped `exam-expiry` delayed worker. The outbox has no relay and no other processors are registered.
 - **Deploy:** Vercel (web) + Railway (API/PostgreSQL), root `Dockerfile` for the API.
 
 ## 2. Modules
@@ -46,7 +47,7 @@ flowchart TB
 | `auth` | Login/register, JWT access cookie, rotating refresh sessions, cookie policy |
 | `authorization` | Policy engine, guards, `@RequirePermission` |
 | `users` | Profiles and user administration |
-| `courses` | Courses, sections, lessons, resources, assignments, exams, progress, progression, public/student views, publishing |
+| `courses` | Courses, sections, lessons, resources, assignments, exams (including the `exam-expiry` Bull worker), progress, progression, public/student views, publishing |
 | `entitlements` | Resource access grants/checks, separate from feature flags |
 | `feature-flags` | Tenant/plan feature toggles |
 | `plans` | Plans and subscriptions |
@@ -157,7 +158,7 @@ Assignment and exam timers are server-owned, but the two models differ:
 - **Assignment:** starting creates an `AssignmentSubmission` with status `IN_PROGRESS`, `startedAt = now`, and `submittedAt = null`. `expiresAt` is derived (`startedAt + timerMinutes`) and is not stored in a column. Each attempt is unique on `(assignmentId, studentId, attemptNumber)`; `maxAttempts` is enforced server-side and concurrent duplicate starts return `409`. Submitting sets `submittedAt`; in-progress rows are excluded from teacher grading. Production runs migration #8 and the attempt model; the 28 October smoke verified attempts 1 and 2 and a rejected third start at `maxAttempts=2`.
 - **Exam:** `ExamAttempt.startedAt` is the timer start. `expiresAt` is derived (`startedAt + timerMinutes`) and is not stored in a column.
 - The UI only displays remaining time; refresh does not extend it.
-- Expiration is computed server-side. The exam client auto-submits at zero; the API records a late submit as `TIMED_OUT`. No background auto-submit worker is registered.
+- Expiration is computed server-side. The exam client auto-submits at zero. A delayed Bull job (`exam-expiry`) is scheduled from `startExamAttempt` at `expiresAt + 5s`; it re-enters the tenant ALS scope and CAS-updates only a still-`IN_PROGRESS` attempt to `TIMED_OUT`. The API records a late client submit as `TIMED_OUT`; a recent worker close returns the same timed-out result instead of a 404. Queue failure is non-fatal and leaves the client timer as the fallback.
 - Submissions are idempotent.
 
 Default durations: assignments **300 minutes**, exams **70 minutes**.
@@ -242,7 +243,7 @@ No mock data is allowed in these surfaces. Every count and state comes from the 
 | Web | Vercel | `main` production branch; `/api/*` rewrite to the current tunnel |
 | API | Local Docker/laptop | compiled NestJS on `:3002`; runtime `DATABASE_URL` = `app_user`; RLS active |
 | DB | Local Docker PostgreSQL | **8/8** migrations; 138 RLS policies on 43 tables; runtime non-owner |
-| Redis | Local Docker | dependency present; no jobs registered |
+| Redis | Local Docker | `exam-expiry` delayed jobs/worker active; outbox relay absent |
 | Tunnel | Cloudflare quick tunnel | temporary; `-SyncFallback` updates the Vercel build fallback when the URL changes |
 | Railway | Retired | endpoint returns `404 Application not found`; not RLS-migrated |
 
@@ -256,7 +257,7 @@ Vercel fail-safes:
 1. Hosted RLS activation (local is active; the retired Railway runtime was not migrated).
 2. Outbox dispatcher.
 3. Real-provider video webhook verification (route exists and is unit-tested; no Bunny library/key configured).
-4. Background job processors.
+4. Remaining background workers (the `exam-expiry` worker exists; outbox relay and other processors do not).
 5. Persisted word-level review evidence.
 6. Provider sandbox verification.
 7. Reconciliation worker.

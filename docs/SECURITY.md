@@ -35,6 +35,7 @@
 > - Locked lesson payloads are metadata-only; student assignment/exam view and enter endpoints return `403 LESSON_LOCKED` without a per-student grant.
 > - Authoring reads require `update`: generic exam/assignment reads, teacher lesson routes, and legacy lesson routes. Student lists expose navigation metadata only, and pre-start exam views withhold the question paper.
 > - Attempts are unique on `(assignmentId, studentId, attemptNumber)`; `maxAttempts` is enforced server-side and concurrent duplicate starts return `409`. An active attempt is checked before the max-attempt count. Migration #8 is applied and existing rows are backfilled as submitted attempt #1.
+> - Server-side exam expiry: a delayed Bull job (`exam-expiry`) is scheduled from `startExamAttempt`, re-enters the tenant ALS/RLS scope, and CAS-updates only a still-`IN_PROGRESS`, expired attempt to `TIMED_OUT`. Queue failure is non-fatal; the client timer remains the normal path.
 >
 > **Critical caveats**
 >
@@ -42,7 +43,7 @@
 > - The video webhook route now exists (`POST /api/video/webhooks/:provider`) with raw-body HMAC verification, tenant-scoped lookup, and a transactional video update + outbox event. It is unit-tested (6/6); a real Bunny library/key is not configured, so a live provider callback is still pending. VdoCipher remains a stub.
 > - There is no outbox dispatcher.
 > - Published course/lesson/exam content has **no immutable version/snapshot layer yet**; the “publish = immutable snapshot” language below is a target control, not a current guarantee.
-> - Exam auto-submit is client-driven; the API marks a late submit `TIMED_OUT`, but no scheduled worker submits abandoned attempts.
+> - Exam auto-submit is now server-backed by the delayed `exam-expiry` worker; the client still auto-submits at zero. The worker must be running with Redis for abandoned-tab cleanup.
 > - 2FA, KMS/Vault, SIEM/Sentry/Prometheus, and WAF are not implemented. Application-level rate limiting uses in-memory storage, not a shared cluster store.
 > - SETH-9 post-quantum signing, ZK delivery, homomorphic grading, active deception, and crypto-shredding are **roadmap-only**; see [`SETH-9-ROADMAP.md`](SETH-9-ROADMAP.md).
 > - Do not treat the older “178 + 26 policies” or `20240101000000_init_rls.sql` references as current; the database has 8 migrations with 138 policies on 43 tables.
@@ -988,7 +989,7 @@ Teacher config change mid-attempt: running attempts keep snapshot (fairness); ne
 | Browser clock rollback | Server `NOW()` only; client clock never read |
 | Double-ENTER race (2 timers?) | Partial unique `(studentId, parentId)` WHERE `IN_PROGRESS` → one wins, other resumes |
 | `?extraTime=true` / body `expiresAt` | DTO strips time fields; any client time = 422 + event |
-| Tab-open-past-expiry | API treats `expiresAt` as authoritative and rejects late writes; **no BullMQ delayed job/sweeper is registered yet** |
+| Tab-open-past-expiry | API treats `expiresAt` as authoritative and rejects late writes; a Bull delayed `exam-expiry` job closes abandoned attempts (18 November 2026). A separate periodic sweeper is not registered. |
 | Answer write after expiry | Write carries server receipt time; post-expiry writes rejected with proof |
 
 ## 8.2 ANSWER EXCLUSION — Solutions Never Leave the Server
@@ -1481,6 +1482,7 @@ DELIVERABLE: findings with SEVERITY + REPRO (requestIds) + retest window. Fix SL
 | v2.3 | 2026-11-16 | Local RLS runtime activated as `app_user` (no SUPERUSER/BYPASSRLS); RLS e2e 5/5; async webhook tenant-context fix and signed round trip; voucher checkout under RLS; destructive demo reset with backup; hosted Railway endpoint retired and not RLS-migrated |
 | v2.4 | 2026-11-16 | Video provider webhook route added (`POST /api/video/webhooks/:provider`): raw-body HMAC before parsing, Host-resolved tenant scope, transactional `Video` update + outbox event, stale/replay handling, 6 unit tests; CSRF exemption mirrors payment webhooks. Bunny library/key not configured, so real-provider verification remains pending. API suite 365/365. |
 | v2.5 | 2026-11-17 | Teacher analytics workspace added: `GET /api/v1/teacher/analytics/overview` under `AnalyticsModule` with `@CanReadAnalytics()`, tenant-scoped reads only, plan-aware history retention, and no cross-tenant aggregates; `/teacher/analytics` now a real Arabic page. Analytics service 4/4; API suite 369/369, web 159/159, build 4/4. No schema or migration change. |
+| v2.6 | 2026-11-18 | Server-side exam expiry added: delayed Bull `exam-expiry` job from `startExamAttempt`, tenant/RLS-scoped processor, CAS `IN_PROGRESS → TIMED_OUT`, submit-race fallback, queue failure non-fatal. Live 1-minute proof; 6 worker tests; API 376/376 (38 suites), web 159/159, build 4/4. No schema or migration change. |
 
 ---
 

@@ -1,7 +1,7 @@
 # Deployment Runbook — Vercel + local demo API
 
 > **Current demo:** web on Vercel; API and PostgreSQL on the demo laptop, exposed through a Cloudflare quick tunnel. The Railway API endpoint returns `404 Application not found` and is retired.
-> **Verified 17 November 2026:** local runtime connects as `app_user` with RLS active; new code `DATABASE_URL` only; API **369/369**, web **159/159**, build **4/4**, RLS e2e **5/5**, live smoke **8/8**, demo doctor **10/10**. Migration chain is **8/8**. The teacher analytics endpoint is tenant-scoped and plan-capped; `/teacher/analytics` is a real page.
+> **Verified 18 November 2026:** local runtime connects as `app_user` with RLS active; new code `DATABASE_URL` only; API **376/376**, web **159/159**, build **4/4**, RLS e2e **5/5**, live smoke **8/8**, demo doctor **10/10**. Migration chain is **8/8**. The teacher analytics endpoint is tenant-scoped and plan-capped; `/teacher/analytics` is a real page. The server-side exam-expiry Bull worker is live-proven.
 > Canonical state: [`CURRENT-STATE.md`](CURRENT-STATE.md).
 
 ## 0. Topology
@@ -12,7 +12,7 @@ Browser
       /api/* ─────────────────────────────→ https://<quick-tunnel>.trycloudflare.com
                                               (NestJS 10, laptop :3002)
                                               → PostgreSQL (local Docker, app_user + RLS)
-                                              → Redis (local Docker; no processors yet)
+                                              → Redis (local Docker; exam-expiry worker)
 ```
 
 - Web project: `sanad-edtech`
@@ -326,7 +326,7 @@ RLS being inactive on a host is a known gap, not a reason to claim hosted isolat
 - Hosted RLS activation: local runtime is active, but the Railway endpoint is retired and was never migrated (section 5).
 - Outbox dispatcher (events are written, not delivered).
 - Real Bunny webhook round trip (route exists and is unit-tested; no Bunny library/key is configured in the demo).
-- No Bull processors.
+- Only one Bull processor exists (`exam-expiry`); there is no outbox relay or reconciliation worker. Redis must be running for the delayed expiry; if it is unavailable, exam start still succeeds and the client timer remains the fallback.
 - Railway auto-deploy: the service is retired; the 28 October deploy was manual with `railway up`.
 - Real provider sandbox transaction not yet recorded.
 - SETH-9 advanced controls are roadmap-only; see [`SETH-9-ROADMAP.md`](SETH-9-ROADMAP.md).

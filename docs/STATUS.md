@@ -1,4 +1,4 @@
-# Status — 17 November 2026
+# Status — 18 November 2026
 
 > Canonical detail lives in [`CURRENT-STATE.md`](CURRENT-STATE.md). This page is the short dashboard: what is live, what is proven, and what is still missing.
 
@@ -7,13 +7,13 @@
 | Item | Value |
 | --- | --- |
 | Production branch | `main` |
-| Web runtime code | Sprint 2 paid checkout (`aa4d2bc`) + tunnel fallback sync (`1fbc7e8`) + UTF-8 comment cleanup (`7ca1ed3`) — 15–16 November 2026 |
-| API runtime | Local compiled NestJS API on `:3002`; runtime `DATABASE_URL` = non-owner `app_user`; RLS active locally |
+| Web runtime code | Sprint 2 paid checkout (`aa4d2bc`) + tunnel fallback sync (`1fbc7e8`) + UTF-8 comment cleanup (`7ca1ed3`) + teacher analytics (`665ecc2`) + latest fallback sync (`0fffd90`) — 15–18 November 2026 |
+| API runtime | Local compiled NestJS API on `:3002`; runtime `DATABASE_URL` = non-owner `app_user`; RLS active locally; tenant-scoped `exam-expiry` Bull worker active |
 | Demo launcher | `scripts/demo/start.ps1`; Windows Startup entry installed with `-Tunnel cloudflared -Watch -SyncFallback`; healthy API/tunnel are reused |
 | Hardening / retakes | **Live** — rate limiting, lock enforcement, authoring-read fixes, and assignment retakes |
 | Sprint 2 paid checkout | **Implemented, deployed, and live-verified** — `402` paid-course guard, atomic enrollment, voucher checkout |
 | Web | <https://sanad-edtech.vercel.app> |
-| API public origin | <https://longest-order-ham-membrane.trycloudflare.com> — quick tunnel; changes on restart |
+| API public origin | <https://modes-lender-ind-controlled.trycloudflare.com> — quick tunnel; changes on restart |
 | Health | `/api/health` → **200**, database **up** |
 | Login page | **200** |
 | Demo tenant | `sanad-demo` |
@@ -26,20 +26,21 @@
 
 | Check | Result | Command |
 | --- | --- | --- |
-| API tests on Sprint 2 + RLS activation + video webhook + teacher analytics | **369/369**, 36 suites; re-run 17 Nov 2026 | `pnpm --filter api exec jest --config jest.config.js --runInBand` |
-| Web tests | **159/159**, 12 files; re-run 17 Nov 2026 | `pnpm --filter web test` |
-| Monorepo build | **4/4** successful; re-run 17 Nov 2026 after the analytics workspace | `pnpm build` |
+| API tests on Sprint 2 + RLS activation + video webhook + teacher analytics + exam-expiry worker | **376/376**, 38 suites; re-run 18 Nov 2026 | `pnpm --filter api exec jest --config jest.config.js --runInBand` |
+| Web tests | **159/159**, 12 files; re-run 18 Nov 2026 | `pnpm --filter web test` |
+| Monorepo build | **4/4** successful; re-run 18 Nov 2026 after the exam-expiry worker | `pnpm build` |
 | RLS runtime activation | **passed 16 Nov 2026**: `app_user` (no SUPERUSER/BYPASSRLS); startup log `DB runtime role: app_user (superuser=off)`; health 200 | Local compiled API |
 | RLS isolation proof | **5/5 passed 16 Nov 2026**: scoped SELECT; cross-tenant UPDATE/DELETE = 0 rows; cross-tenant INSERT rejected; empty context = 0 rows | `jest --config ./test/jest-e2e.json --runInBand rls-isolation` |
 | Voucher checkout under RLS | **passed 16 Nov 2026**: order for `arabic-3-prep`, `SANAD-2026` → `success: true`, one ACTIVE paid enrollment; reset restored the clean state | Local HTTP flow through the API |
 | Signed Paymob webhook under RLS | **passed 16 Nov 2026**: HMAC-SHA512 callback → async event PROCESSED with tenant ID; order CONFIRMED, intent SUCCEEDED, payment PAID, 2 ledger rows, enrollment created; reset restored the clean state | Local signed webhook + DB checks |
 | Video webhook route | **6/6 unit tests**: raw-body HMAC before parsing, tenant-scoped lookup, transactional video update + outbox, stale/replayed callback handling, malformed body rejection; route is CSRF-exempt like payment webhooks. No real Bunny library/key in the demo. | `video.service.spec.ts` |
 | Teacher analytics | **implemented, deployed, and live-verified 17 Nov 2026**: `GET /api/v1/teacher/analytics/overview?days=7\|30\|90` returns tenant-scoped totals, trend, per-course completion, assessment averages, pending grading, and recent activity; starter retention caps 90 at 30; `/teacher/analytics` is a real Arabic page. Analytics service **4/4**. | Live HTTP + browser QA |
+| Server-side exam expiry | **implemented and live-proven 18 Nov 2026**: a delayed Bull job is scheduled from `startExamAttempt`; the tenant/RLS-scoped processor CAS-updates a still-`IN_PROGRESS` attempt to `TIMED_OUT` after `expiresAt`. Live temporary 1-minute exam expired at 65s (`timeRemainingSeconds = 0`); job failures are non-fatal. 6 worker tests; submit-race fallback covered. | Redis + DB + HTTP proof |
 | Destructive demo reset | **passed twice 16 Nov 2026**, exit 0: backup → migrate → truncate → seed free + paid demo → verify; preserves `tenants`, `tenant_domains`, `_prisma_migrations` and the tenant ID | `pnpm demo:reset -Force` |
 | Paid checkout HTTP smoke | **passed**: paid direct enroll 402, invalid voucher 400, valid voucher 201, enrollment `source=voucher`, replay one redemption | Local HTTP smoke, 14 Nov 2026 |
 | Paid checkout browser QA | **passed live**: paid CTA → checkout → `SANAD-2026` → order/intent **201** → “تم تفعيل الكورس”; cleanup restored the demo state | Live browser, 14 Nov 2026 |
 | Live judge path | **passed 15 Nov 2026**: `/demo`, one-click student/teacher, demo banner, checkout **200**, direct paid enroll **402**; **re-verified 17 Nov** with the live analytics workspace (real data, 7/30 range, disabled 90, no overflow) | Browser + HTTP through the web domain |
-| Live authenticated smoke | **8/8 passed** 15 Nov, **8/8** again 16 Nov after RLS + reset, and **8/8** through the live domain 17 Nov: health, public catalog, teacher login/tenant/courses, student login/assignments/enrollments | `pnpm demo:smoke -- -BaseUrl https://sanad-edtech.vercel.app` |
+| Live authenticated smoke | **8/8 passed** 15 Nov, **8/8** again 16 Nov after RLS + reset, **8/8** through the live domain 17 Nov, and **8/8** on 18 Nov after the exam-expiry deploy: health, public catalog, teacher login/tenant/courses, student login/assignments/enrollments | `pnpm demo:smoke -- -BaseUrl https://sanad-edtech.vercel.app` |
 | Demo doctor preflight | **10/10 passed 16 Nov 2026** after the RLS commit and **10/10 again 17 Nov** after the analytics deploy: Docker/containers, local API, tunnel, live health/database, `/demo` + checkout, watchdog, Startup entry, git sync, fallback match, demo DB state (including 1 voucher) | `pnpm demo:doctor` |
 | Autostart + fallback sync | **passed 15–16 Nov 2026**: hidden watchdog restarted the tunnel twice, wrote the new fallback (`14a82df` after the full logon simulation; `1fbc7e8` after the overnight restart), pushed, and live health returned **200** each time | Installed Startup entry + sync log |
 | Cold Docker recovery | **passed 15 Nov 2026**: stopped Docker Desktop → health **503** → watchdog restarted Docker/PostgreSQL/API → health **200** in about 40 seconds | Hidden watchdog, no manual step |
@@ -62,6 +63,7 @@ Older counts (86, 179, 229, 276, 307, 311, 344, 353, 393) belong to historical s
 - Student curriculum board with real section/lesson/task data and direct task links.
 - Student lesson workspace for video, exam, and assignment, including locked-video prerequisite state.
 - Server-authoritative 300-minute assignment timer and 70-minute exam timer.
+- Server-side exam expiry through a tenant-scoped delayed Bull worker, with the client timer as the normal path.
 - Per-student entry-based progression (`ENTER_ASSIGNMENT`, `ENTER_EXAM`) with idempotent grants.
 - Teacher grading queue.
 - Student Command Center with server-derived numbers.
@@ -102,7 +104,6 @@ Production retake smoke passed **31/31**; the demo assignment is set to `maxAtte
 | P2 | Distributed rate limiting | The live in-memory limits are backed by shared storage and proxy-IP handling is verified under production traffic |
 | P2 | Review evidence | Per-word/answer evidence persisted instead of an aggregate bridge |
 | P2 | Content versioning | Published course/lesson/exam revisions stored as immutable versions so old attempts keep their source content |
-| P2 | Server-side exam auto-submit | A scheduled worker expires and submits abandoned attempts without relying on the open tab |
 | P2 | 2FA / secret manager / observability | Controls implemented and tested |
 | P3 | Advanced progression | `COMPLETE_*`, `PASS_EXAM`, `SCORE_THRESHOLD`, `TIME_ELAPSED`, manual unlocks |
 | P3 | Reconciliation worker | Live reconciliation run over provider settlements |
@@ -112,6 +113,7 @@ Production retake smoke passed **31/31**; the demo assignment is set to `maxAtte
 
 - RLS is active on the local demo runtime (`app_user`); the retired Railway runtime is not migrated, so do not claim hosted RLS enforcement.
 - The transactional outbox is not delivering events.
+- Only one Bull processor exists (`exam-expiry`); there is no outbox relay or live reconciliation worker.
 - The video webhook route exists and is unit-tested; a real Bunny callback is not yet recorded.
 - Railway did not auto-deploy the 28 October API push; the API was deployed manually with `railway up`.
 - Instapay, Vodafone Cash, and e&money are not live payment methods.
@@ -139,5 +141,6 @@ Production retake smoke passed **31/31**; the demo assignment is set to `maxAtte
 | 2026-11-16 | RLS runtime activated locally as `app_user` (no SUPERUSER/BYPASSRLS); destructive `pnpm demo:reset` with automatic backup; RLS e2e 5/5; voucher and signed Paymob webhook round trips under RLS; video webhook route added with 6 unit tests (raw-body HMAC, tenant scope, transactional update + outbox, stale/replay handling); 365/365 API, 158/158 web, build 4/4; watchdog resumed and reused the healthy tunnel/API; doctor 10/10 after commit |
 | 2026-11-16 | Afternoon: cloudflared process died; the watchdog started `longest-order-ham-membrane`, synced the fallback (`3dab53e`) after the RLS commit was pushed, and Vercel redeployed; live health returned 200. Fixed the watchdog reuse path to read `tunnel.pid` back and to keep retrying fallback sync after a dirty tree or unpushed commits. |
 | 2026-11-17 | Real teacher analytics workspace: tenant-scoped `GET /api/v1/teacher/analytics/overview`, plan-aware 30/90-day retention, Arabic `/teacher/analytics` page replacing the redirect, nav item restored; demo tenant seeded as `starter`; API 369/369, web 159/159, build 4/4; deployed via `665ecc2`, live browser QA passed, live smoke 8/8, doctor 10/10 |
+| 2026-11-18 | Server-side exam expiry (`bacce7e`): delayed Bull job at `expiresAt + 5s`, tenant/RLS-scoped processor, `TIMED_OUT` CAS update, submit-race fallback; live 1-minute proof expired at 65s; API 376/376 (38 suites), web 159/159, build 4/4; quick tunnel changed and fallback synced via `0fffd90`, live health 200 |
 
 Historical audit: [`AUDIT-2026-10-16.md`](AUDIT-2026-10-16.md). It is preserved as a dated snapshot, not rewritten.
