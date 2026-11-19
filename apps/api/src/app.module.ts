@@ -6,6 +6,7 @@ import { ThrottlerModule } from "@nestjs/throttler";
 import { LoggerModule } from "nestjs-pino";
 import { HealthController } from "./common/health.controller";
 import { ClientIpThrottlerGuard } from "./common/guards/client-ip-throttler.guard";
+import { RedisThrottlerStorage } from "./common/throttler/redis-throttler.storage";
 import { PrismaModule } from "./common/prisma/prisma.module";
 import { TenantModule } from "./modules/tenants/tenant.module";
 import { AuthModule } from "./modules/auth/auth.module";
@@ -38,8 +39,15 @@ import { AnalyticsModule } from "./modules/analytics/analytics.module";
       },
     }),
     // Global per-IP ceiling. Auth routes add stricter per-handler limits in
-    // AuthController; health and provider webhooks opt out below.
-    ThrottlerModule.forRoot([{ ttl: 60_000, limit: 120 }]),
+    // AuthController; health and provider webhooks opt out below. The Redis
+    // store keeps the counter shared across API instances; see
+    // RedisThrottlerStorage for the per-instance fallback.
+    ThrottlerModule.forRootAsync({
+      useFactory: () => ({
+        throttlers: [{ ttl: 60_000, limit: 120 }],
+        storage: new RedisThrottlerStorage(),
+      }),
+    }),
     PrismaModule,
     TenantModule,
     TerminusModule,
