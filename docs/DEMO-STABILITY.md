@@ -114,7 +114,7 @@ curl.exe -s https://sanad-edtech.vercel.app/api/health
 الوضع الحالي مؤقت: الـAutostart مثبت على Cloudflare quick tunnel مع `-SyncFallback`. الرابط الحالي:
 
 ```text
-https://modes-lender-ind-controlled.trycloudflare.com
+https://crew-hardware-models-worm.trycloudflare.com
 ```
 
 عند كل تغيير في رابط الـQuick Tunnel:
@@ -137,6 +137,8 @@ https://modes-lender-ind-controlled.trycloudflare.com
 > في وقت لاحق من 16 نوفمبر 2026، عملية cloudflared وقعت؛ الـWatchdog عمل Tunnel جديد `longest-order-ham-membrane.trycloudflare.com`، وsync الـFallback (`3dab53e`) بعد ما اتعمل push لشغل RLS، والموقع رجع **200**. اتصلح كمان خطأ الـPID القديم: مسار إعادة الاستخدام بقى يقرأ `tunnel.pid` من الملف، والـSync بيفضل معلّق ويعيد المحاولة لو الشجرة فيها تغييرات أو commits مش متدفوعة.
 
 > **18 نوفمبر 2026:** الـQuick Tunnel اتغير مرة أخرى إلى `modes-lender-ind-controlled.trycloudflare.com`، والـFallback اتزامن في `0fffd90` وVercel أعاد النشر؛ فحص `/api/health` عبر الدومين رجع **200**.
+
+> **19 نوفمبر 2026:** الـQuick Tunnel اتغير مرة أخرى إلى `crew-hardware-models-worm.trycloudflare.com`، والـFallback اتزامن في `2333c2e` وVercel أعاد النشر؛ فحص `/api/health` عبر الدومين رجع **200**، و`pnpm demo:doctor` رجع **10/10** بعد تنظيف بيانات الديمو.
 
 > لو `API_PROXY_TARGET` متظبط في Vercel Production، فهو بياخد أولوية على الـFallback. الوضع الحالي اتحقق منه بعد تغيير الـTunnel في 15 نوفمبر: الموقع رجع **200** بعد تحديث الـFallback، يعني مفيش `API_PROXY_TARGET` قديم بيغطي عليه. مش قادرين نفحص Vercel env مباشرة لأن الـCLI/Token مش موجودين على اللابتوب.
 

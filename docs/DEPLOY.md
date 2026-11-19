@@ -1,7 +1,7 @@
 # Deployment Runbook — Vercel + local demo API
 
 > **Current demo:** web on Vercel; API and PostgreSQL on the demo laptop, exposed through a Cloudflare quick tunnel. The Railway API endpoint returns `404 Application not found` and is retired.
-> **Verified 18 November 2026:** local runtime connects as `app_user` with RLS active; new code `DATABASE_URL` only; API **384/384**, web **159/159**, build **4/4**, RLS e2e **5/5**, live smoke **8/8**, demo doctor **10/10**. Migration chain is **8/8**. The teacher analytics endpoint is tenant-scoped and plan-capped; `/teacher/analytics` is a real page. The server-side exam-expiry Bull worker is live-proven, and rate-limit counters are shared through Redis.
+> **Verified 19 November 2026:** local runtime connects as `app_user` with RLS active; new code `DATABASE_URL` only; API **384/384**, web **159/159**, build **4/4**, RLS e2e **5/5**, live smoke **8/8**, demo doctor **10/10**. Migration chain is **8/8**. The teacher analytics endpoint is tenant-scoped and plan-capped; `/teacher/analytics` is a real page. The server-side exam-expiry Bull worker is live-proven, and rate-limit counters are shared through Redis.
 > Canonical state: [`CURRENT-STATE.md`](CURRENT-STATE.md).
 
 ## 0. Topology

@@ -52,7 +52,7 @@ Required work:
 - [x] activate RLS locally as `app_user` (5/5 isolation proof); rotate the database password by hand and remove the owner URL from the runtime path (done locally); hosted activation remains only if the API is redeployed;
 - add an outbox dispatcher with retries and observability;
 - [x] add the video-provider webhook route with signature verification (unit-tested; real Bunny callback pending);
-- [x] replace in-memory rate limiting with Redis-shared counters (18 November 2026); still verify proxy-IP handling behind a trusted edge;
+- [x] replace in-memory rate limiting with Redis-shared counters (19 November 2026); still verify proxy-IP handling behind a trusted edge;
 - keep migration backups, restore tests, and rollback drills current;
 - make CI a reliable release signal, or explicitly keep local test/build evidence as the gate;
 - inventory keys, secrets, certificates, and signing authorities;
@@ -167,7 +167,7 @@ Phase 0 baseline
   ├─ RLS activation
   ├─ outbox dispatcher
   ├─ video webhook (route + unit tests done; live Bunny callback pending)
-  ├─ shared Redis rate limiting (done 18 Nov 2026) + proxy-IP review
+  ├─ shared Redis rate limiting (done 19 Nov 2026) + proxy-IP review
   └─ backup/restore + CI evidence
         ↓
 Phase 1 crypto agility / hybrid PQC pilot
