@@ -15,7 +15,7 @@ SETH-9 is the working name for a set of advanced security ideas raised for the p
 - active deception (honeytokens, canary content, decoy paths);
 - crypto-shredding as a deletion mechanism.
 
-These are legitimate long-term research directions, but none of them is a substitute for the basic controls this platform still needs. The local demo has now closed the RLS runtime gap (`app_user`, 5/5 isolation proof) and added a unit-tested video webhook route, but the following P1 gaps remain: hosted RLS activation if the API is redeployed (Railway is retired), no transactional-outbox dispatcher, no real Bunny webhook round trip, and rate limiting that is in-memory per API instance. Adding advanced cryptography before those controls are closed would increase complexity without reducing the most likely risks.
+These are legitimate long-term research directions, but none of them is a substitute for the basic controls this platform still needs. The local demo has now closed the RLS runtime gap (`app_user`, 5/5 isolation proof), added a unit-tested video webhook route, and moved rate-limit counters to Redis, but the following P1 gaps remain: hosted RLS activation if the API is redeployed (Railway is retired), no transactional-outbox dispatcher, no real Bunny webhook round trip, and proxy-IP handling for rate limits that still needs a trusted edge. Adding advanced cryptography before those controls are closed would increase complexity without reducing the most likely risks.
 
 The platform also handles minors, assessments, payments, and video content. A security control that is hard to operate, hard to explain, or easy to misconfigure can make the system less safe than a simpler control that is actually enforced.
 
@@ -49,17 +49,17 @@ It does **not** assume that a client device is trusted, that a CDN header is an 
 
 Required work:
 
-- activate RLS at runtime as `app_user`; rotate the database password by hand; remove the owner URL from the runtime path;
+- [x] activate RLS locally as `app_user` (5/5 isolation proof); rotate the database password by hand and remove the owner URL from the runtime path (done locally); hosted activation remains only if the API is redeployed;
 - add an outbox dispatcher with retries and observability;
 - [x] add the video-provider webhook route with signature verification (unit-tested; real Bunny callback pending);
-- replace in-memory rate limiting with shared storage and verify proxy-IP handling;
+- [x] replace in-memory rate limiting with Redis-shared counters (18 November 2026); still verify proxy-IP handling behind a trusted edge;
 - keep migration backups, restore tests, and rollback drills current;
 - make CI a reliable release signal, or explicitly keep local test/build evidence as the gate;
 - inventory keys, secrets, certificates, and signing authorities;
 - document data classification, retention, deletion, and legal-hold rules;
 - add dependency and container scanning, plus alerting for failed webhooks and repeated auth failures.
 
-**Exit criteria:** RLS e2e passes on Railway; outbox and video webhook have production evidence; distributed rate limiting is live; a restore drill passes; key/secret inventory is reviewed; CI or the documented local gate is consistently green.
+**Exit criteria:** RLS e2e passes on the hosted runtime actually used; outbox and video webhook have production evidence; rate limits are Redis-shared (done locally) and proxy-IP handling is reviewed; a restore drill passes; key/secret inventory is reviewed; CI or the documented local gate is consistently green.
 
 ### Phase 1 — Crypto agility and PQC readiness (3–9 months)
 
@@ -167,7 +167,7 @@ Phase 0 baseline
   ├─ RLS activation
   ├─ outbox dispatcher
   ├─ video webhook (route + unit tests done; live Bunny callback pending)
-  ├─ distributed rate limiting
+  ├─ shared Redis rate limiting (done 18 Nov 2026) + proxy-IP review
   └─ backup/restore + CI evidence
         ↓
 Phase 1 crypto agility / hybrid PQC pilot

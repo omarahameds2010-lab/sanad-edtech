@@ -1497,6 +1497,8 @@ const fp = sha256(`${canvas}|${ua}|${tz}|${DEVICE_FP_SALT}`).slice(0, 32);
 | Login alerts | New device → email + `security_event` row |
 | Rate limits | 5 login attempts / 15m / IP+email → 30m lockout + CAPTCHA (planned) |
 
+**Live today:** 120 requests/min per route per forwarded IP, login 10/min, register 5/min, refresh 30/min. Counters are shared through Redis with atomic `INCR`/`PEXPIRE`; a Redis outage falls back to per-instance memory. The per-IP+email lockout and CAPTCHA above remain planned.
+
 ---
 
 ## 1️⃣5️⃣ Authorization — PolicyEngine Matrix

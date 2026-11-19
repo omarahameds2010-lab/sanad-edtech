@@ -31,7 +31,7 @@
 > - Refund idempotency, CAS transitions, ledger reversal, and entitlement revocation.
 > - Audit/security event writes for sensitive actions.
 > - DB-side: 138 RLS policies on 43 application tables, `FORCE ROW LEVEL SECURITY`, and per-request tenant context injection. **The local runtime connects as `app_user` (no SUPERUSER, no BYPASSRLS), so RLS is enforcing locally.** The RLS e2e passed 5/5, and voucher + signed-webhook flows ran under `app_user`.
-> - Global per-IP rate limiting: 120 requests/minute per route; login 10/min, register 5/min, refresh 30/min; health/readiness and payment webhooks exempt. Storage is in-memory per API instance.
+> - Global per-IP rate limiting: 120 requests/minute per route; login 10/min, register 5/min, refresh 30/min; health/readiness and payment webhooks exempt. Counters are shared through Redis (`sanad:throttle:*`, atomic INCR/PEXPIRE) with a per-instance memory fallback during a Redis outage.
 > - Locked lesson payloads are metadata-only; student assignment/exam view and enter endpoints return `403 LESSON_LOCKED` without a per-student grant.
 > - Authoring reads require `update`: generic exam/assignment reads, teacher lesson routes, and legacy lesson routes. Student lists expose navigation metadata only, and pre-start exam views withhold the question paper.
 > - Attempts are unique on `(assignmentId, studentId, attemptNumber)`; `maxAttempts` is enforced server-side and concurrent duplicate starts return `409`. An active attempt is checked before the max-attempt count. Migration #8 is applied and existing rows are backfilled as submitted attempt #1.
@@ -44,7 +44,7 @@
 > - There is no outbox dispatcher.
 > - Published course/lesson/exam content has **no immutable version/snapshot layer yet**; the “publish = immutable snapshot” language below is a target control, not a current guarantee.
 > - Exam auto-submit is now server-backed by the delayed `exam-expiry` worker; the client still auto-submits at zero. The worker must be running with Redis for abandoned-tab cleanup.
-> - 2FA, KMS/Vault, SIEM/Sentry/Prometheus, and WAF are not implemented. Application-level rate limiting uses in-memory storage, not a shared cluster store.
+> - 2FA, KMS/Vault, SIEM/Sentry/Prometheus, and WAF are not implemented. Application-level rate limiting uses Redis-shared counters with a per-instance fallback; forwarded client IPs remain best effort.
 > - SETH-9 post-quantum signing, ZK delivery, homomorphic grading, active deception, and crypto-shredding are **roadmap-only**; see [`SETH-9-ROADMAP.md`](SETH-9-ROADMAP.md).
 > - Do not treat the older “178 + 26 policies” or `20240101000000_init_rls.sql` references as current; the database has 8 migrations with 138 policies on 43 tables.
 
@@ -447,7 +447,7 @@ await tx.session.update({ ..., refreshTokenHash: await argon2.hash(newRefreshTok
 | Admin path | Separate `/control/*` + IP allowlist 📋 + mandatory TOTP (§3.7) + shorter sessions |
 | Monitoring | `login_failures{tenant}` spike → alert (stuffing campaign); `REFRESH_REUSE_DETECTED` → page SEV-2 |
 
-> **Current implementation (deployed):** login 10/min per forwarded IP, register 5/min, refresh 30/min, implemented with in-memory `@nestjs/throttler` storage. The IP+email counters, 30-minute lockout, CAPTCHA, and Redis-backed counters above remain target controls.
+> **Current implementation (deployed):** login 10/min per forwarded IP, register 5/min, refresh 30/min, implemented with Redis-backed `@nestjs/throttler` storage (atomic `INCR`/`PEXPIRE`, per-instance fallback on Redis failure). The IP+email counters, 30-minute lockout, and CAPTCHA above remain target controls; the Redis-shared counters are live.
 
 ## 3.6 ACCOUNT LIFECYCLE (Join → Leave → Delete)
 
@@ -1483,6 +1483,7 @@ DELIVERABLE: findings with SEVERITY + REPRO (requestIds) + retest window. Fix SL
 | v2.4 | 2026-11-16 | Video provider webhook route added (`POST /api/video/webhooks/:provider`): raw-body HMAC before parsing, Host-resolved tenant scope, transactional `Video` update + outbox event, stale/replay handling, 6 unit tests; CSRF exemption mirrors payment webhooks. Bunny library/key not configured, so real-provider verification remains pending. API suite 365/365. |
 | v2.5 | 2026-11-17 | Teacher analytics workspace added: `GET /api/v1/teacher/analytics/overview` under `AnalyticsModule` with `@CanReadAnalytics()`, tenant-scoped reads only, plan-aware history retention, and no cross-tenant aggregates; `/teacher/analytics` now a real Arabic page. Analytics service 4/4; API suite 369/369, web 159/159, build 4/4. No schema or migration change. |
 | v2.6 | 2026-11-18 | Server-side exam expiry added: delayed Bull `exam-expiry` job from `startExamAttempt`, tenant/RLS-scoped processor, CAS `IN_PROGRESS → TIMED_OUT`, submit-race fallback, queue failure non-fatal. Live 1-minute proof; 6 worker tests; API 376/376 (38 suites), web 159/159, build 4/4. No schema or migration change. |
+| v2.7 | 2026-11-18 | Redis-backed rate limiting: `RedisThrottlerStorage` replaces per-instance memory counters with atomic `INCR`/`PEXPIRE` under `sanad:throttle:*`; per-instance fallback on Redis failure; shared Bull/throttler connection helper. Live proof 401×10 → 429×2 with `Retry-After` and ~59s PTTL. API 384/384 (40 suites), web 159/159, build 4/4. No schema or migration change. |
 
 ---
 

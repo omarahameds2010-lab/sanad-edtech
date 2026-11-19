@@ -169,7 +169,7 @@ Do not claim every provider is live.
 | Build 4/4 | Verified 16 Nov 2026 |
 | Migrations 8/8 | Verified on the local Docker database |
 | Assignment retakes live | Yes — production smoke 31/31 (historical Railway deploy); local retake behavior intact |
-| Rate limiting + lock enforcement live | Yes — local API; still in-memory per API instance |
+| Rate limiting + lock enforcement live | Yes - local API; limits are Redis-shared with per-instance fallback |
 | RLS enforced | **Yes locally** — runtime connects as `app_user`; 5/5 isolation proof; hosted Railway retired and not migrated |
 | Outbox delivered | **No** — no dispatcher |
 | Video webhook | **Route implemented + unit-tested** — no real Bunny callback yet |

@@ -23,7 +23,7 @@ flowchart TB
     B -->|HTTPS| W
     W -->|same-origin /api rewrite| A
     A -->|Prisma 5.22| P
-    A -->|delayed exam-expiry jobs| R
+    A -->|exam-expiry jobs + rate-limit counters| R
     A -.->|outbox relay not wired| R
     A -->|signed checkout| PAY[Paymob / Fawry]
     A -->|upload/sign| BUN[Bunny Stream]
@@ -34,7 +34,7 @@ flowchart TB
 - **Web:** Next.js 15, React 19, App Router, RTL-first.
 - **API:** NestJS 10 modular monolith, global prefix `/api`.
 - **DB:** PostgreSQL + Prisma, shared schema with `tenantId` on every tenant-owned row.
-- **Cache/jobs:** Redis + Bull are active for the tenant-scoped `exam-expiry` delayed worker. The outbox has no relay and no other processors are registered.
+- **Cache/jobs:** Redis + Bull are active for the tenant-scoped `exam-expiry` delayed worker and Redis-backed shared throttler counters. The outbox has no relay and no other processors are registered.
 - **Deploy:** Vercel (web) + Railway (API/PostgreSQL), root `Dockerfile` for the API.
 
 ## 2. Modules
@@ -143,7 +143,7 @@ Money columns are stored in minor units and serialized as strings. The global JS
 
 ### Rate limiting (deployed)
 
-`ClientIpThrottlerGuard` is registered as an `APP_GUARD`. It keys on the first `X-Forwarded-For` address (falling back to `X-Real-IP`, then the socket address), because Railway/Vercel terminate TLS in front of the API. The default ceiling is 120 requests/minute per route; the auth controller narrows login to 10/min, register to 5/min, and refresh to 30/min. Health/readiness and provider webhooks are exempt. Storage is in-memory per API instance until a shared store is wired.
+`ClientIpThrottlerGuard` is registered as an `APP_GUARD`. It keys on the first `X-Forwarded-For` address (falling back to `X-Real-IP`, then the socket address), because Railway/Vercel terminate TLS in front of the API. The default ceiling is 120 requests/minute per route; the auth controller narrows login to 10/min, register to 5/min, and refresh to 30/min. Health/readiness and provider webhooks are exempt. Counters are shared through `RedisThrottlerStorage` (atomic `INCR`/`PEXPIRE` under `sanad:throttle:*`); during a Redis outage the guard falls back to a per-instance memory store instead of failing requests.
 
 ## 6. LMS domain
 
@@ -243,7 +243,7 @@ No mock data is allowed in these surfaces. Every count and state comes from the 
 | Web | Vercel | `main` production branch; `/api/*` rewrite to the current tunnel |
 | API | Local Docker/laptop | compiled NestJS on `:3002`; runtime `DATABASE_URL` = `app_user`; RLS active |
 | DB | Local Docker PostgreSQL | **8/8** migrations; 138 RLS policies on 43 tables; runtime non-owner |
-| Redis | Local Docker | `exam-expiry` delayed jobs/worker active; outbox relay absent |
+| Redis | Local Docker | `exam-expiry` delayed jobs/worker and shared throttler counters active; outbox relay absent |
 | Tunnel | Cloudflare quick tunnel | temporary; `-SyncFallback` updates the Vercel build fallback when the URL changes |
 | Railway | Retired | endpoint returns `404 Application not found`; not RLS-migrated |
 
@@ -261,7 +261,7 @@ Vercel fail-safes:
 5. Persisted word-level review evidence.
 6. Provider sandbox verification.
 7. Reconciliation worker.
-8. Distributed rate limiting (current limits are in-memory per instance).
+8. Proxy-IP trust tuning (rate limits are Redis-shared; forwarded client IPs remain best effort outside a trusted edge).
 9. Hosted API auto-deploy, if the Railway endpoint is revived (the 28 October release was manual).
 10. CI workflow verification (local evidence is authoritative for the current release).
 11. SETH-9 advanced controls remain roadmap-only; see [`SETH-9-ROADMAP.md`](SETH-9-ROADMAP.md).
