@@ -50,7 +50,7 @@ It does **not** assume that a client device is trusted, that a CDN header is an 
 Required work:
 
 - [x] activate RLS locally as `app_user` (5/5 isolation proof); rotate the database password by hand and remove the owner URL from the runtime path (done locally); hosted activation remains only if the API is redeployed;
-- add an outbox dispatcher with retries and observability;
+- add an outbox dispatcher with retries and observability (design: [`OUTBOX-DELIVERY.md`](OUTBOX-DELIVERY.md));
 - [x] add the video-provider webhook route with signature verification (unit-tested; real Bunny callback pending);
 - [x] replace in-memory rate limiting with Redis-shared counters (19 November 2026); still verify proxy-IP handling behind a trusted edge;
 - keep migration backups, restore tests, and rollback drills current;

@@ -324,7 +324,7 @@ RLS being inactive on a host is a known gap, not a reason to claim hosted isolat
 ## 7. Known deployment gaps
 
 - Hosted RLS activation: local runtime is active, but the Railway endpoint is retired and was never migrated (section 5).
-- Outbox dispatcher (events are written, not delivered).
+- Outbox dispatcher (events are written, not delivered). Design: [`OUTBOX-DELIVERY.md`](OUTBOX-DELIVERY.md).
 - Real Bunny webhook round trip (route exists and is unit-tested; no Bunny library/key is configured in the demo).
 - Only one Bull processor exists (`exam-expiry`); there is no outbox relay or reconciliation worker. Redis must be running for the delayed expiry; if it is unavailable, exam start still succeeds and the client timer remains the fallback.
 - Rate-limit counters are Redis-shared. A Redis outage falls back to per-instance memory, and forwarded client IPs remain a best-effort key outside a trusted proxy edge.

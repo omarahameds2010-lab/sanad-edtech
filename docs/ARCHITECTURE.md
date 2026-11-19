@@ -255,7 +255,7 @@ Vercel fail-safes:
 ## 11. Known architectural gaps
 
 1. Hosted RLS activation (local is active; the retired Railway runtime was not migrated).
-2. Outbox dispatcher.
+2. Outbox dispatcher — design in [`OUTBOX-DELIVERY.md`](OUTBOX-DELIVERY.md), not implemented.
 3. Real-provider video webhook verification (route exists and is unit-tested; no Bunny library/key configured).
 4. Remaining background workers (the `exam-expiry` worker exists; outbox relay and other processors do not).
 5. Persisted word-level review evidence.

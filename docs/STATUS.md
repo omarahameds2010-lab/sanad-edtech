@@ -30,7 +30,7 @@
 | Web tests | **159/159**, 12 files; re-run 19 Nov 2026 | `pnpm --filter web test` |
 | Monorepo build | **4/4** successful; re-run 19 Nov 2026 after the Redis throttler | `pnpm build` |
 | RLS runtime activation | **passed 16 Nov 2026**: `app_user` (no SUPERUSER/BYPASSRLS); startup log `DB runtime role: app_user (superuser=off)`; health 200 | Local compiled API |
-| RLS isolation proof | **5/5 passed 16 Nov 2026**: scoped SELECT; cross-tenant UPDATE/DELETE = 0 rows; cross-tenant INSERT rejected; empty context = 0 rows | `jest --config ./test/jest-e2e.json --runInBand rls-isolation` |
+| RLS isolation proof | **5/5 passed 16 Nov 2026**, re-run **5/5 on 19 Nov 2026** after the Redis throttler: scoped SELECT; cross-tenant UPDATE/DELETE = 0 rows; cross-tenant INSERT rejected; empty context = 0 rows | `jest --config ./test/jest-e2e.json --runInBand rls-isolation` |
 | Voucher checkout under RLS | **passed 16 Nov 2026**: order for `arabic-3-prep`, `SANAD-2026` → `success: true`, one ACTIVE paid enrollment; reset restored the clean state | Local HTTP flow through the API |
 | Signed Paymob webhook under RLS | **passed 16 Nov 2026**: HMAC-SHA512 callback → async event PROCESSED with tenant ID; order CONFIRMED, intent SUCCEEDED, payment PAID, 2 ledger rows, enrollment created; reset restored the clean state | Local signed webhook + DB checks |
 | Video webhook route | **6/6 unit tests**: raw-body HMAC before parsing, tenant-scoped lookup, transactional video update + outbox, stale/replayed callback handling, malformed body rejection; route is CSRF-exempt like payment webhooks. No real Bunny library/key in the demo. | `video.service.spec.ts` |
@@ -99,7 +99,7 @@ Production retake smoke passed **31/31**; the demo assignment is set to `maxAtte
 | --- | --- | --- |
 | P1 | Hosted RLS activation | Local demo runs as `app_user` with RLS active. If the API is redeployed, point its `DATABASE_URL` at `app_user`, omit `MIGRATION_DATABASE_URL` from the runtime, and re-run RLS e2e 5/5. Railway is retired. |
 | P1 | Stable demo tunnel | ngrok static domain or pinned `API_PROXY_TARGET`; URL survives a reboot without a fallback commit/redeploy (autostart is installed and the quick-tunnel sync is tested) |
-| P1 | Outbox dispatcher | Events are delivered, retried, and observable; no longer write-only |
+| P1 | Outbox dispatcher | Events are delivered, retried, and observable; no longer write-only. Design: [`OUTBOX-DELIVERY.md`](OUTBOX-DELIVERY.md) |
 | P1 | Real Bunny webhook round trip | The route exists and is unit-tested (HMAC, tenant scope, transactional update). Closure requires a configured Bunny library/key and one signed provider callback that flips a video to READY. |
 | P2 | Hosted API (optional) | If the Railway endpoint is revived, a `main` push creates and reports an API deployment automatically; no manual `railway up` required |
 | P2 | Real provider sandbox | One Paymob/Fawry sandbox charge and one refund recorded end to end |
@@ -145,6 +145,6 @@ Production retake smoke passed **31/31**; the demo assignment is set to `maxAtte
 | 2026-11-16 | Afternoon: cloudflared process died; the watchdog started `longest-order-ham-membrane`, synced the fallback (`3dab53e`) after the RLS commit was pushed, and Vercel redeployed; live health returned 200. Fixed the watchdog reuse path to read `tunnel.pid` back and to keep retrying fallback sync after a dirty tree or unpushed commits. |
 | 2026-11-17 | Real teacher analytics workspace: tenant-scoped `GET /api/v1/teacher/analytics/overview`, plan-aware 30/90-day retention, Arabic `/teacher/analytics` page replacing the redirect, nav item restored; demo tenant seeded as `starter`; API 369/369, web 159/159, build 4/4; deployed via `665ecc2`, live browser QA passed, live smoke 8/8, doctor 10/10 |
 | 2026-11-18 | Server-side exam expiry (`bacce7e`): delayed Bull job at `expiresAt + 5s`, tenant/RLS-scoped processor, `TIMED_OUT` CAS update, submit-race fallback; live 1-minute proof expired at 65s. API 376/376 (38 suites), web 159/159, build 4/4; quick tunnel changed and fallback synced via `0fffd90`, live health 200, smoke 8/8, doctor 10/10 |
-| 2026-11-19 | Redis-backed shared rate limiting (`85ffc62`): atomic INCR/PEXPIRE, per-instance fallback store; live 401×10 → 429×2 with `Retry-After`. API 384/384 (40 suites), web 159/159, build 4/4; quick tunnel changed and fallback synced via `2333c2e`; removed a leftover test enrollment and test exam attempt, then live health 200, smoke 8/8, doctor 10/10 |
+| 2026-11-19 | Redis-backed shared rate limiting (`85ffc62`): atomic INCR/PEXPIRE, per-instance fallback store; live 401×10 → 429×2 with `Retry-After`. API 384/384 (40 suites), web 159/159, build 4/4, RLS e2e 5/5 re-run; quick tunnel changed and fallback synced via `2333c2e`; removed a leftover test enrollment and test exam attempt, then live health 200, smoke 8/8, doctor 10/10 |
 
 Historical audit: [`AUDIT-2026-10-16.md`](AUDIT-2026-10-16.md). It is preserved as a dated snapshot, not rewritten.
