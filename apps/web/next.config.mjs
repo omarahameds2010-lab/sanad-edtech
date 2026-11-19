@@ -19,7 +19,7 @@ import { fileURLToPath } from "node:url";
 // DEMO_TUNNEL_ORIGIN in Vercel to override this without a code change; remove
 // this fallback after the stable tunnel is verified.
 const FALLBACK_DEMO_TUNNEL_ORIGIN =
-  "https://modes-lender-ind-controlled.trycloudflare.com";
+  "https://crew-hardware-models-worm.trycloudflare.com";
 
 /**
  * Normalize a proxy origin.
