@@ -38,9 +38,18 @@ export class OutboxService {
     });
   }
 
+  /**
+   * Only due, live rows are returned. Dead-lettered or backoff-delayed rows
+   * are excluded so a sweep cannot hammer a failing receiver.
+   */
   async getUnpublishedEvents(limit = 100) {
+    const now = new Date();
     return this.prisma.outboxEvent.findMany({
-      where: { publishedAt: null },
+      where: {
+        publishedAt: null,
+        deadAt: null,
+        OR: [{ nextAttemptAt: null }, { nextAttemptAt: { lte: now } }],
+      },
       orderBy: { createdAt: "asc" },
       take: limit,
     });
@@ -49,16 +58,34 @@ export class OutboxService {
   async markAsPublished(id: string) {
     return this.prisma.outboxEvent.update({
       where: { id },
-      data: { publishedAt: new Date() },
+      data: { publishedAt: new Date(), nextAttemptAt: null },
     });
   }
 
-  async markAsFailed(id: string, error: string) {
+  /**
+   * Retryable failure. `retryCount` is incremented here so the next sweep sees
+   * the new attempt number even if the process crashes after this write.
+   */
+  async markAsFailed(id: string, error: string, nextAttemptAt: Date) {
     return this.prisma.outboxEvent.update({
       where: { id },
       data: {
         retryCount: { increment: 1 },
         lastError: error,
+        nextAttemptAt,
+      },
+    });
+  }
+
+  /** Permanent failure or retry exhaustion. */
+  async markAsDead(id: string, error: string) {
+    return this.prisma.outboxEvent.update({
+      where: { id },
+      data: {
+        retryCount: { increment: 1 },
+        lastError: error,
+        nextAttemptAt: null,
+        deadAt: new Date(),
       },
     });
   }

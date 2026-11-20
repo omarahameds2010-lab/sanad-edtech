@@ -1,3 +1,4 @@
+import { BullModule } from "@nestjs/bull";
 import { Module } from "@nestjs/common";
 import { APP_GUARD } from "@nestjs/core";
 import { ConfigModule } from "@nestjs/config";
@@ -6,6 +7,7 @@ import { ThrottlerModule } from "@nestjs/throttler";
 import { LoggerModule } from "nestjs-pino";
 import { HealthController } from "./common/health.controller";
 import { ClientIpThrottlerGuard } from "./common/guards/client-ip-throttler.guard";
+import { redisConnectionOptions } from "./common/redis/redis-connection";
 import { RedisThrottlerStorage } from "./common/throttler/redis-throttler.storage";
 import { PrismaModule } from "./common/prisma/prisma.module";
 import { TenantModule } from "./modules/tenants/tenant.module";
@@ -38,6 +40,9 @@ import { AnalyticsModule } from "./modules/analytics/analytics.module";
         level: process.env.LOG_LEVEL || "info",
       },
     }),
+    // One shared Redis/Bull configuration for the exam-expiry worker and the
+    // outbox sweep. Feature modules only register their named queues.
+    BullModule.forRoot({ redis: redisConnectionOptions() }),
     // Global per-IP ceiling. Auth routes add stricter per-handler limits in
     // AuthController; health and provider webhooks opt out below. The Redis
     // store keeps the counter shared across API instances; see

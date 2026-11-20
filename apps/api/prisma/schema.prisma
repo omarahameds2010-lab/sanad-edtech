@@ -778,6 +778,8 @@ model OutboxEvent {
   publishedAt   DateTime?
   retryCount    Int       @default(0)
   lastError     String?
+  nextAttemptAt DateTime?
+  deadAt        DateTime?
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   user   User?  @relation(fields: [userId], references: [id], onDelete: SetNull)
@@ -785,6 +787,7 @@ model OutboxEvent {
   @@index([tenantId])
   @@index([userId])
   @@index([publishedAt])
+  @@index([publishedAt, nextAttemptAt])
   @@index([createdAt])
   @@map("outbox_events")
 }
