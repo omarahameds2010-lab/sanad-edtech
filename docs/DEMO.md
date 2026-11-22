@@ -151,7 +151,7 @@ The seed registers the localhost tenant domain; tenant resolution is Host-based,
 ## 7. Known limitations to mention if asked
 
 - RLS is active on the local demo runtime (`app_user`, RLS e2e 5/5); the retired Railway runtime was not migrated, so do not claim hosted RLS enforcement.
-- Outbox events are written but not dispatched.
+- Outbox delivery is Phase 1 and disabled by default. It passed a local HTTP-sink proof 4/4, but no external receiver is configured, so do not claim external delivery.
 - The video webhook route exists and is unit-tested, but no real Bunny callback has been recorded.
 - Locked lesson payloads are redacted and locked assessment entry returns `403 LESSON_LOCKED`; other content types still need their own enforcement review.
 - Word-level review highlights are not persisted.

@@ -114,7 +114,7 @@ curl.exe -s https://sanad-edtech.vercel.app/api/health
 الوضع الحالي مؤقت: الـAutostart مثبت على Cloudflare quick tunnel مع `-SyncFallback`. الرابط الحالي:
 
 ```text
-https://crew-hardware-models-worm.trycloudflare.com
+https://yields-circus-ranges-info.trycloudflare.com
 ```
 
 عند كل تغيير في رابط الـQuick Tunnel:
@@ -139,6 +139,8 @@ https://crew-hardware-models-worm.trycloudflare.com
 > **18 نوفمبر 2026:** الـQuick Tunnel اتغير مرة أخرى إلى `modes-lender-ind-controlled.trycloudflare.com`، والـFallback اتزامن في `0fffd90` وVercel أعاد النشر؛ فحص `/api/health` عبر الدومين رجع **200**.
 
 > **19 نوفمبر 2026:** الـQuick Tunnel اتغير مرة أخرى إلى `crew-hardware-models-worm.trycloudflare.com`، والـFallback اتزامن في `2333c2e` وVercel أعاد النشر؛ فحص `/api/health` عبر الدومين رجع **200**، و`pnpm demo:doctor` رجع **10/10** بعد تنظيف بيانات الديمو.
+
+> **20 نوفمبر 2026:** الـQuick Tunnel اتغير إلى `yields-circus-ranges-info.trycloudflare.com` أثناء تجهيز إصدار الـOutbox؛ الـFallback اتحدّث مع الإصدار، والموقع رجع **200**. ده يوضح إن الـQuick Tunnel لسه مؤقت، والـSync هو اللي بيحافظ على الديمو.
 
 > لو `API_PROXY_TARGET` متظبط في Vercel Production، فهو بياخد أولوية على الـFallback. الوضع الحالي اتحقق منه بعد تغيير الـTunnel في 15 نوفمبر: الموقع رجع **200** بعد تحديث الـFallback، يعني مفيش `API_PROXY_TARGET` قديم بيغطي عليه. مش قادرين نفحص Vercel env مباشرة لأن الـCLI/Token مش موجودين على اللابتوب.
 
@@ -284,7 +286,7 @@ pnpm demo:reset -Force
 3. حذف tenants الاختبار المعروفة الخاصة بـRLS (لو موجودة).
 4. Truncate لجداول الديمو، مع الاحتفاظ بـ`tenants` و`tenant_domains` و`_prisma_migrations` عشان الـtenant ID (`05587220-79b3-4f8f-9a66-b7bf5338c176`) والـAPI tenant cache يفضلوا صالحين.
 5. إعادة seed للديمو المجاني والمدفوع.
-6. Verification: **8 migrations، 1 tenant، 2 users، 3 كورسات منشورة، تسجيل مجاني واحد، الكورس المدفوع غير مسجل، 0 أوردر/دفع/استخدام كوبون، كوبون واحد، فيديو واحد**.
+6. Verification: **9 migrations، 1 tenant، 2 users، 3 كورسات منشورة، تسجيل مجاني واحد، الكورس المدفوع غير مسجل، 0 أوردر/دفع/استخدام كوبون، كوبون واحد، فيديو واحد، 0 صفوف outbox**.
 
 - `pnpm demo:seed` = idempotent backfill فقط، مش reset.
 - `pnpm demo:paid` = يعيد تطبيق الكورس المدفوع والكوبون فقط.

@@ -1,7 +1,7 @@
 # Deployment Runbook — Vercel + local demo API
 
 > **Current demo:** web on Vercel; API and PostgreSQL on the demo laptop, exposed through a Cloudflare quick tunnel. The Railway API endpoint returns `404 Application not found` and is retired.
-> **Verified 19 November 2026:** local runtime connects as `app_user` with RLS active; new code `DATABASE_URL` only; API **384/384**, web **159/159**, build **4/4**, RLS e2e **5/5**, live smoke **8/8**, demo doctor **10/10**. Migration chain is **8/8**. The teacher analytics endpoint is tenant-scoped and plan-capped; `/teacher/analytics` is a real page. The server-side exam-expiry Bull worker is live-proven, and rate-limit counters are shared through Redis.
+> **Verified 20 November 2026:** local runtime connects as `app_user` with RLS active; new code `DATABASE_URL` only; API **404/404** (44 suites), web **159/159**, build **4/4**, RLS e2e **5/5**, outbox local-sink e2e **4/4**. Migration chain is **9/9**. The teacher analytics endpoint is tenant-scoped and plan-capped; `/teacher/analytics` is a real page. The server-side exam-expiry Bull worker is live-proven, rate-limit counters are shared through Redis, and outbox delivery Phase 1 is implemented but disabled by default (no external target configured). Live smoke and demo doctor are re-run after the release commit.
 > Canonical state: [`CURRENT-STATE.md`](CURRENT-STATE.md).
 
 ## 0. Topology
@@ -12,7 +12,7 @@ Browser
       /api/* ─────────────────────────────→ https://<quick-tunnel>.trycloudflare.com
                                               (NestJS 10, laptop :3002)
                                               → PostgreSQL (local Docker, app_user + RLS)
-                                              → Redis (local Docker; exam-expiry worker + shared rate-limit counters)
+                                              → Redis (local Docker; exam-expiry worker + opt-in outbox sweep + shared rate-limit counters)
 ```
 
 - Web project: `sanad-edtech`
@@ -40,7 +40,7 @@ Browser
    pnpm build
    ```
 
-   Current expected evidence on `main`: **147/147 web**, **357/357 API**, **4/4 build**. Production migration is **8/8**, and the 28 October release passed the retake, concurrent-start, teacher-queue, and lock-card smokes.
+   Current expected evidence on `main`: **159/159 web**, **404/404 API** (44 suites), **4/4 build**, RLS e2e **5/5**, outbox local-sink e2e **4/4**. Local migration chain is **9/9**. The 28 October release passed the retake, concurrent-start, teacher-queue, and lock-card smokes; the 20 November release adds the outbox sweep without changing payment behavior.
 
 3. Do not commit `.env`, logs, or generated scratch files.
 
@@ -106,22 +106,44 @@ SANAD_BASE_URL
 SANAD_API_KEY
 ```
 
+Optional outbox delivery (Phase 1 stays disabled unless **both** are set):
+
+```text
+OUTBOX_WEBHOOK_URL=https://receiver.example.com/sanad/outbox
+OUTBOX_WEBHOOK_SECRET=<random-secret>
+OUTBOX_SWEEP_INTERVAL_MS=30000
+OUTBOX_BATCH_SIZE=50
+OUTBOX_MAX_ATTEMPTS=10
+OUTBOX_MAX_TENANTS_PER_SWEEP=50
+OUTBOX_WEBHOOK_TIMEOUT_MS=10000
+OUTBOX_BACKOFF_MS=30000
+```
+
+The receiver must verify `X-SANAD-Signature` as
+`sha256=HMAC-SHA256(timestamp + "." + rawBody, OUTBOX_WEBHOOK_SECRET)`, reject
+stale `X-SANAD-Timestamp` values, and deduplicate on `X-SANAD-Event-Id`. Do not
+put the secret in a URL or log it.
+
 > `ALLOWED_ORIGINS` must be the exact ASCII origin. Invisible Unicode marks survive `.trim()` and break exact matching. If browser login fails with 403 while curl works, delete and re-paste the value.
 
 ### Health checks
 
 ```powershell
-Invoke-RestMethod https://sanad-edtech-production.up.railway.app/api/health
+Invoke-RestMethod http://localhost:3002/api/health
 Invoke-RestMethod https://sanad-edtech.vercel.app/api/health
 ```
 
-Both must return HTTP 200 and `database: up`.
+Both must return HTTP 200 and `database: up`. The Railway endpoint is retired
+and returns `404 Application not found`; do not use it as a health target.
 
 ### Deploy
 
-Push to `main`. Railway builds the root Dockerfile. There is no separate `railway up` step required for the normal flow.
-
-If a build fails, inspect the Railway build log before changing configuration. Do not switch builders blindly; the Dockerfile path is the known-good path.
+The current demo deploys the web app to Vercel on a push to `main`; the API is
+the compiled local process on `:3002` exposed through the Cloudflare quick
+tunnel. Start/restart it with `pnpm demo:start -- -Tunnel cloudflared -Watch
+-SyncFallback`. The watchdog updates the fallback when the tunnel URL changes.
+The root `Dockerfile` remains the known-good API image for a future hosted API,
+but Railway is retired and does not auto-deploy this repository.
 
 ## 3. Vercel web
 
@@ -139,17 +161,13 @@ If a build fails, inspect the Railway build log before changing configuration. D
 `apps/web/next.config.mjs` rewrites `/api/:path*` to:
 
 1. `API_PROXY_TARGET` when set;
-2. `https://sanad-edtech-production.up.railway.app` on Vercel when unset;
-3. `http://localhost:3002` locally.
+2. `DEMO_TUNNEL_ORIGIN` when set;
+3. the `FALLBACK_DEMO_TUNNEL_ORIGIN` quick tunnel on Vercel when both are unset;
+4. `http://localhost:3002` locally.
 
-This default exists because a production build without `API_PROXY_TARGET` once baked `http://localhost:3002`; Vercel refuses to proxy to a private host (`X-Vercel-Error: DNS_HOSTNAME_RESOLVED_PRIVATE`), so every `/api/*` call 404'd.
+This default exists because a production build without `API_PROXY_TARGET` once baked `http://localhost:3002`; Vercel refuses to proxy to a private host (`X-Vercel-Error: DNS_HOSTNAME_RESOLVED_PRIVATE`), so every `/api/*` call 404'd. The current fallback is the quick tunnel in `next.config.mjs`; `-SyncFallback` updates it when the tunnel restarts.
 
-`apps/web/app/lib/api.ts` has the same fail-safe split:
-
-- browser: same-origin (`""`), so cookies stay first-party;
-- server: production API origin on Vercel, `localhost:3002` elsewhere.
-
-Do not set `NEXT_PUBLIC_API_URL` to `http://localhost:3002` in a Vercel production environment.
+`apps/web/app/lib/api.ts` keeps the browser same-origin (`""`) so cookies stay first-party. Its server-side fallback still points at the retired Railway origin; the demo's data calls run in the browser, and `API_PROXY_TARGET` is the supported override for a future server-side call. Do not set `NEXT_PUBLIC_API_URL` to `http://localhost:3002` in a Vercel production environment.
 
 ### Verify
 
@@ -162,7 +180,7 @@ Then log in through the browser as the teacher and load `/teacher/courses`; conf
 
 ## 4. Database migrations
 
-Production has **8** migrations. Migration #8 was applied on 28 October 2026:
+The local demo database has **9** migrations. Migration #9 was applied on 20 November 2026; the retired Railway production chain was 8/8.
 
 ```text
 0_init
@@ -173,11 +191,14 @@ Production has **8** migrations. Migration #8 was applied on 28 October 2026:
 20261017000000_webhook_raw_payload
 20261017000001_student_lesson_unlocks
 20261027000001_assignment_retakes
+20261119000000_outbox_delivery
 ```
 
 Migration #8 is additive: existing submissions are backfilled as submitted attempt #1 with `startedAt = submittedAt`, then `submittedAt` becomes nullable and the unique key becomes `(assignmentId, studentId, attemptNumber)`. It was applied after a full backup.
 
-The production preflight on 27 October 2026 returned **1 total submission, 1 submitted, 0 with null content, 0 empty content**. The backup was a custom-format dump plus globals, restore-tested into a local PostgreSQL 18 container: **44 tables, 3 courses, 1 submission, 7 migrations** at backup time. Post-migration `prisma migrate status` reports **8/8** and “Database schema is up to date!”.
+Migration #9 is additive: it adds `outbox_events.nextAttemptAt`, `outbox_events.deadAt`, the due-row index, and the `SECURITY DEFINER` `app_list_active_tenant_ids()` function that returns tenant IDs only. It does not change payment, enrollment, or RLS policy behavior.
+
+The production preflight on 27 October 2026 returned **1 total submission, 1 submitted, 0 with null content, 0 empty content**. The backup was a custom-format dump plus globals, restore-tested into a local PostgreSQL 18 container: **44 tables, 3 courses, 1 submission, 7 migrations** at backup time. At that time `prisma migrate status` reported **8/8**; the local chain now reports **9/9** and “Database schema is up to date!”.
 
 Apply with the migration/owner URL. Prisma's datasource reads `DATABASE_URL`, so set it to the owner URL for the migration command:
 
@@ -299,6 +320,36 @@ If the app cannot connect as `app_user`:
 
 RLS being inactive on a host is a known gap, not a reason to claim hosted isolation is complete.
 
+### Outbox delivery (optional, Phase 1)
+
+The `outbox-dispatch` sweep is idle unless both variables are set. With no
+receiver configured, events remain unpublished; that is the safe default for
+the demo.
+
+```powershell
+$env:OUTBOX_WEBHOOK_URL="https://receiver.example.com/sanad/outbox"
+$env:OUTBOX_WEBHOOK_SECRET="<random-secret>"
+# restart the API so the transport reads the environment
+```
+
+The receiver must verify `X-SANAD-Signature` over
+`X-SANAD-Timestamp + "." + rawBody`, reject stale timestamps, and deduplicate
+on `X-SANAD-Event-Id`. A 2xx marks `publishedAt`; 408/429/5xx/network failures
+retry with backoff; other 4xx (or max attempts) set `deadAt`. The local proof
+does not need a real external endpoint:
+
+```powershell
+cd apps/api
+$env:OUTBOX_E2E="1"
+$env:RLS_ADMIN_URL="postgresql://postgres:postgres@127.0.0.1:5432/learning_platform?schema=public"
+$env:RLS_APP_URL="postgresql://app_user:app_user_password@127.0.0.1:5432/learning_platform?schema=public"
+pnpm exec jest --config test/jest-e2e.json --runInBand outbox-delivery
+```
+
+Expected: **4/4**. To disable delivery again, remove both variables and restart
+the API. Do not claim external delivery until a real receiver has recorded the
+signed request and the resulting `publishedAt`.
+
 ## 6. Demo verification checklist
 
 | Check | Expected |
@@ -318,15 +369,17 @@ RLS being inactive on a host is a known gap, not a reason to claim hosted isolat
 | Assignment retake | concurrent start **201 + 409**; third start **400** at `maxAttempts=2` |
 | Teacher grading queue | excludes `IN_PROGRESS`; shows both submitted attempts |
 | Locked assignment | **403 `LESSON_LOCKED`**; lock card in dark and light with no overflow |
+| Outbox (disabled default) | API boots, scheduler logs the sweep, dispatcher logs idle when URL/secret are absent; no outbox rows are consumed |
+| Outbox local sink | `OUTBOX_E2E=1` + `RLS_ADMIN_URL` + `RLS_APP_URL` → **4/4** |
 | Demo doctor | `pnpm demo:doctor` → **10/10** |
 | Logout → refresh | **401**, `/student` redirected to login |
 
 ## 7. Known deployment gaps
 
 - Hosted RLS activation: local runtime is active, but the Railway endpoint is retired and was never migrated (section 5).
-- Outbox dispatcher (events are written, not delivered). Design: [`OUTBOX-DELIVERY.md`](OUTBOX-DELIVERY.md).
+- Outbox delivery is Phase 1 and local-only: the sweep, HMAC transport, retry, and dead-letter state exist and passed a local sink **4/4**, but no external receiver is configured. See [`OUTBOX-DELIVERY.md`](OUTBOX-DELIVERY.md).
 - Real Bunny webhook round trip (route exists and is unit-tested; no Bunny library/key is configured in the demo).
-- Only one Bull processor exists (`exam-expiry`); there is no outbox relay or reconciliation worker. Redis must be running for the delayed expiry; if it is unavailable, exam start still succeeds and the client timer remains the fallback.
+- Bull runs `exam-expiry` and the opt-in `outbox-dispatch` sweep; there is no reconciliation worker or dead-letter administration route. Redis must be running for the delayed expiry and the sweep; if it is unavailable, exam start still succeeds and the client timer remains the fallback.
 - Rate-limit counters are Redis-shared. A Redis outage falls back to per-instance memory, and forwarded client IPs remain a best-effort key outside a trusted proxy edge.
 - Railway auto-deploy: the service is retired; the 28 October deploy was manual with `railway up`.
 - Real provider sandbox transaction not yet recorded.

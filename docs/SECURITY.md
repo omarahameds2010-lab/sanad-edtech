@@ -20,7 +20,7 @@
 
 ### *Protected by architecture, not by promises. Every claim below cites code.*
 
-> **Current security posture — local demo verified 16 November 2026 after RLS runtime activation; the Railway endpoint is retired.** Read [`CURRENT-STATE.md`](CURRENT-STATE.md) for the canonical state. This document is a threat model and control catalogue; the dated dashboard below is a historical snapshot.
+> **Current security posture — local demo verified 20–22 November 2026 after RLS runtime activation, Redis throttling, and outbox delivery Phase 1; the Railway endpoint is retired.** Read [`CURRENT-STATE.md`](CURRENT-STATE.md) for the canonical state. This document is a threat model and control catalogue; the dated dashboard below is a historical snapshot.
 >
 > **Active controls on the local demo**
 >
@@ -30,23 +30,24 @@
 > - Paymob/Fawry webhook signature verification with raw-body retention, constant-time comparison, deduplication, idempotency, and atomic settlement.
 > - Refund idempotency, CAS transitions, ledger reversal, and entitlement revocation.
 > - Audit/security event writes for sensitive actions.
-> - DB-side: 138 RLS policies on 43 application tables, `FORCE ROW LEVEL SECURITY`, and per-request tenant context injection. **The local runtime connects as `app_user` (no SUPERUSER, no BYPASSRLS), so RLS is enforcing locally.** The RLS e2e passed 5/5, and voucher + signed-webhook flows ran under `app_user`.
+> - DB-side: 138 RLS policies on 43 application tables, `FORCE ROW LEVEL SECURITY`, and per-request tenant context injection. **The local runtime connects as `app_user` (no SUPERUSER, no BYPASSRLS), so RLS is enforcing locally.** The RLS e2e passed 5/5 on 16 November and again 5/5 on 20 November after migration #9; voucher + signed-webhook flows ran under `app_user`.
 > - Global per-IP rate limiting: 120 requests/minute per route; login 10/min, register 5/min, refresh 30/min; health/readiness and payment webhooks exempt. Counters are shared through Redis (`sanad:throttle:*`, atomic INCR/PEXPIRE) with a per-instance memory fallback during a Redis outage.
 > - Locked lesson payloads are metadata-only; student assignment/exam view and enter endpoints return `403 LESSON_LOCKED` without a per-student grant.
 > - Authoring reads require `update`: generic exam/assignment reads, teacher lesson routes, and legacy lesson routes. Student lists expose navigation metadata only, and pre-start exam views withhold the question paper.
 > - Attempts are unique on `(assignmentId, studentId, attemptNumber)`; `maxAttempts` is enforced server-side and concurrent duplicate starts return `409`. An active attempt is checked before the max-attempt count. Migration #8 is applied and existing rows are backfilled as submitted attempt #1.
 > - Server-side exam expiry: a delayed Bull job (`exam-expiry`) is scheduled from `startExamAttempt`, re-enters the tenant ALS/RLS scope, and CAS-updates only a still-`IN_PROGRESS`, expired attempt to `TIMED_OUT`. Queue failure is non-fatal; the client timer remains the normal path.
+> - Outbox delivery Phase 1 is opt-in and RLS-safe: the sweep lists active tenant IDs through a `SECURITY DEFINER` function that returns IDs only, then re-enters each tenant’s ALS/RLS scope before reading or updating events. Delivery uses HMAC-SHA256 over `timestamp + "." + rawBody`, rejects redirects, and keeps the URL/secret in environment configuration, never in a tenant row. The dispatcher is idle unless both `OUTBOX_WEBHOOK_URL` and `OUTBOX_WEBHOOK_SECRET` are set. Local sink proof **4/4**; no external receiver is configured.
 >
 > **Critical caveats**
 >
 > - **RLS is active on the local demo only.** The Railway endpoint is retired and its runtime was never migrated to `app_user`; do not claim hosted RLS enforcement. If the API is redeployed, follow `docs/DEPLOY.md` §5.2 and re-run the 5/5 isolation proof. Application `tenantId` filters remain in every query as defense in depth.
 > - The video webhook route now exists (`POST /api/video/webhooks/:provider`) with raw-body HMAC verification, tenant-scoped lookup, and a transactional video update + outbox event. It is unit-tested (6/6); a real Bunny library/key is not configured, so a live provider callback is still pending. VdoCipher remains a stub.
-> - There is no outbox dispatcher.
+> - Outbox delivery is **Phase 1 and local-only**: the sweep, HMAC transport, retry/backoff, and dead-letter state exist and passed a local HTTP sink **4/4**, but no external receiver is configured. External delivery is not live-proven, and there is no dead-letter administration route.
 > - Published course/lesson/exam content has **no immutable version/snapshot layer yet**; the “publish = immutable snapshot” language below is a target control, not a current guarantee.
 > - Exam auto-submit is now server-backed by the delayed `exam-expiry` worker; the client still auto-submits at zero. The worker must be running with Redis for abandoned-tab cleanup.
 > - 2FA, KMS/Vault, SIEM/Sentry/Prometheus, and WAF are not implemented. Application-level rate limiting uses Redis-shared counters with a per-instance fallback; forwarded client IPs remain best effort.
 > - SETH-9 post-quantum signing, ZK delivery, homomorphic grading, active deception, and crypto-shredding are **roadmap-only**; see [`SETH-9-ROADMAP.md`](SETH-9-ROADMAP.md).
-> - Do not treat the older “178 + 26 policies” or `20240101000000_init_rls.sql` references as current; the database has 8 migrations with 138 policies on 43 tables.
+> - Do not treat the older “178 + 26 policies” or `20240101000000_init_rls.sql` references as current; the local database has 9 migrations with 138 policies on 43 tables. The retired Railway chain was 8/8.
 
 [![RLS](https://img.shields.io/badge/RLS-active_local_app__user-4169E1?style=for-the-badge&logo=postgresql&logoColor=white)](#-5-tenancy--isolation-rls-the-last-wall)
 [![Argon2id](https://img.shields.io/badge/Hashing-Argon2id-2D3748?style=for-the-badge)](#-31-password-security-argon2id-real)
@@ -1410,7 +1411,7 @@ Q20 Compliance certificates? → SAQ-A (PCI) + PDPL file + DPAs 📋 — tracked
 DB-SIDE DONE: RLS policy set (138 policies / 43 tables) + `app_user` role + FORCE.
 RUNTIME ACTIVE (local demo): API connects as `app_user`; RLS e2e 5/5; voucher + signed webhook round trips passed. The Railway endpoint is retired and was not migrated.
 CODE DONE: Argon2id · refresh rotation · PolicyEngine · redeem · HMAC paymob/fawry/bunny-helper/watermark/tokens ·
-  inbox interface · tenant uniques · boot validator.
+  inbox interface · tenant uniques · boot validator · opt-in outbox sweep (HMAC, retry, dead-letter; local sink 4/4).
 NEXT (P1): hosted RLS activation if the API is redeployed · answers-absent CI gate · log-grep CI · RLS-coverage CI ·
   external pentest (money+isolation) · backup-restore drill · secret hunt in release PRs.
 P1: TOTP enforced · KMS/Vault + PII envelope · Cloudflare WAF/bot/rate-limit · IP allowlists ·
@@ -1484,6 +1485,7 @@ DELIVERABLE: findings with SEVERITY + REPRO (requestIds) + retest window. Fix SL
 | v2.5 | 2026-11-17 | Teacher analytics workspace added: `GET /api/v1/teacher/analytics/overview` under `AnalyticsModule` with `@CanReadAnalytics()`, tenant-scoped reads only, plan-aware history retention, and no cross-tenant aggregates; `/teacher/analytics` now a real Arabic page. Analytics service 4/4; API suite 369/369, web 159/159, build 4/4. No schema or migration change. |
 | v2.6 | 2026-11-18 | Server-side exam expiry added: delayed Bull `exam-expiry` job from `startExamAttempt`, tenant/RLS-scoped processor, CAS `IN_PROGRESS → TIMED_OUT`, submit-race fallback, queue failure non-fatal. Live 1-minute proof; 6 worker tests; API 376/376 (38 suites), web 159/159, build 4/4. No schema or migration change. |
 | v2.7 | 2026-11-19 | Redis-backed rate limiting: `RedisThrottlerStorage` replaces per-instance memory counters with atomic `INCR`/`PEXPIRE` under `sanad:throttle:*`; per-instance fallback on Redis failure; shared Bull/throttler connection helper. Live proof 401×10 → 429×2 with `Retry-After` and ~59s PTTL. API 384/384 (40 suites), web 159/159, build 4/4. No schema or migration change. |
+| v2.8 | 2026-11-20 | Outbox delivery Phase 1 added: migration #9 (`nextAttemptAt`, `deadAt`, due-row index, `app_list_active_tenant_ids()` IDs-only `SECURITY DEFINER` function); tenant-scoped Bull sweep; HMAC-SHA256 HTTP transport; retry/backoff; dead-letter state. Disabled unless both `OUTBOX_WEBHOOK_URL` and `OUTBOX_WEBHOOK_SECRET` are set. Local sink e2e 4/4; API 404/404 (44 suites), web 159/159, build 4/4, RLS 5/5. External delivery remains unproven. |
 
 ---
 
@@ -1833,8 +1835,10 @@ Test: duplicate delivery → second insert rejected → ACK path exercised.
 ### `outbox_events`
 
 ```
-INSERT: business txs (service role). SELECT: relay worker only. UPDATE: relay marks processed (narrow policy).
-DELETE: retention job only (processed + aged). Test: unprocessed rows never deleted (job asserts).
+INSERT: business txs (service role). SELECT/UPDATE: relay sweep inside the event tenant's app.tenant_id
+(due rows only; marks publishedAt/retry/dead state). DELETE: none implemented (retention job is a follow-up).
+Tenant directory: app_list_active_tenant_ids() is SECURITY DEFINER, returns IDs only, EXECUTE granted to
+app_user, PUBLIC revoked. Test: app_user direct SELECT on tenants without context = 0 rows; directory = active IDs.
 ```
 
 ## H5. Video Tables

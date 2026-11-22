@@ -1,16 +1,19 @@
-# Outbox Delivery — Design
+# Outbox Delivery — Phase 1
 
-> **Status: design only, not implemented.** The transactional outbox is still
-> write-only. `OutboxEvent` rows are committed atomically with payments,
-> refunds, and video updates, but no dispatcher reads or delivers them. This
-> document defines the delivery design, the RLS constraints, and the evidence
-> required before the gap can be marked closed.
+> **Status: Phase 1 implemented locally (20 November 2026), disabled by
+> default.** Migration #9 adds retry/dead-letter columns and the tenant-ID
+> directory. The `outbox-dispatch` Bull sweep is wired into the API and was
+> proven against a local HTTP sink: **4/4** e2e checks (valid HMAC +
+> `publishedAt`, a 500 retry followed by success, a permanent 4xx dead-letter,
+> and no redelivery after publication). The dispatcher stays idle unless both
+> `OUTBOX_WEBHOOK_URL` and `OUTBOX_WEBHOOK_SECRET` are set. No real external
+> target is configured, so external delivery is still unproven.
 
 ## 1. Why this exists
 
 The repository has a transactional outbox so a business transaction can write
 its domain event in the same database transaction as the money/entitlement/
-video state change. That part works. Delivery does not.
+video state change. Phase 1 adds the missing tenant-scoped delivery sweep.
 
 Current writers:
 
@@ -22,20 +25,21 @@ Current writers:
 | `video.processing.started` / `completed` / `failed` | video | provider webhook transaction |
 | `video.deleted` | video | video deletion |
 
-The only Bull processor today is `exam-expiry`. There is no outbox relay,
-reconciliation worker, or dead-letter surface.
+Bull now has two processors: the tenant-scoped `exam-expiry` worker and the
+opt-in `outbox-dispatch` sweep. There is still no reconciliation worker or
+dead-letter administration endpoint.
 
 ## 2. Constraints
 
 1. **RLS stays on.** Runtime uses `app_user`, which has no `SUPERUSER` and no
-   `BYPASSRLS`. Every read/write of tenant-owned rows must happen inside
+   `BYPASSRLS`. Every read/write of tenant-owned rows happens inside
    `runWithTenantId()` (or with an explicit `set_config('app.tenant_id', …,
    true)` transaction).
 2. **No cross-tenant payload reads.** A dispatcher may learn tenant IDs, but it
    must not read another tenant's events without entering that tenant's scope.
 3. **At-least-once.** A crash after delivery but before `publishedAt` must be
    allowed. Consumers deduplicate on the event ID.
-4. **No event loss.** A failed HTTP call must leave the row unpublished with
+4. **No event loss.** A failed HTTP call leaves the row unpublished with
    `retryCount`, `lastError`, and a future retry time.
 5. **Zero-cost demo.** No new managed service is required. An HTTP webhook
    target is optional; with no target configured the dispatcher stays disabled.
@@ -47,18 +51,19 @@ reconciliation worker, or dead-letter surface.
 
 | Option | Verdict | Reason |
 | --- | --- | --- |
-| **A. Per-tenant sweep + tenant-ID directory function** | **Recommended** | Keeps application queries under RLS; exposes only tenant IDs; one worker can sweep every tenant. |
+| **A. Per-tenant sweep + tenant-ID directory function** | **Implemented** | Keeps application queries under RLS; exposes only tenant IDs; one worker can sweep every tenant. |
 | B. Dispatcher DB role with `BYPASSRLS` | Rejected | A second privileged runtime path weakens the isolation story and needs its own credential rotation. |
 | C. Enqueue each event at write time only | Rejected as the only mechanism | The enqueue can happen before the transaction commits, or fail after commit. It can complement a sweep, but cannot replace it. |
 | D. Global `app.outbox_dispatcher` GUC policy | Rejected | Any `app_user` connection could set the GUC and read cross-tenant payment/video payloads. |
 
-## 4. Recommended architecture
+## 4. Implemented architecture
 
 ### 4.1 Tenant directory (migration #9)
 
 `tenants` itself is RLS-protected (`tenants_select_policy` allows only the
 current `app.tenant_id`). A dispatcher therefore cannot list tenants through the
-normal Prisma client. Add one narrowly scoped `SECURITY DEFINER` function:
+normal Prisma client. Migration `20261119000000_outbox_delivery` adds one
+narrowly scoped `SECURITY DEFINER` function:
 
 ```sql
 CREATE OR REPLACE FUNCTION app_list_active_tenant_ids()
@@ -66,57 +71,60 @@ RETURNS TABLE (tenant_id text)
 LANGUAGE sql
 STABLE
 SECURITY DEFINER
-SET search_path = public
+SET search_path = public, pg_temp
 AS $$
-  SELECT id::text
-  FROM tenants
-  WHERE status IN ('ACTIVE', 'GRACE_PERIOD');
+  SELECT t."id"::text
+  FROM public."tenants" t
+  WHERE t."status" IN ('ACTIVE', 'GRACE_PERIOD');
 $$;
 
 REVOKE ALL ON FUNCTION app_list_active_tenant_ids() FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION app_list_active_tenant_ids() TO app_user;
 ```
 
+The migration grants execute only when `app_user` exists; otherwise it raises a
+notice so a pre-bootstrap database can grant it manually.
+
 Rules for this function:
 
 - returns **only IDs**, no names, domains, config, users, or payloads;
 - `STABLE`, no parameters, no dynamic SQL;
 - owned by the migration owner, not `app_user`;
-- regression test proves `app_user` can call it but still cannot select
-  `tenants` rows for another tenant.
+- the local proof shows `app_user` can call it (`1` active ID) while a direct
+  `SELECT FROM tenants` still returns `0` rows without a tenant context.
 
 This is the only cross-tenant read surface the dispatcher gets.
 
 ### 4.2 Sweep worker
 
-New `OutboxDispatcherModule` with a Bull queue named `outbox-dispatch`:
+The implementation lives in `apps/api/src/modules/outbox/`:
 
-- one repeatable job (`jobId: "outbox-sweep"`, every 30 seconds) so multiple API
-  instances do not all sweep at once;
-- each run:
-  1. call `app_list_active_tenant_ids()` outside any tenant ALS scope;
-  2. for each ID, `runWithTenantId(id, () => outbox.getUnpublishedEvents(50))`;
-  3. deliver each event through the configured transport;
-  4. update the row inside the same tenant scope.
-- the sweep is bounded (batch size + per-run tenant count) so one noisy tenant
-  cannot starve the rest;
-- a queue/Redis failure is logged and never fails a request path.
+- `OutboxModule` registers the `outbox-dispatch` queue; `AppModule` owns the
+  single `BullModule.forRoot(...)` Redis configuration.
+- `OutboxDispatchScheduler` installs one repeatable job named `sweep` every
+  30 seconds (`OUTBOX_SWEEP_INTERVAL_MS`), with `jobId: "sweep"` so API
+  instances do not each add their own repeat entry.
+- `OutboxDispatchProcessor` calls `OutboxDispatcherService.sweep()`.
+- `OutboxDispatcherService`:
+  1. calls `app_list_active_tenant_ids()` outside any tenant ALS scope;
+  2. for each ID, enters `runWithTenantId(id, …)`;
+  3. fetches due events (`publishedAt = null`, `deadAt = null`, and
+     `nextAttemptAt` null or in the past);
+  4. delivers each event and writes the result inside that tenant scope.
+- the sweep is bounded by `OUTBOX_BATCH_SIZE` (default 50) and
+  `OUTBOX_MAX_TENANTS_PER_SWEEP` (default 50);
+- a queue/Redis failure is logged and never fails a request path. The repeatable
+  job is stored in Redis at boot; if Redis is down at that moment, restart the
+  API after Redis recovers.
 
 ### 4.3 Delivery transport
 
-Define a small interface so tests and future providers do not depend on HTTP:
+`OutboxTransport` is a small interface so tests and future providers do not
+depend on HTTP. Phase 1 uses `HttpOutboxTransport`:
 
-```ts
-interface OutboxTransport {
-  readonly enabled: boolean;
-  deliver(event: OutboxEnvelope): Promise<DeliveryResult>;
-}
-```
-
-Phase 1 implementation is `HttpOutboxTransport`:
-
-- enabled only when `OUTBOX_WEBHOOK_URL` is set; otherwise it logs once and the
-  sweep marks nothing;
+- enabled only when **both** `OUTBOX_WEBHOOK_URL` and
+  `OUTBOX_WEBHOOK_SECRET` are set; otherwise it logs once and the sweep marks
+  nothing;
 - `POST` JSON envelope:
 
 ```json
@@ -135,17 +143,17 @@ Phase 1 implementation is `HttpOutboxTransport`:
   - `X-SANAD-Event-Id: <event.id>`
   - `X-SANAD-Timestamp: <unix seconds>`
   - `X-SANAD-Signature: sha256=<HMAC-SHA256(timestamp + "." + rawBody, OUTBOX_WEBHOOK_SECRET)>`
-- 10-second timeout, no redirects, `Content-Type: application/json`;
-- 2xx = delivered; 408/429/5xx/network = retryable; other 4xx = permanent
-  failure (still recorded, not retried forever);
+- 10-second default timeout (`OUTBOX_WEBHOOK_TIMEOUT_MS`), no redirects,
+  `Content-Type: application/json`;
+- 2xx = delivered; 408/429/5xx/network/timeout = retryable; other 4xx =
+  permanent failure (still recorded, not retried forever);
 - the URL comes from env, not from a tenant or request body, which avoids SSRF
   from tenant-controlled input. Per-tenant endpoints are a later phase and
   require an allowlist.
 
 ### 4.4 Retry, backoff, and dead letters
 
-The model already has `retryCount` and `lastError`. Add two nullable columns in
-the same migration:
+Migration #9 adds two nullable columns to `outbox_events`:
 
 | Column | Purpose |
 | --- | --- |
@@ -155,10 +163,11 @@ the same migration:
 Policy:
 
 - first attempt immediately after the sweep finds the event;
-- retry delay `min(30s * 2^retryCount, 1h)`;
+- retry delay `min(30s * 2^(retryCount - 1), 1h)`;
 - default max attempts `10`, configurable with `OUTBOX_MAX_ATTEMPTS`;
-- on exhaustion set `deadAt` and log a structured error with event ID, tenant
-  ID, type, and attempt count; do **not** log the payload;
+- on exhaustion or a permanent 4xx, set `deadAt` and write a structured
+  dead-letter log with tenant ID, event ID, event type, attempt count, and error
+  code; the payload is not logged;
 - an admin/dead-letter read endpoint is a follow-up, not part of phase 1;
 - `publishedAt` is set only after a 2xx response. A crash between delivery and
   the update can duplicate a delivery; the event ID is the dedupe key.
@@ -175,41 +184,47 @@ Policy:
 
 ### 4.6 Observability
 
-- structured logs: `tenantId`, `eventId`, `eventType`, `attempt`, `outcome`,
-  `durationMs`; no payload, no PII;
+- aggregate sweep log: tenants, examined, delivered, retried, dead, failed
+  tenants;
+- one warning per dead-lettered event: tenant ID, event ID, event type,
+  attempt, error code; no payload, no PII, no secret;
+- the local e2e test asserts the receiver saw the signed body and that
+  `publishedAt`/`deadAt`/`retryCount` match the delivery outcome;
 - counters (when a metrics backend exists): delivered, retried, dead;
-- `pnpm demo:doctor` can later assert that the outbox queue has a worker and
-  that no event is older than the configured SLA.
+- `pnpm demo:doctor` does not yet assert outbox health; a dead-letter alert is
+  a follow-up.
 
 ## 5. Rollout plan
 
-1. **Migration + tests.** Add the tenant-ID function and `nextAttemptAt`/
-   `deadAt`; prove `app_user` can call the function, direct cross-tenant
-   `tenants`/`outbox_events` reads still return zero rows.
-2. **Dispatcher behind a flag.** `OUTBOX_DELIVERY_ENABLED=false` by default.
-   Unit-test the sweep, tenant scoping, transport, retry, and dead-letter paths
-   with a fake transport.
-3. **Local sink.** Run a tiny local HTTP receiver, enable the dispatcher for one
-   tenant, and prove: one delivery, duplicate-safe replay, a forced 500 retry,
-   and a 4xx permanent failure. Reset the demo afterward.
-4. **Live proof.** Configure a real target and repeat the same checks; record
+1. **Migration + tests.** ✅ Migration #9 and the tenant-ID function are
+   applied locally; the RLS isolation suite remains 5/5.
+2. **Dispatcher behind an opt-in gate.** ✅ No URL/secret means idle. The
+   dispatcher is registered at boot but does not query the database while
+   disabled. Unit tests cover sweep, tenant scoping, transport, retry, and
+   dead-letter paths.
+3. **Local sink.** ✅ A local HTTP receiver ran inside the e2e test: one
+   delivery with a valid HMAC and `publishedAt`, a forced 500 retry followed by
+   success, a permanent 4xx dead-letter, and no redelivery after publication.
+4. **Live proof.** ⬜ Configure a real target and repeat the same checks; record
    event IDs, HTTP statuses, retry counts, and final `publishedAt`.
-5. **Only then** update the public claim from “outbox is write-only” to
-   “outbox delivery is implemented and proven.”
+5. **Only then** update the public claim from “implemented locally, disabled by
+   default” to “outbox delivery is live-proven.”
 
 ## 6. Acceptance criteria
 
-- [ ] `app_user` can list tenant IDs but cannot read another tenant's rows.
-- [ ] A payment event is delivered once with a valid HMAC and marked
-      `publishedAt` only after 2xx.
-- [ ] A 500/network failure increments `retryCount`, stores `lastError`, and
+- [x] `app_user` can list tenant IDs but cannot read another tenant's rows.
+- [x] An outbox event is delivered with a valid HMAC and marked `publishedAt`
+      only after 2xx (local sink, synthetic e2e event).
+- [x] A 500/network failure increments `retryCount`, stores `lastError`, and
       retries after `nextAttemptAt`.
-- [ ] A permanent 4xx is recorded without an infinite retry loop.
-- [ ] Max attempts set `deadAt` and produce an observable log.
-- [ ] A crash between delivery and `publishedAt` is safe because the consumer
-      deduplicates on `event.id`.
-- [ ] No payload or credential appears in logs.
-- [ ] `pnpm build`, API tests, web tests, RLS e2e, and `pnpm demo:doctor` pass.
+- [x] A permanent 4xx is recorded without an infinite retry loop.
+- [x] Max attempts set `deadAt` and produce an observable log.
+- [x] A published event is not redelivered by the next sweep; consumers must
+      still deduplicate on `event.id` for the crash window.
+- [x] No payload or credential appears in logs.
+- [ ] A real payment/refund event is delivered to an external target.
+- [x] `pnpm build`, API tests, web tests, RLS e2e, and the local outbox e2e pass;
+      `pnpm demo:doctor` is run after the release commit.
 
 ## 7. Non-goals
 
@@ -222,10 +237,11 @@ Policy:
 ## 8. Open decisions
 
 1. Which target receives the first live delivery (internal notification
-   service, teacher webhook, or an operations sink)?
+   service, teacher webhook, or an operations sink)? Phase 1 exposes one generic
+   `OUTBOX_WEBHOOK_URL`; a real target is still pending.
 2. Whether per-tenant endpoints are needed before the judging deadline.
-3. Whether `nextAttemptAt`/`deadAt` ship in migration #9 or a separate
-   migration after the tenant-ID function.
+3. Whether a dead-letter retry/admin endpoint is needed before the deadline.
 
-Until those are decided, the correct current claim remains: **the outbox is
-transactional and write-only; no dispatcher exists.**
+The correct current claim is: **outbox delivery is implemented locally,
+disabled by default, and proven against a local sink; external delivery is not
+yet proven.**

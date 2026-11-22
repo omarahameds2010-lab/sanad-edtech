@@ -1,6 +1,6 @@
 # Architecture — Learning Platform
 
-> **Current runtime architecture, verified 16 November 2026 after local RLS activation and the destructive-reset work.** This replaces the older aspirational architecture notes. For exact release/test facts see [`CURRENT-STATE.md`](CURRENT-STATE.md). For deployment steps see [`DEPLOY.md`](DEPLOY.md).
+> **Current runtime architecture, verified 20 November 2026 after local RLS activation, the destructive-reset work, the exam-expiry worker, Redis throttling, and outbox delivery Phase 1.** This replaces the older aspirational architecture notes. For exact release/test facts see [`CURRENT-STATE.md`](CURRENT-STATE.md). For deployment steps see [`DEPLOY.md`](DEPLOY.md).
 
 ## 1. System shape
 
@@ -23,8 +23,8 @@ flowchart TB
     B -->|HTTPS| W
     W -->|same-origin /api rewrite| A
     A -->|Prisma 5.22| P
-    A -->|exam-expiry jobs + rate-limit counters| R
-    A -.->|outbox relay not wired| R
+    A -->|exam-expiry + outbox sweep jobs + rate-limit counters| R
+    A -.->|opt-in HMAC outbox| EXT[External HTTPS receiver]
     A -->|signed checkout| PAY[Paymob / Fawry]
     A -->|upload/sign| BUN[Bunny Stream]
     B -->|unlisted embed| YT[YouTube]
@@ -34,8 +34,8 @@ flowchart TB
 - **Web:** Next.js 15, React 19, App Router, RTL-first.
 - **API:** NestJS 10 modular monolith, global prefix `/api`.
 - **DB:** PostgreSQL + Prisma, shared schema with `tenantId` on every tenant-owned row.
-- **Cache/jobs:** Redis + Bull are active for the tenant-scoped `exam-expiry` delayed worker and Redis-backed shared throttler counters. The outbox has no relay and no other processors are registered.
-- **Deploy:** Vercel (web) + Railway (API/PostgreSQL), root `Dockerfile` for the API.
+- **Cache/jobs:** Redis + Bull run the tenant-scoped `exam-expiry` delayed worker, the opt-in `outbox-dispatch` sweep, and Redis-backed shared throttler counters. The outbox sweep is idle without both `OUTBOX_WEBHOOK_URL` and `OUTBOX_WEBHOOK_SECRET`; no reconciliation processor is registered.
+- **Deploy:** Vercel (web) + the local compiled API on `:3002` behind a Cloudflare quick tunnel. Railway is retired. Root `Dockerfile` is kept for a future hosted API.
 
 ## 2. Modules
 
@@ -55,7 +55,7 @@ flowchart TB
 | `video` | Video records, provider abstraction, YouTube attach, upload/signing |
 | `video-protection` | Signed playback tokens, watermark engine, playback sessions |
 | `audit` | Audit and security event writes |
-| `outbox` | Transactional event rows (no dispatcher) |
+| `outbox` | Transactional event rows, tenant-scoped sweep, HMAC HTTP transport, retry/backoff and dead-letter state (opt-in) |
 | `analytics` | Tenant-scoped teacher overview: enrollment trend, course completion, assessment averages, pending grading, recent activity; plan-aware history window |
 
 The `courses` module contains subfolders for assignments, exams, lessons, resources, enrollments, progress, and progression; they are not separate top-level Nest modules.
@@ -101,13 +101,13 @@ Interactive `$transaction` callbacks are not automatically wrapped; those sites 
 
 The database side is installed:
 
-- 8 production migrations (migration #8 applied 28 October 2026);
+- 9 local migrations (migration #9 outbox delivery applied 20 November 2026; the retired Railway chain was 8/8);
 - 43 application tables;
 - 138 policies;
 - `FORCE ROW LEVEL SECURITY` on application tables;
 - `app_user` role created by the bootstrap.
 
-The local demo runtime is **active**: `PrismaService` reads `DATABASE_URL` only (no fallback to `MIGRATION_DATABASE_URL`), `scripts/demo/start.ps1` passes the non-owner `app_user` URL to the API, and startup logs `DB runtime role: app_user (superuser=off)`. Migrations and seeds use the owner URL explicitly. The RLS isolation suite passed **5/5**; a voucher checkout and a signed Paymob webhook (async `setImmediate` re-enters the event tenant scope) both completed under `app_user`. The retired Railway runtime was never migrated, so hosted RLS is still pending.
+The local demo runtime is **active**: `PrismaService` reads `DATABASE_URL` only (no fallback to `MIGRATION_DATABASE_URL`), `scripts/demo/start.ps1` passes the non-owner `app_user` URL to the API, and startup logs `DB runtime role: app_user (superuser=off)`. Migrations and seeds use the owner URL explicitly. The RLS isolation suite passed **5/5** on 16 November and again **5/5** on 20 November after migration #9; a voucher checkout and a signed Paymob webhook (async `setImmediate` re-enters the event tenant scope) both completed under `app_user`. The outbox sweep re-enters each tenant scope and reaches the tenant directory only through `app_list_active_tenant_ids()`, which returns IDs and nothing else. The retired Railway runtime was never migrated, so hosted RLS is still pending.
 
 **Therefore:** application-level `tenantId` filters remain required on every query as defense in depth. See `docs/DEPLOY.md` for local verification and hosted activation.
 
@@ -188,6 +188,8 @@ Order
   → OutboxEvent
 ```
 
+The `OutboxEvent` is committed in the same transaction. If `OUTBOX_WEBHOOK_URL` and `OUTBOX_WEBHOOK_SECRET` are configured, the opt-in sweep delivers it later with an HMAC signature and retry/dead-letter state; otherwise it remains unpublished.
+
 Key invariants:
 
 - Every financial mutation has an idempotency key.
@@ -242,8 +244,8 @@ No mock data is allowed in these surfaces. Every count and state comes from the 
 | --- | --- | --- |
 | Web | Vercel | `main` production branch; `/api/*` rewrite to the current tunnel |
 | API | Local Docker/laptop | compiled NestJS on `:3002`; runtime `DATABASE_URL` = `app_user`; RLS active |
-| DB | Local Docker PostgreSQL | **8/8** migrations; 138 RLS policies on 43 tables; runtime non-owner |
-| Redis | Local Docker | `exam-expiry` delayed jobs/worker and shared throttler counters active; outbox relay absent |
+| DB | Local Docker PostgreSQL | **9/9** migrations; 138 RLS policies on 43 tables; runtime non-owner |
+| Redis | Local Docker | `exam-expiry` delayed jobs/worker, opt-in `outbox-dispatch` sweep, and shared throttler counters active; reconciliation worker absent |
 | Tunnel | Cloudflare quick tunnel | temporary; `-SyncFallback` updates the Vercel build fallback when the URL changes |
 | Railway | Retired | endpoint returns `404 Application not found`; not RLS-migrated |
 
@@ -255,9 +257,9 @@ Vercel fail-safes:
 ## 11. Known architectural gaps
 
 1. Hosted RLS activation (local is active; the retired Railway runtime was not migrated).
-2. Outbox dispatcher — design in [`OUTBOX-DELIVERY.md`](OUTBOX-DELIVERY.md), not implemented.
+2. External outbox delivery — Phase 1 is implemented locally and disabled by default; only a local HTTP-sink proof exists. See [`OUTBOX-DELIVERY.md`](OUTBOX-DELIVERY.md).
 3. Real-provider video webhook verification (route exists and is unit-tested; no Bunny library/key configured).
-4. Remaining background workers (the `exam-expiry` worker exists; outbox relay and other processors do not).
+4. Remaining background workers (the `exam-expiry` worker and opt-in `outbox-dispatch` sweep exist; no reconciliation or dead-letter administration worker).
 5. Persisted word-level review evidence.
 6. Provider sandbox verification.
 7. Reconciliation worker.

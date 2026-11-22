@@ -58,7 +58,7 @@ pnpm --filter api exec jest --config jest.config.js --runInBand
 pnpm build
 ```
 
-Current expected results on production code: **147/147 web**, **357/357 API**, **4/4 build**, **8/8 production migrations**, and the production retake smoke **31/31**. The hardening and retakes branches were verified pre-merge at **344/344** and **353/353** API / **145/145** web; those are historical counts, not the current gate.
+Current expected results on the local release code: **159/159 web**, **404/404 API** (44 suites), **4/4 build**, **9/9 local migrations**, RLS e2e **5/5**, and outbox local-sink e2e **4/4**. The retired Railway production retake smoke was **31/31**; the hardening and retakes branches were verified pre-merge at **344/344** and **353/353** API / **145/145** web. Those are historical counts, not the current gate.
 
 Older versions of this document claimed the design-system build had 24 pre-existing errors and the web suite had 8 port-drift failures. Those conditions are no longer true at the current release; do not use them to justify skipping gates.
 

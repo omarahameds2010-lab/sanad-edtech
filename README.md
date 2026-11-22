@@ -263,7 +263,7 @@ PLATFORM (universe)
 | PolicyEngine + Guards | ✅ | `authorization` module |
 | Entitlements vs Feature Flags split | ✅ | Separate modules |
 | Plans + Subscriptions | ✅ | `plans` module |
-| Transactional outbox | Partial | `outbox` module writes events; no relay/dispatcher |
+| Transactional outbox | Phase 1 | `outbox` module writes events; opt-in `outbox-dispatch` sweep delivers HMAC-signed HTTP events with retry/dead-letter; disabled unless `OUTBOX_WEBHOOK_URL` + `OUTBOX_WEBHOOK_SECRET` are set; only a local-sink proof exists |
 | Server-side exam expiry | ✅ | Delayed Bull `exam-expiry` worker; client timer remains the normal path |
 | Idempotency keys (24h TTL) | ✅ | `payments` + `IdempotencyKeys` table |
 | Audit logging | ✅ | `audit` + `payment_audit_logs` |
@@ -614,7 +614,7 @@ learning-platform/
 │   │           │       ├── signed-token.service.ts
 │   │           │       └── playback-session.service.ts
 │   │           ├── audit/              ← Audit logs + security_events
-│   │           ├── outbox/             ← Transactional outbox relay
+│   │           ├── outbox/             ← Transactional outbox + opt-in delivery sweep
 │   │           ├── notifications/      ← (planned) email/WhatsApp/push
 │   │           └── analytics/          ← teacher overview (operational tables)
 │   └── web/                            ← Next.js 16 App Router
@@ -851,7 +851,7 @@ notepad .env.local
 | `REDIS_PORT` | ✅ | `6379` | — |
 | `REDIS_PASSWORD` | ⬜ (prod ✅) | `` | Set in prod; use ACL user if available |
 | `BULLMQ_PREFIX` | ⬜ | `lp` | Queue key prefix |
-| `OUTBOX_RELAY_INTERVAL_MS` | ⬜ | `2000` | Poll interval for outbox → BullMQ |
+| `OUTBOX_SWEEP_INTERVAL_MS` | ⬜ | `30000` | Repeatable outbox sweep interval (requires `OUTBOX_WEBHOOK_URL` + `OUTBOX_WEBHOOK_SECRET`) |
 | `EXAM_AUTOSUBMIT_DELAY` | ⬜ | `on-expiresAt` | BullMQ delayed job per attempt (see §18) |
 
 #### Storage (R2/S3)
@@ -1097,7 +1097,7 @@ git commit -m "feat(lms): add ENTER_EXAM unlock for next lesson
 | `video` | `modules/video` | Upload URLs (TUS), status sync, provider abstraction | `bunny.provider.ts`, `vdocipher.provider.ts` (stub) | `tenants` |
 | `video-protection` | `modules/video-protection` | Tokens, watermark, sessions, heartbeat, risk | `watermark-engine.ts`, `signed-token.service.ts`, `playback-session.service.ts` | `video`, `entitlements` |
 | `audit` | `modules/audit` | `audit_logs`, `payment_audit_logs`, `security_events` | `audit.service.ts` | `tenants` |
-| `outbox` | `modules/outbox` | `outbox_events` writer only; relay/dispatcher is not implemented | `outbox.service.ts` | `tenants` |
+| `outbox` | `modules/outbox` | `outbox_events` writer + opt-in tenant-scoped sweep, HMAC HTTP transport, retry/dead-letter; idle without URL+secret | `outbox.service.ts`, `outbox-dispatcher.service.ts`, `http-outbox.transport.ts` | `tenants` |
 | `notifications` | `modules/notifications` | (planned) email/WhatsApp/push via BullMQ | — | `outbox` |
 | `analytics` | `modules/analytics` | Teacher overview: tenant-scoped KPIs, enrollment trend, course completion, assessment averages, pending grading, recent activity; plan-aware history window | `analytics.service.ts` | `courses`, `plans` |
 
