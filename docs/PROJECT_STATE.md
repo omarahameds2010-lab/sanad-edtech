@@ -11,7 +11,7 @@
 | الفرع | `main` |
 | كوميت الويب | `2333c2e` — آخر مزامنة fallback للـtunnel (19 نوفمبر)؛ قبله `0fffd90` و`665ecc2` لمساحة تحليلات المعلم |
 | كوميت الـAPI | `fe56e64` — تسليم Outbox اختياري (Phase 1) مع الهجرة #9؛ قبله `85ffc62` لحدود Redis و`bacce7e` لعامل إنهاء الامتحان. التشغيل المحلي المترجم على `:3002` |
-| الـAPI | <https://yields-circus-ranges-info.trycloudflare.com> — quick tunnel متغير، والـVercel rewrite يتبعه |
+| الـAPI | <https://monkey-repeated-red-closed.trycloudflare.com> — quick tunnel متغير، والـVercel rewrite يتبعه |
 | التقوية الأمنية | **منشورة** — Rate Limiting، إخفاء محتوى الدروس المقفولة، وحراسة مسارات التقييم |
 | إعادة المحاولات | **منشورة** — الهجرة #8، `IN_PROGRESS`، `attemptNumber`، `maxAttempts` مفروض على السيرفر |
 | الويب | <https://sanad-edtech.vercel.app> |

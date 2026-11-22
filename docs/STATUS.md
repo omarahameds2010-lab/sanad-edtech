@@ -13,7 +13,7 @@
 | Hardening / retakes | **Live** — Redis-backed rate limiting, lock enforcement, authoring-read fixes, and assignment retakes |
 | Sprint 2 paid checkout | **Implemented, deployed, and live-verified** — `402` paid-course guard, atomic enrollment, voucher checkout |
 | Web | <https://sanad-edtech.vercel.app> |
-| API public origin | <https://yields-circus-ranges-info.trycloudflare.com> - quick tunnel; changes on restart |
+| API public origin | <https://monkey-repeated-red-closed.trycloudflare.com> - quick tunnel; changes on restart |
 | Health | `/api/health` → **200**, database **up** |
 | Login page | **200** |
 | Demo tenant | `sanad-demo` |
@@ -148,6 +148,6 @@ Production retake smoke passed **31/31**; the demo assignment is set to `maxAtte
 | 2026-11-18 | Server-side exam expiry (`bacce7e`): delayed Bull job at `expiresAt + 5s`, tenant/RLS-scoped processor, `TIMED_OUT` CAS update, submit-race fallback; live 1-minute proof expired at 65s. API 376/376 (38 suites), web 159/159, build 4/4; quick tunnel changed and fallback synced via `0fffd90`, live health 200, smoke 8/8, doctor 10/10 |
 | 2026-11-19 | Redis-backed shared rate limiting (`85ffc62`): atomic INCR/PEXPIRE, per-instance fallback store; live 401×10 → 429×2 with `Retry-After`. API 384/384 (40 suites), web 159/159, build 4/4, RLS e2e 5/5 re-run; quick tunnel changed and fallback synced via `2333c2e`; removed a leftover test enrollment and test exam attempt, then live health 200, smoke 8/8, doctor 10/10 |
 | 2026-11-20 | Outbox delivery Phase 1 (`fe56e64`): migration #9, tenant-ID directory, tenant-scoped Bull sweep, HMAC transport, retry/dead-letter; disabled by default without URL+secret. Local sink e2e 4/4; API 404/404 (44 suites), web 159/159, build 4/4, RLS e2e 5/5. Quick tunnel changed and fallback updated in the release. |
-| 2026-11-22 | Outbox docs and fallback pushed (`3a51338`); Vercel redeployed, live health 200, authenticated smoke 8/8, demo doctor 10/10. |
+| 2026-11-22 | Outbox docs pushed (`3a51338`, `97ef5ad`); the quick tunnel changed again and the watchdog synced `d633bd1`; Vercel redeployed, live health 200, authenticated smoke 8/8. The watchdog process was found stopped during final verification and was restarted from the Startup entry; demo doctor then passed 10/10. |
 
 Historical audit: [`AUDIT-2026-10-16.md`](AUDIT-2026-10-16.md). It is preserved as a dated snapshot, not rewritten.
