@@ -1,7 +1,7 @@
 # Deployment Runbook — Vercel + local demo API
 
 > **Current demo:** web on Vercel; API and PostgreSQL on the demo laptop, exposed through a Cloudflare quick tunnel. The Railway API endpoint returns `404 Application not found` and is retired.
-> **Verified 20 November 2026:** local runtime connects as `app_user` with RLS active; new code `DATABASE_URL` only; API **404/404** (44 suites), web **159/159**, build **4/4**, RLS e2e **5/5**, outbox local-sink e2e **4/4**. Migration chain is **9/9**. The teacher analytics endpoint is tenant-scoped and plan-capped; `/teacher/analytics` is a real page. The server-side exam-expiry Bull worker is live-proven, rate-limit counters are shared through Redis, and outbox delivery Phase 1 is implemented but disabled by default (no external target configured). Live smoke and demo doctor are re-run after the release commit.
+> **Verified 22 November 2026:** local runtime connects as `app_user` with RLS active; new code `DATABASE_URL` only; API **404/404** (44 suites), web **159/159**, build **4/4**, RLS e2e **5/5**, outbox local-sink e2e **4/4**, live smoke **8/8**, demo doctor **10/10**. Migration chain is **9/9**. The teacher analytics endpoint is tenant-scoped and plan-capped; `/teacher/analytics` is a real page. The server-side exam-expiry Bull worker is live-proven, rate-limit counters are shared through Redis, and outbox delivery Phase 1 is implemented but disabled by default (no external target configured).
 > Canonical state: [`CURRENT-STATE.md`](CURRENT-STATE.md).
 
 ## 0. Topology
@@ -262,8 +262,8 @@ Local verification (16 November 2026):
 | RLS isolation e2e | **5/5** (scoped SELECT; cross-tenant UPDATE/DELETE = 0 rows; cross-tenant INSERT rejected; empty context = 0 rows) |
 | Voucher checkout | order + `SANAD-2026` intent `success: true`; one ACTIVE paid enrollment |
 | Signed Paymob webhook | async event **PROCESSED** with tenant ID; order **CONFIRMED**, intent **SUCCEEDED**, payment **PAID**, ledger + enrollment created |
-| Live smoke | **8/8** through `https://sanad-edtech.vercel.app` |
-| Demo doctor | **10/10** |
+| Live smoke | **8/8** through `https://sanad-edtech.vercel.app` (22 November 2026) |
+| Demo doctor | **10/10** (22 November 2026) |
 
 To reproduce locally:
 

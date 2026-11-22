@@ -224,7 +224,8 @@ Policy:
 - [x] No payload or credential appears in logs.
 - [ ] A real payment/refund event is delivered to an external target.
 - [x] `pnpm build`, API tests, web tests, RLS e2e, and the local outbox e2e pass;
-      `pnpm demo:doctor` is run after the release commit.
+      live smoke **8/8** and `pnpm demo:doctor` **10/10** passed on 22 November
+      2026 after the release commit and Vercel redeploy.
 
 ## 7. Non-goals
 
