@@ -19,7 +19,7 @@ import { fileURLToPath } from "node:url";
 // DEMO_TUNNEL_ORIGIN in Vercel to override this without a code change; remove
 // this fallback after the stable tunnel is verified.
 const FALLBACK_DEMO_TUNNEL_ORIGIN =
-  "https://judges-king-stopped-eden.trycloudflare.com";
+  "https://inclusion-barely-taste-screens.trycloudflare.com";
 
 /**
  * Normalize a proxy origin.
