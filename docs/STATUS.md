@@ -1,19 +1,21 @@
-# Status — 22 November 2026
+# Status — 23 November 2026
 
 > Canonical detail lives in [`CURRENT-STATE.md`](CURRENT-STATE.md). This page is the short dashboard: what is live, what is proven, and what is still missing.
+>
+> Re-verified 23 November 2026 after the quick tunnel changed: live smoke **8/8** and `pnpm demo:doctor` **10/10**.
 
 ## Release
 
 | Item | Value |
 | --- | --- |
 | Production branch | `main` |
-| Web runtime code | Sprint 2 paid checkout (`aa4d2bc`) + tunnel fallback sync (`1fbc7e8`) + UTF-8 comment cleanup (`7ca1ed3`) + teacher analytics (`665ecc2`) + latest fallback syncs (`0fffd90`, `2333c2e`) — 15–19 November 2026 |
+| Web runtime code | Sprint 2 paid checkout (`aa4d2bc`) + tunnel fallback sync (`1fbc7e8`) + UTF-8 comment cleanup (`7ca1ed3`) + teacher analytics (`665ecc2`) + latest fallback syncs (`0fffd90`, `2333c2e`, `d633bd1`, `f50bc35`) — 15–23 November 2026 |
 | API runtime | Local compiled NestJS API on `:3002`; runtime `DATABASE_URL` = non-owner `app_user`; RLS active locally; tenant-scoped `exam-expiry` Bull worker, opt-in `outbox-dispatch` sweep with ADMIN-only dead-letter list/retry API, and Redis-backed shared rate-limit counters active |
 | Demo launcher | `scripts/demo/start.ps1`; Windows Startup entry installed with `-Tunnel cloudflared -Watch -SyncFallback`; healthy API/tunnel are reused |
 | Hardening / retakes | **Live** — Redis-backed rate limiting, lock enforcement, authoring-read fixes, and assignment retakes |
 | Sprint 2 paid checkout | **Implemented, deployed, and live-verified** — `402` paid-course guard, atomic enrollment, voucher checkout |
 | Web | <https://sanad-edtech.vercel.app> |
-| API public origin | <https://monkey-repeated-red-closed.trycloudflare.com> - quick tunnel; changes on restart |
+| API public origin | The current fallback in `apps/web/next.config.mjs` (<https://inclusion-barely-taste-screens.trycloudflare.com>) - quick tunnel; changes on restart |
 | Health | `/api/health` → **200**, database **up** |
 | Login page | **200** |
 | Demo tenant | `sanad-demo` |
@@ -42,8 +44,8 @@
 | Paid checkout HTTP smoke | **passed**: paid direct enroll 402, invalid voucher 400, valid voucher 201, enrollment `source=voucher`, replay one redemption | Local HTTP smoke, 14 Nov 2026 |
 | Paid checkout browser QA | **passed live**: paid CTA → checkout → `SANAD-2026` → order/intent **201** → “تم تفعيل الكورس”; cleanup restored the demo state | Live browser, 14 Nov 2026 |
 | Live judge path | **passed 15 Nov 2026**: `/demo`, one-click student/teacher, demo banner, checkout **200**, direct paid enroll **402**; **re-verified 17 Nov** with the live analytics workspace (real data, 7/30 range, disabled 90, no overflow) | Browser + HTTP through the web domain |
-| Live authenticated smoke | **8/8 passed** 15 Nov, **8/8** again 16 Nov after RLS + reset, **8/8** through the live domain 17 Nov, **8/8** on 18 Nov after the exam-expiry deploy, **8/8** on 19 Nov after the Redis throttler change, and **8/8** on 22 Nov after the outbox and dead-letter admin releases: health, public catalog, teacher login/tenant/courses, student login/assignments/enrollments. The live dead-letter route returned **403** for a teacher token and **401** anonymously. | `pnpm demo:smoke -- -BaseUrl https://sanad-edtech.vercel.app` |
-| Demo doctor preflight | **10/10 passed 16 Nov 2026** after the RLS commit, **10/10 again 17 Nov** after the analytics deploy, **10/10 on 18 Nov** after the exam-expiry push, **10/10 on 19 Nov** after the Redis throttler and demo cleanup, and **10/10 on 22 Nov** after the outbox release: Docker/containers, local API, tunnel, live health/database, `/demo` + checkout, watchdog, Startup entry, git sync, fallback match, demo DB state (including 1 voucher). The dead-letter admin release was verified with doctor **10/10** after its commit. | `pnpm demo:doctor` |
+| Live authenticated smoke | **8/8 passed** 15 Nov, **8/8** again 16 Nov after RLS + reset, **8/8** through the live domain 17 Nov, **8/8** on 18 Nov after the exam-expiry deploy, **8/8** on 19 Nov after the Redis throttler change, **8/8** on 22 Nov after the outbox and dead-letter admin releases, and **8/8** on 23 Nov after the tunnel fallback sync: health, public catalog, teacher login/tenant/courses, student login/assignments/enrollments. The live dead-letter route returned **403** for a teacher token and **401** anonymously. | `pnpm demo:smoke -- -BaseUrl https://sanad-edtech.vercel.app` |
+| Demo doctor preflight | **10/10 passed 16 Nov 2026** after the RLS commit, **10/10 again 17 Nov** after the analytics deploy, **10/10 on 18 Nov** after the exam-expiry push, **10/10 on 19 Nov** after the Redis throttler and demo cleanup, **10/10 on 22 Nov** after the outbox release, and **10/10 on 23 Nov** after the tunnel fallback sync: Docker/containers, local API, tunnel, live health/database, `/demo` + checkout, watchdog, Startup entry, git sync, fallback match, demo DB state (including 1 voucher). The dead-letter admin release was verified with doctor **10/10** after its commit. | `pnpm demo:doctor` |
 | Autostart + fallback sync | **passed 15–16 Nov 2026**: hidden watchdog restarted the tunnel twice, wrote the new fallback (`14a82df` after the full logon simulation; `1fbc7e8` after the overnight restart), pushed, and live health returned **200** each time | Installed Startup entry + sync log |
 | Cold Docker recovery | **passed 15 Nov 2026**: stopped Docker Desktop → health **503** → watchdog restarted Docker/PostgreSQL/API → health **200** in about 40 seconds | Hidden watchdog, no manual step |
 | Full logon simulation | **passed 15 Nov 2026**: stopped watchdog/tunnel/API/Docker → launched Startup `SANAD-Demo.cmd` → services restarted, fallback `14a82df` pushed, health **200** in about 70 seconds | Startup entry, no manual step; real Windows logoff not performed |

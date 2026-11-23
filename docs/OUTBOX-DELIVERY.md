@@ -247,8 +247,9 @@ idle and the row stays pending.
 - [x] `pnpm build`, API tests, web tests, RLS e2e, and the local outbox e2e pass;
       API **412/412** (45 suites), outbox e2e **5/5**, RLS **5/5**, live smoke
       **8/8**, and `pnpm demo:doctor` **10/10** passed on 22 November 2026 after
-      the dead-letter admin release. The API is local, so no Vercel redeploy was
-      required for this release.
+      the dead-letter admin release; live smoke **8/8** and doctor **10/10** were
+      re-run on 23 November 2026 after the tunnel fallback sync. The API is local,
+      so no Vercel redeploy was required for this release.
 
 ## 7. Non-goals
 

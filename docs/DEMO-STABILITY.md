@@ -111,10 +111,10 @@ curl.exe -s https://sanad-edtech.vercel.app/api/health
 
 ## 4) الـTunnel السريع والـFallback
 
-الوضع الحالي مؤقت: الـAutostart مثبت على Cloudflare quick tunnel مع `-SyncFallback`. الرابط الحالي:
+الوضع الحالي مؤقت: الـAutostart مثبت على Cloudflare quick tunnel مع `-SyncFallback`. الرابط الحالي (المصدر هو `FALLBACK_DEMO_TUNNEL_ORIGIN` في `apps/web/next.config.mjs`):
 
 ```text
-https://monkey-repeated-red-closed.trycloudflare.com
+https://inclusion-barely-taste-screens.trycloudflare.com
 ```
 
 عند كل تغيير في رابط الـQuick Tunnel:
@@ -143,6 +143,8 @@ https://monkey-repeated-red-closed.trycloudflare.com
 > **20 نوفمبر 2026:** الـQuick Tunnel اتغير إلى `yields-circus-ranges-info.trycloudflare.com` أثناء تجهيز إصدار الـOutbox؛ الـFallback اتحدّث مع الإصدار، والموقع رجع **200**. ده يوضح إن الـQuick Tunnel لسه مؤقت، والـSync هو اللي بيحافظ على الديمو.
 
 > **22 نوفمبر 2026:** الـQuick Tunnel اتغير مرة أخرى إلى `monkey-repeated-red-closed.trycloudflare.com`، والـFallback اتزامن في `d633bd1`. أثناء الفحص النهائي الـWatchdog كان واقف (`count=0`)، فاتشغّل من Startup entry تاني، وبعدها `pnpm demo:doctor` رجع **10/10**. ده تأكيد إضافي إن الـWatchdog نفسه محتاج مراقبة، مش بس الـTunnel.
+
+> **23 نوفمبر 2026:** الـQuick Tunnel اتغير مرة أخرى إلى `inclusion-barely-taste-screens.trycloudflare.com`، والـFallback اتزامن في `f50bc35`. بعد إعادة نشر Vercel رجع `/api/health` **200**، والـSmoke **8/8** والـDoctor **10/10**.
 
 > لو `API_PROXY_TARGET` متظبط في Vercel Production، فهو بياخد أولوية على الـFallback. الوضع الحالي اتحقق منه بعد تغيير الـTunnel في 15 نوفمبر: الموقع رجع **200** بعد تحديث الـFallback، يعني مفيش `API_PROXY_TARGET` قديم بيغطي عليه. مش قادرين نفحص Vercel env مباشرة لأن الـCLI/Token مش موجودين على اللابتوب.
 
