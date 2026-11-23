@@ -15,7 +15,7 @@ SETH-9 is the working name for a set of advanced security ideas raised for the p
 - active deception (honeytokens, canary content, decoy paths);
 - crypto-shredding as a deletion mechanism.
 
-These are legitimate long-term research directions, but none of them is a substitute for the basic controls this platform still needs. The local demo has now closed the RLS runtime gap (`app_user`, 5/5 isolation proof), added a unit-tested video webhook route, moved rate-limit counters to Redis, and added an opt-in outbox dispatcher with a local-sink proof (4/4). The following P1 gaps remain: hosted RLS activation if the API is redeployed (Railway is retired), external outbox delivery/dead-letter administration, no real Bunny webhook round trip, and proxy-IP handling for rate limits that still needs a trusted edge. Adding advanced cryptography before those controls are closed would increase complexity without reducing the most likely risks.
+These are legitimate long-term research directions, but none of them is a substitute for the basic controls this platform still needs. The local demo has now closed the RLS runtime gap (`app_user`, 5/5 isolation proof), added a unit-tested video webhook route, moved rate-limit counters to Redis, and added an opt-in outbox dispatcher with a local-sink proof (5/5), including ADMIN-only dead-letter list/retry under RLS. The following P1 gaps remain: hosted RLS activation if the API is redeployed (Railway is retired), external outbox delivery and dead-letter alerting/UI, no real Bunny webhook round trip, and proxy-IP handling for rate limits that still needs a trusted edge. Adding advanced cryptography before those controls are closed would increase complexity without reducing the most likely risks.
 
 The platform also handles minors, assessments, payments, and video content. A security control that is hard to operate, hard to explain, or easy to misconfigure can make the system less safe than a simpler control that is actually enforced.
 
@@ -50,7 +50,7 @@ It does **not** assume that a client device is trusted, that a CDN header is an 
 Required work:
 
 - [x] activate RLS locally as `app_user` (5/5 isolation proof); rotate the database password by hand and remove the owner URL from the runtime path (done locally); hosted activation remains only if the API is redeployed;
-- [x] add an outbox dispatcher with retries and observability (Phase 1 local, disabled by default; local-sink proof 4/4; external target pending; [`OUTBOX-DELIVERY.md`](OUTBOX-DELIVERY.md));
+- [x] add an outbox dispatcher with retries and observability (Phase 1 local, disabled by default; local-sink proof 5/5, including ADMIN dead-letter list/retry; external target pending; [`OUTBOX-DELIVERY.md`](OUTBOX-DELIVERY.md));
 - [x] add the video-provider webhook route with signature verification (unit-tested; real Bunny callback pending);
 - [x] replace in-memory rate limiting with Redis-shared counters (19 November 2026); still verify proxy-IP handling behind a trusted edge;
 - keep migration backups, restore tests, and rollback drills current;

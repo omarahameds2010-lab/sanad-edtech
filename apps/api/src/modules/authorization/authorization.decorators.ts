@@ -174,6 +174,15 @@ export const CanReadAnalytics = () =>
 export const CanExportAnalytics = () =>
   RequirePermission({ action: "export", resourceType: "analytics" });
 
+// Outbox dead-letter administration is tenant-scoped and ADMIN-only. The
+// resource has no tenant-controlled ID; RLS plus the explicit tenantId filter
+// in OutboxAdminService keep the query inside the current tenant.
+export const CanReadOutbox = () =>
+  RequirePermission({ action: "read", resourceType: "outbox" });
+
+export const CanManageOutbox = () =>
+  RequirePermission({ action: "manage", resourceType: "outbox" });
+
 export const CanManageTenantSettings = () =>
   RequirePermission({ action: "manage", resourceType: "settings" });
 

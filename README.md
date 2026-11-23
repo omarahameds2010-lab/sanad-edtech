@@ -263,7 +263,7 @@ PLATFORM (universe)
 | PolicyEngine + Guards | ✅ | `authorization` module |
 | Entitlements vs Feature Flags split | ✅ | Separate modules |
 | Plans + Subscriptions | ✅ | `plans` module |
-| Transactional outbox | Phase 1 | `outbox` module writes events; opt-in `outbox-dispatch` sweep delivers HMAC-signed HTTP events with retry/dead-letter; disabled unless `OUTBOX_WEBHOOK_URL` + `OUTBOX_WEBHOOK_SECRET` are set; only a local-sink proof exists |
+| Transactional outbox | Phase 1 | `outbox` module writes events; opt-in `outbox-dispatch` sweep delivers HMAC-signed HTTP events with retry/dead-letter; disabled unless `OUTBOX_WEBHOOK_URL` + `OUTBOX_WEBHOOK_SECRET` are set; local-sink proof **5/5**, including ADMIN-only dead-letter list/retry under RLS; external delivery is not live-proven |
 | Server-side exam expiry | ✅ | Delayed Bull `exam-expiry` worker; client timer remains the normal path |
 | Idempotency keys (24h TTL) | ✅ | `payments` + `IdempotencyKeys` table |
 | Audit logging | ✅ | `audit` + `payment_audit_logs` |
@@ -1097,7 +1097,7 @@ git commit -m "feat(lms): add ENTER_EXAM unlock for next lesson
 | `video` | `modules/video` | Upload URLs (TUS), status sync, provider abstraction | `bunny.provider.ts`, `vdocipher.provider.ts` (stub) | `tenants` |
 | `video-protection` | `modules/video-protection` | Tokens, watermark, sessions, heartbeat, risk | `watermark-engine.ts`, `signed-token.service.ts`, `playback-session.service.ts` | `video`, `entitlements` |
 | `audit` | `modules/audit` | `audit_logs`, `payment_audit_logs`, `security_events` | `audit.service.ts` | `tenants` |
-| `outbox` | `modules/outbox` | `outbox_events` writer + opt-in tenant-scoped sweep, HMAC HTTP transport, retry/dead-letter; idle without URL+secret | `outbox.service.ts`, `outbox-dispatcher.service.ts`, `http-outbox.transport.ts` | `tenants` |
+| `outbox` | `modules/outbox` | `outbox_events` writer + opt-in tenant-scoped sweep, HMAC HTTP transport, retry/dead-letter, ADMIN-only dead-letter list/retry; idle without URL+secret | `outbox.service.ts`, `outbox-dispatcher.service.ts`, `http-outbox.transport.ts`, `outbox-admin.controller.ts`, `outbox-admin.service.ts` | `tenants`, `audit` |
 | `notifications` | `modules/notifications` | (planned) email/WhatsApp/push via BullMQ | — | `outbox` |
 | `analytics` | `modules/analytics` | Teacher overview: tenant-scoped KPIs, enrollment trend, course completion, assessment averages, pending grading, recent activity; plan-aware history window | `analytics.service.ts` | `courses`, `plans` |
 

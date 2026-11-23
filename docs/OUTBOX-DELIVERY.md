@@ -1,13 +1,14 @@
 # Outbox Delivery — Phase 1
 
-> **Status: Phase 1 implemented locally (20 November 2026), disabled by
-> default.** Migration #9 adds retry/dead-letter columns and the tenant-ID
-> directory. The `outbox-dispatch` Bull sweep is wired into the API and was
-> proven against a local HTTP sink: **4/4** e2e checks (valid HMAC +
-> `publishedAt`, a 500 retry followed by success, a permanent 4xx dead-letter,
-> and no redelivery after publication). The dispatcher stays idle unless both
-> `OUTBOX_WEBHOOK_URL` and `OUTBOX_WEBHOOK_SECRET` are set. No real external
-> target is configured, so external delivery is still unproven.
+> **Status: Phase 1 implemented locally (20 November 2026), dead-letter admin
+> API added 22 November 2026, disabled by default.** Migration #9 adds
+> retry/dead-letter columns and the tenant-ID directory. The `outbox-dispatch`
+> Bull sweep is wired into the API and was proven against a local HTTP sink:
+> **5/5** e2e checks (valid HMAC + `publishedAt`, a 500 retry followed by
+> success, a permanent 4xx dead-letter, no redelivery after publication, and an
+> ADMIN-only list/requeue of a dead letter under RLS). The dispatcher stays idle
+> unless both `OUTBOX_WEBHOOK_URL` and `OUTBOX_WEBHOOK_SECRET` are set. No real
+> external target is configured, so external delivery is still unproven.
 
 ## 1. Why this exists
 
@@ -26,8 +27,9 @@ Current writers:
 | `video.deleted` | video | video deletion |
 
 Bull now has two processors: the tenant-scoped `exam-expiry` worker and the
-opt-in `outbox-dispatch` sweep. There is still no reconciliation worker or
-dead-letter administration endpoint.
+opt-in `outbox-dispatch` sweep. There is still no reconciliation worker. The
+dead-letter administration API is tenant-scoped and ADMIN-only; there is no
+dead-letter UI yet.
 
 ## 2. Constraints
 
@@ -168,9 +170,21 @@ Policy:
 - on exhaustion or a permanent 4xx, set `deadAt` and write a structured
   dead-letter log with tenant ID, event ID, event type, attempt count, and error
   code; the payload is not logged;
-- an admin/dead-letter read endpoint is a follow-up, not part of phase 1;
 - `publishedAt` is set only after a 2xx response. A crash between delivery and
   the update can duplicate a delivery; the event ID is the dedupe key.
+
+Dead-letter administration (added 22 November 2026):
+
+| Endpoint | Permission | Behavior |
+| --- | --- | --- |
+| `GET /api/v1/admin/outbox/dead-letters?limit=50` | `outbox:read` (ADMIN) | Lists this tenant's unpublished dead letters, newest `deadAt` first. The response omits `payload`; it includes event identity, `retryCount`, `lastError`, and `deadAt`. Limit is clamped to 1-100. |
+| `POST /api/v1/admin/outbox/dead-letters/:eventId/retry` | `outbox:manage` (ADMIN) | CAS-requeues only a still-dead, unpublished row in the current tenant: clears `deadAt`/`lastError`, resets `retryCount` to `0`, and sets `nextAttemptAt` to now. Returns **202**; a missing, published, or concurrently claimed row returns **404**. |
+
+Every retry writes `OUTBOX_DEAD_LETTER_RETRIED` to `audit_logs` with the prior
+error and retry count; the payload is never copied into the audit record. The
+retry only makes the event eligible for the next sweep — if
+`OUTBOX_WEBHOOK_URL`/`OUTBOX_WEBHOOK_SECRET` are unset, the dispatcher remains
+idle and the row stays pending.
 
 ### 4.5 Idempotency and ordering
 
@@ -190,6 +204,8 @@ Policy:
   attempt, error code; no payload, no PII, no secret;
 - the local e2e test asserts the receiver saw the signed body and that
   `publishedAt`/`deadAt`/`retryCount` match the delivery outcome;
+- dead-letter list/retry is available to ADMINs through the tenant-scoped API;
+  every retry is recorded in `audit_logs`;
 - counters (when a metrics backend exists): delivered, retried, dead;
 - `pnpm demo:doctor` does not yet assert outbox health; a dead-letter alert is
   a follow-up.
@@ -221,11 +237,18 @@ Policy:
 - [x] Max attempts set `deadAt` and produce an observable log.
 - [x] A published event is not redelivered by the next sweep; consumers must
       still deduplicate on `event.id` for the crash window.
-- [x] No payload or credential appears in logs.
+- [x] An ADMIN can list this tenant's dead letters and requeue one; teachers get
+      **403**, anonymous callers get **401**, and a cross-tenant/non-dead event
+      is not visible.
+- [x] A dead-letter retry resets the retry budget and writes an audit row
+      without the payload.
+- [x] No payload or credential appears in logs or admin responses.
 - [ ] A real payment/refund event is delivered to an external target.
 - [x] `pnpm build`, API tests, web tests, RLS e2e, and the local outbox e2e pass;
-      live smoke **8/8** and `pnpm demo:doctor` **10/10** passed on 22 November
-      2026 after the release commit and Vercel redeploy.
+      API **412/412** (45 suites), outbox e2e **5/5**, RLS **5/5**, live smoke
+      **8/8**, and `pnpm demo:doctor` **10/10** passed on 22 November 2026 after
+      the dead-letter admin release. The API is local, so no Vercel redeploy was
+      required for this release.
 
 ## 7. Non-goals
 
@@ -241,8 +264,10 @@ Policy:
    service, teacher webhook, or an operations sink)? Phase 1 exposes one generic
    `OUTBOX_WEBHOOK_URL`; a real target is still pending.
 2. Whether per-tenant endpoints are needed before the judging deadline.
-3. Whether a dead-letter retry/admin endpoint is needed before the deadline.
+3. Whether a dead-letter UI is needed; the ADMIN-only API is implemented, but
+   there is no screen yet.
 
 The correct current claim is: **outbox delivery is implemented locally,
-disabled by default, and proven against a local sink; external delivery is not
-yet proven.**
+disabled by default, and proven against a local sink; a tenant-scoped,
+ADMIN-only dead-letter list/retry API exists; external delivery is not yet
+proven.**

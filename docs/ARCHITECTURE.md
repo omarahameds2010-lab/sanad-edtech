@@ -55,7 +55,7 @@ flowchart TB
 | `video` | Video records, provider abstraction, YouTube attach, upload/signing |
 | `video-protection` | Signed playback tokens, watermark engine, playback sessions |
 | `audit` | Audit and security event writes |
-| `outbox` | Transactional event rows, tenant-scoped sweep, HMAC HTTP transport, retry/backoff and dead-letter state (opt-in) |
+| `outbox` | Transactional event rows, tenant-scoped sweep, HMAC HTTP transport, retry/backoff and dead-letter state (opt-in); ADMIN-only dead-letter list/retry API |
 | `analytics` | Tenant-scoped teacher overview: enrollment trend, course completion, assessment averages, pending grading, recent activity; plan-aware history window |
 
 The `courses` module contains subfolders for assignments, exams, lessons, resources, enrollments, progress, and progression; they are not separate top-level Nest modules.
@@ -257,9 +257,9 @@ Vercel fail-safes:
 ## 11. Known architectural gaps
 
 1. Hosted RLS activation (local is active; the retired Railway runtime was not migrated).
-2. External outbox delivery — Phase 1 is implemented locally and disabled by default; only a local HTTP-sink proof exists. See [`OUTBOX-DELIVERY.md`](OUTBOX-DELIVERY.md).
+2. External outbox delivery — Phase 1 is implemented locally and disabled by default; only a local HTTP-sink proof exists. Dead letters can be listed and requeued through the ADMIN-only API, but there is no dead-letter UI or alert. See [`OUTBOX-DELIVERY.md`](OUTBOX-DELIVERY.md).
 3. Real-provider video webhook verification (route exists and is unit-tested; no Bunny library/key configured).
-4. Remaining background workers (the `exam-expiry` worker and opt-in `outbox-dispatch` sweep exist; no reconciliation or dead-letter administration worker).
+4. Remaining background workers (the `exam-expiry` worker and opt-in `outbox-dispatch` sweep exist; no reconciliation worker).
 5. Persisted word-level review evidence.
 6. Provider sandbox verification.
 7. Reconciliation worker.

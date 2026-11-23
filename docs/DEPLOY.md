@@ -1,7 +1,7 @@
 # Deployment Runbook — Vercel + local demo API
 
 > **Current demo:** web on Vercel; API and PostgreSQL on the demo laptop, exposed through a Cloudflare quick tunnel. The Railway API endpoint returns `404 Application not found` and is retired.
-> **Verified 22 November 2026:** local runtime connects as `app_user` with RLS active; new code `DATABASE_URL` only; API **404/404** (44 suites), web **159/159**, build **4/4**, RLS e2e **5/5**, outbox local-sink e2e **4/4**, live smoke **8/8**, demo doctor **10/10**. Migration chain is **9/9**. The teacher analytics endpoint is tenant-scoped and plan-capped; `/teacher/analytics` is a real page. The server-side exam-expiry Bull worker is live-proven, rate-limit counters are shared through Redis, and outbox delivery Phase 1 is implemented but disabled by default (no external target configured).
+> **Verified 22 November 2026:** local runtime connects as `app_user` with RLS active; new code `DATABASE_URL` only; API **412/412** (45 suites), web **159/159**, build **4/4**, RLS e2e **5/5**, outbox local-sink e2e **5/5**, live smoke **8/8**, demo doctor **10/10**. Migration chain is **9/9**. The teacher analytics endpoint is tenant-scoped and plan-capped; `/teacher/analytics` is a real page. The server-side exam-expiry Bull worker is live-proven, rate-limit counters are shared through Redis, and outbox delivery Phase 1 is implemented but disabled by default (no external target configured); its ADMIN-only dead-letter list/retry API is tenant-scoped and audited.
 > Canonical state: [`CURRENT-STATE.md`](CURRENT-STATE.md).
 
 ## 0. Topology
@@ -40,7 +40,7 @@ Browser
    pnpm build
    ```
 
-   Current expected evidence on `main`: **159/159 web**, **404/404 API** (44 suites), **4/4 build**, RLS e2e **5/5**, outbox local-sink e2e **4/4**. Local migration chain is **9/9**. The 28 October release passed the retake, concurrent-start, teacher-queue, and lock-card smokes; the 20 November release adds the outbox sweep without changing payment behavior.
+   Current expected evidence on `main`: **159/159 web**, **412/412 API** (45 suites), **4/4 build**, RLS e2e **5/5**, outbox local-sink e2e **5/5**. Local migration chain is **9/9**. The 28 October release passed the retake, concurrent-start, teacher-queue, and lock-card smokes; the 20 November release adds the outbox sweep without changing payment behavior; the 22 November dead-letter admin API is read/requeue only and does not change delivery or payment behavior.
 
 3. Do not commit `.env`, logs, or generated scratch files.
 
@@ -346,9 +346,21 @@ $env:RLS_APP_URL="postgresql://app_user:app_user_password@127.0.0.1:5432/learnin
 pnpm exec jest --config test/jest-e2e.json --runInBand outbox-delivery
 ```
 
-Expected: **4/4**. To disable delivery again, remove both variables and restart
+Expected: **5/5**. To disable delivery again, remove both variables and restart
 the API. Do not claim external delivery until a real receiver has recorded the
 signed request and the resulting `publishedAt`.
+
+ADMIN-only dead-letter operations (the response omits payloads):
+
+```text
+GET  /api/v1/admin/outbox/dead-letters?limit=50
+POST /api/v1/admin/outbox/dead-letters/:eventId/retry   -> 202
+```
+
+A retry clears `deadAt`/`lastError`, resets `retryCount` to `0`, sets
+`nextAttemptAt` to now, and writes `OUTBOX_DEAD_LETTER_RETRIED` to `audit_logs`.
+It only makes the row eligible for the next sweep; if delivery is disabled, the
+row remains pending. A teacher token gets **403** and an anonymous caller **401**.
 
 ## 6. Demo verification checklist
 
@@ -370,16 +382,16 @@ signed request and the resulting `publishedAt`.
 | Teacher grading queue | excludes `IN_PROGRESS`; shows both submitted attempts |
 | Locked assignment | **403 `LESSON_LOCKED`**; lock card in dark and light with no overflow |
 | Outbox (disabled default) | API boots, scheduler logs the sweep, dispatcher logs idle when URL/secret are absent; no outbox rows are consumed |
-| Outbox local sink | `OUTBOX_E2E=1` + `RLS_ADMIN_URL` + `RLS_APP_URL` → **4/4** |
+| Outbox local sink | `OUTBOX_E2E=1` + `RLS_ADMIN_URL` + `RLS_APP_URL` → **5/5** |
 | Demo doctor | `pnpm demo:doctor` → **10/10** |
 | Logout → refresh | **401**, `/student` redirected to login |
 
 ## 7. Known deployment gaps
 
 - Hosted RLS activation: local runtime is active, but the Railway endpoint is retired and was never migrated (section 5).
-- Outbox delivery is Phase 1 and local-only: the sweep, HMAC transport, retry, and dead-letter state exist and passed a local sink **4/4**, but no external receiver is configured. See [`OUTBOX-DELIVERY.md`](OUTBOX-DELIVERY.md).
+- Outbox delivery is Phase 1 and local-only: the sweep, HMAC transport, retry, and dead-letter state exist and passed a local sink **5/5**, but no external receiver is configured. Dead letters can be listed and requeued through the ADMIN-only API; there is no dead-letter UI or alert. See [`OUTBOX-DELIVERY.md`](OUTBOX-DELIVERY.md).
 - Real Bunny webhook round trip (route exists and is unit-tested; no Bunny library/key is configured in the demo).
-- Bull runs `exam-expiry` and the opt-in `outbox-dispatch` sweep; there is no reconciliation worker or dead-letter administration route. Redis must be running for the delayed expiry and the sweep; if it is unavailable, exam start still succeeds and the client timer remains the fallback.
+- Bull runs `exam-expiry` and the opt-in `outbox-dispatch` sweep; there is no reconciliation worker. Redis must be running for the delayed expiry and the sweep; if it is unavailable, exam start still succeeds and the client timer remains the fallback.
 - Rate-limit counters are Redis-shared. A Redis outage falls back to per-instance memory, and forwarded client IPs remain a best-effort key outside a trusted proxy edge.
 - Railway auto-deploy: the service is retired; the 28 October deploy was manual with `railway up`.
 - Real provider sandbox transaction not yet recorded.

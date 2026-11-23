@@ -1,7 +1,10 @@
 import { createHmac } from "node:crypto";
 import { createServer, type IncomingMessage, type Server } from "node:http";
 import { PrismaClient } from "@prisma/client";
+import { runWithTenantId } from "../src/common/prisma/tenant-context";
+import { AuditService } from "../src/modules/audit/audit.service";
 import { HttpOutboxTransport } from "../src/modules/outbox/http-outbox.transport";
+import { OutboxAdminService } from "../src/modules/outbox/outbox-admin.service";
 import { OutboxDispatcherService } from "../src/modules/outbox/outbox-dispatcher.service";
 import { OutboxService } from "../src/modules/outbox/outbox.service";
 import { PrismaService } from "../src/modules/tenants/prisma.service";
@@ -32,6 +35,7 @@ describeOutbox("Outbox delivery (real DB + local HTTP sink)", () => {
   let appPrisma: PrismaService;
   let outbox: OutboxService;
   let dispatcher: OutboxDispatcherService;
+  let adminService: OutboxAdminService;
   let server: Server;
   let sinkUrl: string;
   let tenantId: string;
@@ -77,10 +81,12 @@ describeOutbox("Outbox delivery (real DB + local HTTP sink)", () => {
       outbox,
       new HttpOutboxTransport(),
     );
+    adminService = new OutboxAdminService(appPrisma, new AuditService(appPrisma));
   }, 30_000);
 
   afterEach(async () => {
     await admin.outboxEvent.deleteMany({ where: { tenantId } });
+    await admin.auditLog.deleteMany({ where: { tenantId } });
     requests.length = 0;
     sinkMode = "ok";
   });
@@ -88,6 +94,7 @@ describeOutbox("Outbox delivery (real DB + local HTTP sink)", () => {
   afterAll(async () => {
     if (admin && tenantId) {
       await admin.outboxEvent.deleteMany({ where: { tenantId } });
+      await admin.auditLog.deleteMany({ where: { tenantId } });
       await admin.tenant.deleteMany({ where: { id: tenantId } });
     }
     await appPrisma?.onModuleDestroy();
@@ -192,6 +199,42 @@ describeOutbox("Outbox delivery (real DB + local HTTP sink)", () => {
     expect(stored.publishedAt).toBeNull();
     expect(stored.deadAt).not.toBeNull();
     expect(stored.lastError).toBe("http-400");
+  });
+
+  it("lists and requeues a dead letter through the admin service", async () => {
+    const id = eventId();
+    await insertEvent(id);
+    sinkMode = "400";
+
+    await dispatcher.sweep();
+
+    const listed = await runWithTenantId(tenantId, () =>
+      adminService.listDeadLetters(tenantId),
+    );
+    expect(listed.total).toBe(1);
+    expect(listed.items[0]).toMatchObject({
+      id,
+      eventType: "e2e.outbox.test",
+      retryCount: 1,
+      lastError: "http-400",
+    });
+    expect(listed.items[0]).not.toHaveProperty("payload");
+
+    const retried = await runWithTenantId(tenantId, () =>
+      adminService.retryDeadLetter(tenantId, id),
+    );
+    expect(retried).toMatchObject({ id, requeued: true });
+
+    const stored = await admin.outboxEvent.findUniqueOrThrow({ where: { id } });
+    expect(stored.deadAt).toBeNull();
+    expect(stored.retryCount).toBe(0);
+    expect(stored.lastError).toBeNull();
+    expect(stored.nextAttemptAt).not.toBeNull();
+
+    const audit = await admin.auditLog.findFirst({
+      where: { tenantId, resourceId: id },
+    });
+    expect(audit?.action).toBe("OUTBOX_DEAD_LETTER_RETRIED");
   });
 
   it("does not redeliver an already-published event", async () => {

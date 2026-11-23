@@ -5,6 +5,7 @@ import {
   TeacherLessonsController,
 } from "../courses/courses.controller";
 import { LessonsController } from "../courses/lessons/lessons.controller";
+import { OutboxAdminController } from "../outbox/outbox-admin.controller";
 
 function permission(handler: Function) {
   return Reflect.getMetadata(AUTHZ_OPTIONS_KEY, handler);
@@ -72,6 +73,21 @@ describe("authoring route permissions", () => {
     ).toMatchObject({
       action: "read",
       resourceType: "assignment",
+    });
+  });
+
+  it("keeps outbox dead-letter reads and retries behind the outbox resource", () => {
+    expect(
+      permission(OutboxAdminController.prototype.listDeadLetters),
+    ).toMatchObject({
+      action: "read",
+      resourceType: "outbox",
+    });
+    expect(
+      permission(OutboxAdminController.prototype.retryDeadLetter),
+    ).toMatchObject({
+      action: "manage",
+      resourceType: "outbox",
     });
   });
 });

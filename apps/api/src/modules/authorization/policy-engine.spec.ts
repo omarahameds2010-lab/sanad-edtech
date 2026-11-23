@@ -204,4 +204,28 @@ describe("PolicyEngine (student loop)", () => {
     );
     expect(decision.allowed).toBe(false);
   });
+
+  it("allows an admin to read and manage outbox dead letters", async () => {
+    await expect(
+      engine.can({ ...student, role: "ADMIN" }, "read", "outbox"),
+    ).resolves.toMatchObject({ allowed: true });
+    await expect(
+      engine.can({ ...student, role: "ADMIN" }, "manage", "outbox"),
+    ).resolves.toMatchObject({ allowed: true });
+  });
+
+  it("denies outbox access to teachers and students", async () => {
+    await expect(
+      engine.can({ ...student, role: "TEACHER" }, "read", "outbox"),
+    ).resolves.toMatchObject({
+      allowed: false,
+      reason: "INSUFFICIENT_PERMISSIONS",
+    });
+    await expect(
+      engine.can(student, "manage", "outbox"),
+    ).resolves.toMatchObject({
+      allowed: false,
+      reason: "INSUFFICIENT_PERMISSIONS",
+    });
+  });
 });

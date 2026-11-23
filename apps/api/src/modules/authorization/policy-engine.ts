@@ -22,7 +22,8 @@ export type ResourceType =
   | "notification"
   | "analytics"
   | "settings"
-  | "section";
+  | "section"
+  | "outbox";
 
 export type Action =
   | "create"
@@ -274,6 +275,9 @@ export class PolicyEngine {
         notification: ["create", "read", "manage"],
         analytics: ["read", "export", "manage"],
         settings: ["read", "update", "manage"],
+        // Dead-letter administration is an operator action. It is deliberately
+        // ADMIN-only; teachers must never see another tenant's event metadata.
+        outbox: ["read", "manage"],
       },
       TEACHER: {
         course: ["create", "read", "update", "publish", "unpublish"],
@@ -312,6 +316,7 @@ export class PolicyEngine {
         notification: ["create", "read"],
         analytics: ["read"],
         settings: ["read", "update"],
+        outbox: [],
       },
       STUDENT: {
         course: ["read"],
@@ -337,6 +342,7 @@ export class PolicyEngine {
         notification: ["read"],
         analytics: [],
         settings: ["read", "update"],
+        outbox: [],
       },
       PARENT: {
         course: ["read"],
@@ -360,6 +366,7 @@ export class PolicyEngine {
         notification: ["read"],
         analytics: ["read"],
         settings: ["read"],
+        outbox: [],
       },
     };
 
