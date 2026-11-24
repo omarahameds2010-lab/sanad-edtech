@@ -284,7 +284,7 @@ receiver should treat it as a notification, not the source of truth.
 - [ ] A real payment/refund event is delivered to an external target.
 - [x] `pnpm build`, API tests, web tests, RLS e2e, and the local outbox e2e pass;
       API **416/416** (46 suites), outbox e2e **5/5**, RLS **5/5**, live smoke
-      **8/8**, and `pnpm demo:doctor` **10/10** passed on 22-23 November 2026
+      **8/8**, and `pnpm demo:doctor` **10/10** passed on 22-24 November 2026
       after the dead-letter admin and alerting releases. The API is local, so no
       Vercel redeploy was required for the API change.
 

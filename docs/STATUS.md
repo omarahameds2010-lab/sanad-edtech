@@ -2,7 +2,7 @@
 
 > Canonical detail lives in [`CURRENT-STATE.md`](CURRENT-STATE.md). This page is the short dashboard: what is live, what is proven, and what is still missing.
 >
-> Re-verified 23-24 November 2026 after the quick tunnel changed: live smoke **8/8** and `pnpm demo:doctor` **10/10** on 23 November; the fallback was re-synced on 24 November after the alerting release.
+> Re-verified 23-24 November 2026 after the quick tunnel changed: live smoke **8/8** and `pnpm demo:doctor` **10/10** on both days; the fallback was re-synced on 24 November after the alerting release.
 
 ## Release
 
@@ -32,7 +32,7 @@
 | Web tests | **159/159**, 12 files; re-run 22 Nov 2026 | `pnpm --filter web test` |
 | Monorepo build | **4/4** successful; re-run 22 Nov 2026 after the dead-letter admin work | `pnpm build` |
 | RLS runtime activation | **passed 16 Nov 2026**: `app_user` (no SUPERUSER/BYPASSRLS); startup log `DB runtime role: app_user (superuser=off)`; health 200 | Local compiled API |
-| RLS isolation proof | **5/5 passed 16 Nov 2026**, re-run **5/5 on 20 Nov 2026** after migration #9: scoped SELECT; cross-tenant UPDATE/DELETE = 0 rows; cross-tenant INSERT rejected; empty context = 0 rows | `jest --config ./test/jest-e2e.json --runInBand rls-isolation` |
+| RLS isolation proof | **5/5 passed 16 Nov 2026**, re-run **5/5 on 20 Nov 2026** after migration #9, **5/5 on 22 Nov** after the dead-letter admin API, and **5/5 on 23 Nov** after alerting: scoped SELECT; cross-tenant UPDATE/DELETE = 0 rows; cross-tenant INSERT rejected; empty context = 0 rows | `jest --config ./test/jest-e2e.json --runInBand rls-isolation` |
 | Voucher checkout under RLS | **passed 16 Nov 2026**: order for `arabic-3-prep`, `SANAD-2026` → `success: true`, one ACTIVE paid enrollment; reset restored the clean state | Local HTTP flow through the API |
 | Signed Paymob webhook under RLS | **passed 16 Nov 2026**: HMAC-SHA512 callback → async event PROCESSED with tenant ID; order CONFIRMED, intent SUCCEEDED, payment PAID, 2 ledger rows, enrollment created; reset restored the clean state | Local signed webhook + DB checks |
 | Video webhook route | **6/6 unit tests**: raw-body HMAC before parsing, tenant-scoped lookup, transactional video update + outbox, stale/replayed callback handling, malformed body rejection; route is CSRF-exempt like payment webhooks. No real Bunny library/key in the demo. | `video.service.spec.ts` |
@@ -153,5 +153,6 @@ Production retake smoke passed **31/31**; the demo assignment is set to `maxAtte
 | 2026-11-22 | Outbox docs pushed (`3a51338`, `97ef5ad`); the quick tunnel changed again and the watchdog synced `d633bd1`; Vercel redeployed, live health 200, authenticated smoke 8/8. The watchdog process was found stopped during final verification and was restarted from the Startup entry; demo doctor then passed 10/10. |
 | 2026-11-22 | Outbox dead-letter admin API: ADMIN-only `GET /api/v1/admin/outbox/dead-letters` and `POST .../:eventId/retry`, tenant-scoped under RLS, payload omitted, CAS requeue, audit log. API 412/412 (45 suites), outbox e2e 5/5, RLS 5/5, web 159/159, build 4/4; live teacher **403**/anonymous **401**; smoke 8/8 and doctor 10/10. |
 | 2026-11-23 | Quick tunnel changed; watchdog synced fallback `f50bc35`, Vercel redeployed, live smoke 8/8 and doctor 10/10. Optional payload-free dead-letter alert webhook: separate `OUTBOX_ALERT_WEBHOOK_URL` + `OUTBOX_ALERT_WEBHOOK_SECRET`, HMAC-signed body with no payload/PII, best-effort delivery. API 416/416 (46 suites), outbox e2e 5/5 including the alert, web 159/159, build 4/4; external delivery and external alerting remain unproven. |
+| 2026-11-24 | Quick tunnel restarted to `surgical-mask-arrangements-trivia`; fallback updated in the alerting release, Vercel redeployed, live health 200, authenticated smoke 8/8, doctor 10/10, and the live dead-letter route re-checked 403 teacher / 401 anonymous. |
 
 Historical audit: [`AUDIT-2026-10-16.md`](AUDIT-2026-10-16.md). It is preserved as a dated snapshot, not rewritten.

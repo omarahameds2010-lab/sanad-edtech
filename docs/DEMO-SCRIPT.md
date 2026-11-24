@@ -170,7 +170,7 @@ Do not claim every provider is live.
 | Migrations 9/9 | Verified on the local Docker database |
 | Assignment retakes live | Yes — production smoke 31/31 (historical Railway deploy); local retake behavior intact |
 | Rate limiting + lock enforcement live | Yes - local API; limits are Redis-shared with per-instance fallback |
-| RLS enforced | **Yes locally** — runtime connects as `app_user`; 5/5 isolation proof re-run 23 Nov 2026; hosted Railway retired and not migrated |
+| RLS enforced | **Yes locally** — runtime connects as `app_user`; 5/5 isolation proof re-run 23 Nov 2026; hosted Railway retired and not migrated. Live smoke 8/8 and doctor 10/10 re-ran 24 Nov 2026. |
 | Outbox delivered | **Local sink only** - Phase 1 dispatcher passed 5/5 against a local receiver, including ADMIN dead-letter list/retry under RLS and the optional payload-free HMAC alert; disabled by default; no external target |
 | Video webhook | **Route implemented + unit-tested** — no real Bunny callback yet |
 | Paymob/Fawry sandbox charge | **Not yet verified** |
