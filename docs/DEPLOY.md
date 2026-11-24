@@ -1,7 +1,7 @@
 # Deployment Runbook — Vercel + local demo API
 
 > **Current demo:** web on Vercel; API and PostgreSQL on the demo laptop, exposed through a Cloudflare quick tunnel. The Railway API endpoint returns `404 Application not found` and is retired.
-> **Verified 22-23 November 2026:** local runtime connects as `app_user` with RLS active; new code `DATABASE_URL` only; API **412/412** (45 suites), web **159/159**, build **4/4**, RLS e2e **5/5**, outbox local-sink e2e **5/5**, live smoke **8/8**, demo doctor **10/10**. Live smoke and doctor were re-run on 23 November after the quick tunnel changed and the fallback sync redeployed Vercel. Migration chain is **9/9**. The teacher analytics endpoint is tenant-scoped and plan-capped; `/teacher/analytics` is a real page. The server-side exam-expiry Bull worker is live-proven, rate-limit counters are shared through Redis, and outbox delivery Phase 1 is implemented but disabled by default (no external target configured); its ADMIN-only dead-letter list/retry API is tenant-scoped and audited.
+> **Verified 22-24 November 2026:** local runtime connects as `app_user` with RLS active; new code `DATABASE_URL` only; API **416/416** (46 suites), web **159/159**, build **4/4**, RLS e2e **5/5**, outbox local-sink e2e **5/5**, live smoke **8/8**, demo doctor **10/10**. Live smoke and doctor were re-run on 23 November after the quick tunnel changed and the fallback sync redeployed Vercel. Migration chain is **9/9**. The teacher analytics endpoint is tenant-scoped and plan-capped; `/teacher/analytics` is a real page. The server-side exam-expiry Bull worker is live-proven, rate-limit counters are shared through Redis, and outbox delivery Phase 1 is implemented but disabled by default (no external target configured); its ADMIN-only dead-letter list/retry API is tenant-scoped and audited, and the optional payload-free dead-letter alert webhook is local-sink-proven only.
 > Canonical state: [`CURRENT-STATE.md`](CURRENT-STATE.md).
 
 ## 0. Topology
@@ -40,7 +40,7 @@ Browser
    pnpm build
    ```
 
-   Current expected evidence on `main`: **159/159 web**, **412/412 API** (45 suites), **4/4 build**, RLS e2e **5/5**, outbox local-sink e2e **5/5**. Local migration chain is **9/9**. The 28 October release passed the retake, concurrent-start, teacher-queue, and lock-card smokes; the 20 November release adds the outbox sweep without changing payment behavior; the 22 November dead-letter admin API is read/requeue only and does not change delivery or payment behavior.
+   Current expected evidence on `main`: **159/159 web**, **416/416 API** (46 suites), **4/4 build**, RLS e2e **5/5**, outbox local-sink e2e **5/5** including the alert. Local migration chain is **9/9**. The 28 October release passed the retake, concurrent-start, teacher-queue, and lock-card smokes; the 20 November release adds the outbox sweep without changing payment behavior; the 22 November dead-letter admin API is read/requeue only and does not change delivery or payment behavior; the 23 November alerter is best-effort and does not alter delivery state.
 
 3. Do not commit `.env`, logs, or generated scratch files.
 
@@ -119,10 +119,20 @@ OUTBOX_WEBHOOK_TIMEOUT_MS=10000
 OUTBOX_BACKOFF_MS=30000
 ```
 
-The receiver must verify `X-SANAD-Signature` as
+Optional dead-letter alerting is independent and stays idle unless **both** are
+set:
+
+```text
+OUTBOX_ALERT_WEBHOOK_URL=https://alerts.example.com/sanad/outbox
+OUTBOX_ALERT_WEBHOOK_SECRET=<random-alert-secret>
+```
+
+The delivery receiver must verify `X-SANAD-Signature` as
 `sha256=HMAC-SHA256(timestamp + "." + rawBody, OUTBOX_WEBHOOK_SECRET)`, reject
-stale `X-SANAD-Timestamp` values, and deduplicate on `X-SANAD-Event-Id`. Do not
-put the secret in a URL or log it.
+stale `X-SANAD-Timestamp` values, and deduplicate on `X-SANAD-Event-Id`. The
+alert receiver verifies the same construction with `OUTBOX_ALERT_WEBHOOK_SECRET`,
+using `X-SANAD-Signature` and `X-SANAD-Timestamp`; the alert body is payload-free.
+Do not put either secret in a URL or log it.
 
 > `ALLOWED_ORIGINS` must be the exact ASCII origin. Invisible Unicode marks survive `.trim()` and break exact matching. If browser login fails with 403 while curl works, delete and re-paste the value.
 
@@ -324,12 +334,15 @@ RLS being inactive on a host is a known gap, not a reason to claim hosted isolat
 
 The `outbox-dispatch` sweep is idle unless both variables are set. With no
 receiver configured, events remain unpublished; that is the safe default for
-the demo.
+the demo. The alerter has its own pair and is independent of delivery.
 
 ```powershell
 $env:OUTBOX_WEBHOOK_URL="https://receiver.example.com/sanad/outbox"
 $env:OUTBOX_WEBHOOK_SECRET="<random-secret>"
-# restart the API so the transport reads the environment
+# optional: payload-free dead-letter notice
+$env:OUTBOX_ALERT_WEBHOOK_URL="https://alerts.example.com/sanad/outbox"
+$env:OUTBOX_ALERT_WEBHOOK_SECRET="<random-alert-secret>"
+# restart the API so the transport and alerter read the environment
 ```
 
 The receiver must verify `X-SANAD-Signature` over
@@ -346,9 +359,11 @@ $env:RLS_APP_URL="postgresql://app_user:app_user_password@127.0.0.1:5432/learnin
 pnpm exec jest --config test/jest-e2e.json --runInBand outbox-delivery
 ```
 
-Expected: **5/5**. To disable delivery again, remove both variables and restart
-the API. Do not claim external delivery until a real receiver has recorded the
-signed request and the resulting `publishedAt`.
+Expected: **5/5**, including the payload-free HMAC alert on the forced
+dead-letter. To disable delivery again, remove both delivery variables and
+restart the API; remove both alert variables to disable alerting. Do not claim
+external delivery or external alerting until a real receiver has recorded the
+signed request and the resulting `publishedAt` / alert.
 
 ADMIN-only dead-letter operations (the response omits payloads):
 
@@ -389,7 +404,7 @@ row remains pending. A teacher token gets **403** and an anonymous caller **401*
 ## 7. Known deployment gaps
 
 - Hosted RLS activation: local runtime is active, but the Railway endpoint is retired and was never migrated (section 5).
-- Outbox delivery is Phase 1 and local-only: the sweep, HMAC transport, retry, and dead-letter state exist and passed a local sink **5/5**, but no external receiver is configured. Dead letters can be listed and requeued through the ADMIN-only API; there is no dead-letter UI or alert. See [`OUTBOX-DELIVERY.md`](OUTBOX-DELIVERY.md).
+- Outbox delivery is Phase 1 and local-only: the sweep, HMAC transport, retry, and dead-letter state exist and passed a local sink **5/5**, but no external receiver is configured. Dead letters can be listed and requeued through the ADMIN-only API; the optional payload-free HMAC alert webhook is implemented and local-sink-proven. There is no dead-letter UI. See [`OUTBOX-DELIVERY.md`](OUTBOX-DELIVERY.md).
 - Real Bunny webhook round trip (route exists and is unit-tested; no Bunny library/key is configured in the demo).
 - Bull runs `exam-expiry` and the opt-in `outbox-dispatch` sweep; there is no reconciliation worker. Redis must be running for the delayed expiry and the sweep; if it is unavailable, exam start still succeeds and the client timer remains the fallback.
 - Rate-limit counters are Redis-shared. A Redis outage falls back to per-instance memory, and forwarded client IPs remain a best-effort key outside a trusted proxy edge.

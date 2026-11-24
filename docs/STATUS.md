@@ -1,8 +1,8 @@
-# Status — 23 November 2026
+# Status — 24 November 2026
 
 > Canonical detail lives in [`CURRENT-STATE.md`](CURRENT-STATE.md). This page is the short dashboard: what is live, what is proven, and what is still missing.
 >
-> Re-verified 23 November 2026 after the quick tunnel changed: live smoke **8/8** and `pnpm demo:doctor` **10/10**.
+> Re-verified 23-24 November 2026 after the quick tunnel changed: live smoke **8/8** and `pnpm demo:doctor` **10/10** on 23 November; the fallback was re-synced on 24 November after the alerting release.
 
 ## Release
 
@@ -10,12 +10,12 @@
 | --- | --- |
 | Production branch | `main` |
 | Web runtime code | Sprint 2 paid checkout (`aa4d2bc`) + tunnel fallback sync (`1fbc7e8`) + UTF-8 comment cleanup (`7ca1ed3`) + teacher analytics (`665ecc2`) + latest fallback syncs (`0fffd90`, `2333c2e`, `d633bd1`, `f50bc35`) — 15–23 November 2026 |
-| API runtime | Local compiled NestJS API on `:3002`; runtime `DATABASE_URL` = non-owner `app_user`; RLS active locally; tenant-scoped `exam-expiry` Bull worker, opt-in `outbox-dispatch` sweep with ADMIN-only dead-letter list/retry API, and Redis-backed shared rate-limit counters active |
+| API runtime | Local compiled NestJS API on `:3002`; runtime `DATABASE_URL` = non-owner `app_user`; RLS active locally; tenant-scoped `exam-expiry` Bull worker, opt-in `outbox-dispatch` sweep with ADMIN-only dead-letter list/retry API and optional payload-free dead-letter alerting, and Redis-backed shared rate-limit counters active |
 | Demo launcher | `scripts/demo/start.ps1`; Windows Startup entry installed with `-Tunnel cloudflared -Watch -SyncFallback`; healthy API/tunnel are reused |
 | Hardening / retakes | **Live** — Redis-backed rate limiting, lock enforcement, authoring-read fixes, and assignment retakes |
 | Sprint 2 paid checkout | **Implemented, deployed, and live-verified** — `402` paid-course guard, atomic enrollment, voucher checkout |
 | Web | <https://sanad-edtech.vercel.app> |
-| API public origin | The current fallback in `apps/web/next.config.mjs` (<https://inclusion-barely-taste-screens.trycloudflare.com>) - quick tunnel; changes on restart |
+| API public origin | The current fallback in `apps/web/next.config.mjs` (<https://surgical-mask-arrangements-trivia.trycloudflare.com>) - quick tunnel; changes on restart |
 | Health | `/api/health` → **200**, database **up** |
 | Login page | **200** |
 | Demo tenant | `sanad-demo` |
@@ -28,7 +28,7 @@
 
 | Check | Result | Command |
 | --- | --- | --- |
-| API tests on Sprint 2 + RLS activation + video webhook + teacher analytics + exam-expiry worker + Redis throttler + outbox delivery + dead-letter admin | **412/412**, 45 suites; re-run 22 Nov 2026 | `pnpm --filter api exec jest --config jest.config.js --runInBand` |
+| API tests on Sprint 2 + RLS activation + video webhook + teacher analytics + exam-expiry worker + Redis throttler + outbox delivery + dead-letter admin + alerting | **416/416**, 46 suites; re-run 23 Nov 2026 | `pnpm --filter api exec jest --config jest.config.js --runInBand` |
 | Web tests | **159/159**, 12 files; re-run 22 Nov 2026 | `pnpm --filter web test` |
 | Monorepo build | **4/4** successful; re-run 22 Nov 2026 after the dead-letter admin work | `pnpm build` |
 | RLS runtime activation | **passed 16 Nov 2026**: `app_user` (no SUPERUSER/BYPASSRLS); startup log `DB runtime role: app_user (superuser=off)`; health 200 | Local compiled API |
@@ -117,8 +117,8 @@ Production retake smoke passed **31/31**; the demo assignment is set to `maxAtte
 ## What is not a current claim
 
 - RLS is active on the local demo runtime (`app_user`); the retired Railway runtime is not migrated, so do not claim hosted RLS enforcement.
-- The transactional outbox is Phase 1 and local-only; it is disabled unless both `OUTBOX_WEBHOOK_URL` and `OUTBOX_WEBHOOK_SECRET` are set. Only a local HTTP-sink proof exists; external delivery is not live-proven.
-- Two Bull processors exist (`exam-expiry` and the opt-in `outbox-dispatch` sweep); there is no reconciliation worker. Dead letters can be listed and requeued through the ADMIN-only API, but there is no dead-letter UI or alert.
+- The transactional outbox is Phase 1 and local-only; it is disabled unless both `OUTBOX_WEBHOOK_URL` and `OUTBOX_WEBHOOK_SECRET` are set. Only a local HTTP-sink proof exists; external delivery is not live-proven. The optional payload-free alert webhook has its own `OUTBOX_ALERT_WEBHOOK_URL` + `OUTBOX_ALERT_WEBHOOK_SECRET` pair and is local-sink-proven only.
+- Two Bull processors exist (`exam-expiry` and the opt-in `outbox-dispatch` sweep); there is no reconciliation worker. Dead letters can be listed and requeued through the ADMIN-only API; the payload-free HMAC alert webhook is implemented, but there is no dead-letter UI or external alert target.
 - The video webhook route exists and is unit-tested; a real Bunny callback is not yet recorded.
 - Rate-limit counters are shared through Redis, but forwarded-header client IPs remain best-effort and are not an authorization boundary; during a Redis outage the fallback is per API instance.
 - Railway did not auto-deploy the 28 October API push; the API was deployed manually with `railway up`.
@@ -152,5 +152,6 @@ Production retake smoke passed **31/31**; the demo assignment is set to `maxAtte
 | 2026-11-20 | Outbox delivery Phase 1 (`fe56e64`): migration #9, tenant-ID directory, tenant-scoped Bull sweep, HMAC transport, retry/dead-letter; disabled by default without URL+secret. Local sink e2e 4/4; API 404/404 (44 suites), web 159/159, build 4/4, RLS e2e 5/5. Quick tunnel changed and fallback updated in the release. |
 | 2026-11-22 | Outbox docs pushed (`3a51338`, `97ef5ad`); the quick tunnel changed again and the watchdog synced `d633bd1`; Vercel redeployed, live health 200, authenticated smoke 8/8. The watchdog process was found stopped during final verification and was restarted from the Startup entry; demo doctor then passed 10/10. |
 | 2026-11-22 | Outbox dead-letter admin API: ADMIN-only `GET /api/v1/admin/outbox/dead-letters` and `POST .../:eventId/retry`, tenant-scoped under RLS, payload omitted, CAS requeue, audit log. API 412/412 (45 suites), outbox e2e 5/5, RLS 5/5, web 159/159, build 4/4; live teacher **403**/anonymous **401**; smoke 8/8 and doctor 10/10. |
+| 2026-11-23 | Quick tunnel changed; watchdog synced fallback `f50bc35`, Vercel redeployed, live smoke 8/8 and doctor 10/10. Optional payload-free dead-letter alert webhook: separate `OUTBOX_ALERT_WEBHOOK_URL` + `OUTBOX_ALERT_WEBHOOK_SECRET`, HMAC-signed body with no payload/PII, best-effort delivery. API 416/416 (46 suites), outbox e2e 5/5 including the alert, web 159/159, build 4/4; external delivery and external alerting remain unproven. |
 
 Historical audit: [`AUDIT-2026-10-16.md`](AUDIT-2026-10-16.md). It is preserved as a dated snapshot, not rewritten.

@@ -1,6 +1,9 @@
 import { Injectable, Logger } from "@nestjs/common";
 import type { OutboxEvent } from "@prisma/client";
-import { runWithTenantId, getTenantId } from "../../common/prisma/tenant-context";
+import {
+  runWithTenantId,
+  getTenantId,
+} from "../../common/prisma/tenant-context";
 import { PrismaService } from "../tenants/prisma.service";
 import {
   outboxBackoffMs,
@@ -10,6 +13,7 @@ import {
 } from "./outbox-delivery.constants";
 import { OutboxService } from "./outbox.service";
 import { HttpOutboxTransport } from "./http-outbox.transport";
+import { OutboxDeadLetterAlerter } from "./outbox-dead-letter-alerter";
 import type { OutboxEnvelope } from "./outbox.types";
 
 export interface OutboxSweepResult {
@@ -48,6 +52,7 @@ export class OutboxDispatcherService {
     private readonly prisma: PrismaService,
     private readonly outbox: OutboxService,
     private readonly transport: HttpOutboxTransport,
+    private readonly deadLetterAlerter: OutboxDeadLetterAlerter,
   ) {}
 
   async sweep(): Promise<OutboxSweepResult> {
@@ -104,7 +109,12 @@ export class OutboxDispatcherService {
       }
     }
 
-    if (result.delivered || result.retried || result.dead || result.failedTenants) {
+    if (
+      result.delivered ||
+      result.retried ||
+      result.dead ||
+      result.failedTenants
+    ) {
       this.logger.log(
         `Outbox sweep: tenants=${result.tenants} examined=${result.examined} delivered=${result.delivered} retried=${result.retried} dead=${result.dead} failedTenants=${result.failedTenants}`,
       );
@@ -164,6 +174,13 @@ export class OutboxDispatcherService {
         this.logger.warn(
           `Outbox event dead-lettered: tenant=${tenantId} event=${event.id} type=${event.eventType} attempt=${attempt} error=${error}`,
         );
+        await this.deadLetterAlerter.send({
+          tenantId,
+          eventId: event.id,
+          eventType: event.eventType,
+          attempt,
+          error,
+        });
         continue;
       }
 

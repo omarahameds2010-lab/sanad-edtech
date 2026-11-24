@@ -49,20 +49,20 @@ describe("OutboxDispatcherService", () => {
     }
   });
 
-  function build(overrides: {
-    tenants?: string[];
-    events?: any[];
-    transportEnabled?: boolean;
-    deliver?: jest.Mock;
-  } = {}) {
+  function build(
+    overrides: {
+      tenants?: string[];
+      events?: any[];
+      transportEnabled?: boolean;
+      deliver?: jest.Mock;
+    } = {},
+  ) {
     const prisma = {
-      $queryRaw: jest
-        .fn()
-        .mockResolvedValue(
-          (overrides.tenants ?? ["tenant-1"]).map((tenant_id) => ({
-            tenant_id,
-          })),
-        ),
+      $queryRaw: jest.fn().mockResolvedValue(
+        (overrides.tenants ?? ["tenant-1"]).map((tenant_id) => ({
+          tenant_id,
+        })),
+      ),
     } as any;
     const outbox = {
       getUnpublishedEvents: jest.fn().mockResolvedValue(overrides.events ?? []),
@@ -77,12 +77,21 @@ describe("OutboxDispatcherService", () => {
         overrides.deliver ??
         jest.fn().mockResolvedValue({ ok: true, retryable: false }),
     } as any;
+    const deadLetterAlerter = {
+      send: jest.fn().mockResolvedValue({ sent: true, skipped: false }),
+    } as any;
 
     return {
-      service: new OutboxDispatcherService(prisma, outbox, transport),
+      service: new OutboxDispatcherService(
+        prisma,
+        outbox,
+        transport,
+        deadLetterAlerter,
+      ),
       prisma,
       outbox,
       transport,
+      deadLetterAlerter,
     };
   }
 
@@ -126,7 +135,7 @@ describe("OutboxDispatcherService", () => {
       retryable: true,
       error: "http-500",
     });
-    const { service, outbox } = build({
+    const { service, outbox, deadLetterAlerter } = build({
       events: [makeEvent()],
       deliver,
     });
@@ -140,6 +149,7 @@ describe("OutboxDispatcherService", () => {
     expect(error).toBe("http-500");
     expect(nextAttemptAt.getTime()).toBeGreaterThanOrEqual(before + 29_000);
     expect(outbox.markAsDead).not.toHaveBeenCalled();
+    expect(deadLetterAlerter.send).not.toHaveBeenCalled();
   });
 
   it("marks a permanent failure as dead immediately", async () => {
@@ -148,7 +158,7 @@ describe("OutboxDispatcherService", () => {
       retryable: false,
       error: "http-400",
     });
-    const { service, outbox } = build({
+    const { service, outbox, deadLetterAlerter } = build({
       events: [makeEvent()],
       deliver,
     });
@@ -157,6 +167,13 @@ describe("OutboxDispatcherService", () => {
 
     expect(result).toEqual(expect.objectContaining({ retried: 0, dead: 1 }));
     expect(outbox.markAsDead).toHaveBeenCalledWith("event-1", "http-400");
+    expect(deadLetterAlerter.send).toHaveBeenCalledWith({
+      tenantId: "tenant-1",
+      eventId: "event-1",
+      eventType: "payment.paid",
+      attempt: 1,
+      error: "http-400",
+    });
   });
 
   it("marks retry exhaustion as dead", async () => {
@@ -165,7 +182,7 @@ describe("OutboxDispatcherService", () => {
       retryable: true,
       error: "http-503",
     });
-    const { service, outbox } = build({
+    const { service, outbox, deadLetterAlerter } = build({
       events: [makeEvent({ retryCount: 9 })],
       deliver,
     });
@@ -174,6 +191,13 @@ describe("OutboxDispatcherService", () => {
 
     expect(result).toEqual(expect.objectContaining({ retried: 0, dead: 1 }));
     expect(outbox.markAsDead).toHaveBeenCalledWith("event-1", "http-503");
+    expect(deadLetterAlerter.send).toHaveBeenCalledWith({
+      tenantId: "tenant-1",
+      eventId: "event-1",
+      eventType: "payment.paid",
+      attempt: 10,
+      error: "http-503",
+    });
   });
 
   it("skips dead, already-published, and backoff-delayed rows", async () => {
@@ -191,7 +215,12 @@ describe("OutboxDispatcherService", () => {
     const result = await service.sweep();
 
     expect(result).toEqual(
-      expect.objectContaining({ examined: 0, delivered: 0, retried: 0, dead: 0 }),
+      expect.objectContaining({
+        examined: 0,
+        delivered: 0,
+        retried: 0,
+        dead: 0,
+      }),
     );
     expect(outbox.markAsPublished).not.toHaveBeenCalled();
   });

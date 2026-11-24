@@ -1,14 +1,18 @@
 # Outbox Delivery — Phase 1
 
 > **Status: Phase 1 implemented locally (20 November 2026), dead-letter admin
-> API added 22 November 2026, disabled by default.** Migration #9 adds
-> retry/dead-letter columns and the tenant-ID directory. The `outbox-dispatch`
-> Bull sweep is wired into the API and was proven against a local HTTP sink:
-> **5/5** e2e checks (valid HMAC + `publishedAt`, a 500 retry followed by
-> success, a permanent 4xx dead-letter, no redelivery after publication, and an
-> ADMIN-only list/requeue of a dead letter under RLS). The dispatcher stays idle
-> unless both `OUTBOX_WEBHOOK_URL` and `OUTBOX_WEBHOOK_SECRET` are set. No real
-> external target is configured, so external delivery is still unproven.
+> API added 22 November 2026, optional payload-free dead-letter alerting added
+> 23 November 2026; disabled by default.** Migration #9 adds retry/dead-letter
+> columns and the tenant-ID directory. The `outbox-dispatch` Bull sweep is wired
+> into the API and was proven against a local HTTP sink: **5/5** e2e checks
+> (valid HMAC + `publishedAt`, a 500 retry followed by success, a permanent 4xx
+> dead-letter, no redelivery after publication, and an ADMIN-only list/requeue
+> of a dead letter under RLS). The same sink also received a payload-free,
+> HMAC-signed dead-letter alert. The dispatcher stays idle unless both
+> `OUTBOX_WEBHOOK_URL` and `OUTBOX_WEBHOOK_SECRET` are set; the alerter is idle
+> unless both `OUTBOX_ALERT_WEBHOOK_URL` and `OUTBOX_ALERT_WEBHOOK_SECRET` are
+> set. No real external target is configured, so external delivery is still
+> unproven.
 
 ## 1. Why this exists
 
@@ -28,8 +32,9 @@ Current writers:
 
 Bull now has two processors: the tenant-scoped `exam-expiry` worker and the
 opt-in `outbox-dispatch` sweep. There is still no reconciliation worker. The
-dead-letter administration API is tenant-scoped and ADMIN-only; there is no
-dead-letter UI yet.
+dead-letter administration API is tenant-scoped and ADMIN-only, and an optional
+operator alert webhook can receive a payload-free dead-letter notice; there is
+no dead-letter UI yet.
 
 ## 2. Constraints
 
@@ -186,7 +191,34 @@ retry only makes the event eligible for the next sweep — if
 `OUTBOX_WEBHOOK_URL`/`OUTBOX_WEBHOOK_SECRET` are unset, the dispatcher remains
 idle and the row stays pending.
 
-### 4.5 Idempotency and ordering
+### 4.5 Dead-letter alerting (23 November 2026)
+
+`OutboxDeadLetterAlerter` sends one best-effort POST after an event transitions
+to dead-letter. It is intentionally separate from `OUTBOX_WEBHOOK_URL`: the
+delivery target receives business events, while the alert target receives a
+small operational notice. It is disabled unless both variables are set:
+
+| Variable | Purpose |
+| --- | --- |
+| `OUTBOX_ALERT_WEBHOOK_URL` | Operator alert endpoint. Deployment configuration only; never tenant input. |
+| `OUTBOX_ALERT_WEBHOOK_SECRET` | HMAC-SHA256 signing secret for the alert body. |
+
+The alert body contains `alert`, `tenantId`, `eventId`, `eventType`, `attempt`,
+`error`, and `deadAt`. It deliberately omits the event payload, aggregate ID,
+user IDs, PII, and credentials. Headers:
+
+```text
+X-SANAD-Alert-Id:  <event id>
+X-SANAD-Timestamp: <unix seconds>
+X-SANAD-Signature: sha256=<HMAC-SHA256(timestamp + "." + raw body)>
+```
+
+Alerting is best-effort: a non-2xx, timeout, or network failure is logged and
+does not change the dead-letter row or fail the sweep. The event remains visible
+to the ADMIN-only list/retry API. Alert delivery is not retried or queued; a
+receiver should treat it as a notification, not the source of truth.
+
+### 4.6 Idempotency and ordering
 
 - Consumers must deduplicate on `event.id`; the dispatcher guarantees
   at-least-once, not exactly-once.
@@ -196,19 +228,21 @@ idle and the row stays pending.
 - `payment.paid` and `refund.succeeded` already carry stable aggregate IDs and
   money as strings; the envelope preserves that shape.
 
-### 4.6 Observability
+### 4.7 Observability
 
 - aggregate sweep log: tenants, examined, delivered, retried, dead, failed
   tenants;
 - one warning per dead-lettered event: tenant ID, event ID, event type,
   attempt, error code; no payload, no PII, no secret;
-- the local e2e test asserts the receiver saw the signed body and that
-  `publishedAt`/`deadAt`/`retryCount` match the delivery outcome;
+- optional payload-free alert webhook with HMAC; success and failure are logged;
+- the local e2e test asserts the receiver saw the signed delivery body and the
+  signed alert body, and that `publishedAt`/`deadAt`/`retryCount` match the
+  delivery outcome;
 - dead-letter list/retry is available to ADMINs through the tenant-scoped API;
   every retry is recorded in `audit_logs`;
-- counters (when a metrics backend exists): delivered, retried, dead;
-- `pnpm demo:doctor` does not yet assert outbox health; a dead-letter alert is
-  a follow-up.
+- counters (when a metrics backend exists): delivered, retried, dead, alerted;
+- `pnpm demo:doctor` does not yet assert outbox health; a paging provider and a
+  dead-letter UI remain follow-ups.
 
 ## 5. Rollout plan
 
@@ -220,7 +254,8 @@ idle and the row stays pending.
    dead-letter paths.
 3. **Local sink.** ✅ A local HTTP receiver ran inside the e2e test: one
    delivery with a valid HMAC and `publishedAt`, a forced 500 retry followed by
-   success, a permanent 4xx dead-letter, and no redelivery after publication.
+   success, a permanent 4xx dead-letter, no redelivery after publication, and a
+   payload-free HMAC alert when that event dead-lettered.
 4. **Live proof.** ⬜ Configure a real target and repeat the same checks; record
    event IDs, HTTP statuses, retry counts, and final `publishedAt`.
 5. **Only then** update the public claim from “implemented locally, disabled by
@@ -242,14 +277,16 @@ idle and the row stays pending.
       is not visible.
 - [x] A dead-letter retry resets the retry budget and writes an audit row
       without the payload.
-- [x] No payload or credential appears in logs or admin responses.
+- [x] A newly dead-lettered event produces a payload-free HMAC alert; an alert
+      receiver failure is logged and does not alter the dead-letter row or fail
+      the sweep.
+- [x] No payload or credential appears in logs, alert bodies, or admin responses.
 - [ ] A real payment/refund event is delivered to an external target.
 - [x] `pnpm build`, API tests, web tests, RLS e2e, and the local outbox e2e pass;
-      API **412/412** (45 suites), outbox e2e **5/5**, RLS **5/5**, live smoke
-      **8/8**, and `pnpm demo:doctor` **10/10** passed on 22 November 2026 after
-      the dead-letter admin release; live smoke **8/8** and doctor **10/10** were
-      re-run on 23 November 2026 after the tunnel fallback sync. The API is local,
-      so no Vercel redeploy was required for this release.
+      API **416/416** (46 suites), outbox e2e **5/5**, RLS **5/5**, live smoke
+      **8/8**, and `pnpm demo:doctor` **10/10** passed on 22-23 November 2026
+      after the dead-letter admin and alerting releases. The API is local, so no
+      Vercel redeploy was required for the API change.
 
 ## 7. Non-goals
 
@@ -257,6 +294,8 @@ idle and the row stays pending.
 - A full event bus, schema registry, or Kafka replacement.
 - Per-tenant webhook configuration in phase 1.
 - A dead-letter administration UI.
+- Guaranteed alert delivery or an alert retry queue; alerts are best-effort and
+  the dead-letter row remains the source of truth.
 - Reconciliation of payment provider state (separate worker).
 
 ## 8. Open decisions
@@ -265,10 +304,14 @@ idle and the row stays pending.
    service, teacher webhook, or an operations sink)? Phase 1 exposes one generic
    `OUTBOX_WEBHOOK_URL`; a real target is still pending.
 2. Whether per-tenant endpoints are needed before the judging deadline.
-3. Whether a dead-letter UI is needed; the ADMIN-only API is implemented, but
+3. Which alert channel an operator should use (generic webhook now; email or a
+   paging provider later). The webhook contract is local-sink-proven, not
+   configured against a real external alert target.
+4. Whether a dead-letter UI is needed; the ADMIN-only API is implemented, but
    there is no screen yet.
 
 The correct current claim is: **outbox delivery is implemented locally,
 disabled by default, and proven against a local sink; a tenant-scoped,
-ADMIN-only dead-letter list/retry API exists; external delivery is not yet
-proven.**
+ADMIN-only dead-letter list/retry API exists; a payload-free HMAC alert webhook
+is implemented and local-sink-proven; external delivery and external alerting
+are not yet proven.**

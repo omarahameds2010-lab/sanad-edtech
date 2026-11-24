@@ -5,6 +5,7 @@ import { runWithTenantId } from "../src/common/prisma/tenant-context";
 import { AuditService } from "../src/modules/audit/audit.service";
 import { HttpOutboxTransport } from "../src/modules/outbox/http-outbox.transport";
 import { OutboxAdminService } from "../src/modules/outbox/outbox-admin.service";
+import { OutboxDeadLetterAlerter } from "../src/modules/outbox/outbox-dead-letter-alerter";
 import { OutboxDispatcherService } from "../src/modules/outbox/outbox-dispatcher.service";
 import { OutboxService } from "../src/modules/outbox/outbox.service";
 import { PrismaService } from "../src/modules/tenants/prisma.service";
@@ -24,6 +25,7 @@ const ENABLED = process.env.OUTBOX_E2E === "1" && Boolean(ADMIN_URL && APP_URL);
 const describeOutbox = ENABLED ? describe : describe.skip;
 
 const SECRET = "outbox-e2e-secret";
+const ALERT_SECRET = "outbox-alert-e2e-secret";
 
 interface SinkRequest {
   body: string;
@@ -41,10 +43,12 @@ describeOutbox("Outbox delivery (real DB + local HTTP sink)", () => {
   let tenantId: string;
   let sinkMode: "ok" | "500" | "400" = "ok";
   const requests: SinkRequest[] = [];
+  const alertRequests: SinkRequest[] = [];
 
   beforeAll(async () => {
     process.env.DATABASE_URL = APP_URL;
     process.env.OUTBOX_WEBHOOK_SECRET = SECRET;
+    process.env.OUTBOX_ALERT_WEBHOOK_SECRET = ALERT_SECRET;
     process.env.OUTBOX_WEBHOOK_TIMEOUT_MS = "2000";
 
     admin = new PrismaClient({ datasources: { db: { url: ADMIN_URL } } });
@@ -59,19 +63,27 @@ describeOutbox("Outbox delivery (real DB + local HTTP sink)", () => {
 
     server = createServer(async (req, res) => {
       const body = await readBody(req);
-      requests.push({ body, headers: req.headers });
-      const status = sinkMode === "ok" ? 200 : Number(sinkMode);
+      const isAlert = req.url?.startsWith("/alert") ?? false;
+      if (isAlert) {
+        alertRequests.push({ body, headers: req.headers });
+      } else {
+        requests.push({ body, headers: req.headers });
+      }
+      const status = isAlert ? 200 : sinkMode === "ok" ? 200 : Number(sinkMode);
       res.statusCode = status;
       res.setHeader("Content-Type", "application/json");
       res.end(JSON.stringify({ ok: status === 200 }));
     });
-    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    await new Promise<void>((resolve) =>
+      server.listen(0, "127.0.0.1", resolve),
+    );
     const address = server.address();
     if (!address || typeof address === "string") {
       throw new Error("outbox-e2e-sink-did-not-bind");
     }
     sinkUrl = `http://127.0.0.1:${address.port}/outbox`;
     process.env.OUTBOX_WEBHOOK_URL = sinkUrl;
+    process.env.OUTBOX_ALERT_WEBHOOK_URL = `http://127.0.0.1:${address.port}/alert`;
 
     appPrisma = new PrismaService();
     await appPrisma.onModuleInit();
@@ -80,14 +92,19 @@ describeOutbox("Outbox delivery (real DB + local HTTP sink)", () => {
       appPrisma,
       outbox,
       new HttpOutboxTransport(),
+      new OutboxDeadLetterAlerter(),
     );
-    adminService = new OutboxAdminService(appPrisma, new AuditService(appPrisma));
+    adminService = new OutboxAdminService(
+      appPrisma,
+      new AuditService(appPrisma),
+    );
   }, 30_000);
 
   afterEach(async () => {
     await admin.outboxEvent.deleteMany({ where: { tenantId } });
     await admin.auditLog.deleteMany({ where: { tenantId } });
     requests.length = 0;
+    alertRequests.length = 0;
     sinkMode = "ok";
   });
 
@@ -104,6 +121,8 @@ describeOutbox("Outbox delivery (real DB + local HTTP sink)", () => {
     }
     delete process.env.OUTBOX_WEBHOOK_URL;
     delete process.env.OUTBOX_WEBHOOK_SECRET;
+    delete process.env.OUTBOX_ALERT_WEBHOOK_URL;
+    delete process.env.OUTBOX_ALERT_WEBHOOK_SECRET;
     delete process.env.OUTBOX_WEBHOOK_TIMEOUT_MS;
   });
 
@@ -133,6 +152,7 @@ describeOutbox("Outbox delivery (real DB + local HTTP sink)", () => {
 
     expect(result.failedTenants).toBe(0);
     expect(requests).toHaveLength(1);
+    expect(alertRequests).toHaveLength(0);
     const request = requests[0];
     const body = request.body;
     const headers = request.headers;
@@ -171,6 +191,7 @@ describeOutbox("Outbox delivery (real DB + local HTTP sink)", () => {
     expect(afterFailure.retryCount).toBe(1);
     expect(afterFailure.nextAttemptAt).not.toBeNull();
     expect(afterFailure.lastError).toBe("http-500");
+    expect(alertRequests).toHaveLength(0);
 
     await admin.outboxEvent.update({
       where: { id },
@@ -199,6 +220,29 @@ describeOutbox("Outbox delivery (real DB + local HTTP sink)", () => {
     expect(stored.publishedAt).toBeNull();
     expect(stored.deadAt).not.toBeNull();
     expect(stored.lastError).toBe("http-400");
+
+    expect(alertRequests).toHaveLength(1);
+    const alert = alertRequests[0];
+    const alertBody = alert.body;
+    const alertTimestamp = alert.headers["x-sanad-timestamp"] as string;
+    const alertSignature = alert.headers["x-sanad-signature"] as string;
+    const expectedAlertSignature = createHmac("sha256", ALERT_SECRET)
+      .update(`${alertTimestamp}.${alertBody}`)
+      .digest("hex");
+    expect(alert.headers["x-sanad-alert-id"]).toBe(id);
+    expect(alertSignature).toBe(`sha256=${expectedAlertSignature}`);
+    const alertPayload = JSON.parse(alertBody);
+    expect(alertPayload).toEqual(
+      expect.objectContaining({
+        alert: "outbox.dead_letter",
+        tenantId,
+        eventId: id,
+        eventType: "e2e.outbox.test",
+        attempt: 1,
+        error: "http-400",
+      }),
+    );
+    expect(alertPayload).not.toHaveProperty("payload");
   });
 
   it("lists and requeues a dead letter through the admin service", async () => {
